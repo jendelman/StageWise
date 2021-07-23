@@ -4,14 +4,23 @@
 \alias{Stage2}
 \title{Stage 2 analysis of multi-environment trials}
 \usage{
-Stage2(data, traits, fixed = NULL, silent = TRUE, workspace = "500mb")
+Stage2(
+  data,
+  vcov = NULL,
+  geno = NULL,
+  fix.eff.marker = NULL,
+  silent = TRUE,
+  workspace = "500mb"
+)
 }
 \arguments{
 \item{data}{data frame of BLUEs from Stage 1 (see Details)}
 
-\item{traits}{names of traits, matching columns in \code{data}}
+\item{vcov}{list of variance-covariance matrices for the BLUEs}
 
-\item{fixed}{optional names of fixed effects, matching columns in \code{data}}
+\item{geno}{output from \code{\link{read_geno}}}
+
+\item{fix.eff.marker}{markers in \code{geno} to include as additive fixed effect covariates}
 
 \item{silent}{TRUE/FALSE, whether to suppress ASReml-R output}
 
@@ -21,18 +30,25 @@ Stage2(data, traits, fixed = NULL, silent = TRUE, workspace = "500mb")
 List containing
 \describe{
 \item{aic}{AIC}
-\item{vars}{variances}
-\item{fixed}{fixed effects}
-\item{cov.mat}{genetic variance-covariance matrix for the traits or locations}
+\item{vars}{variances, as variable of class \code{\link{class_var}}}
+\item{fixed}{Fixed effect estimates for env and markers}
+\item{random}{Random effect predictions}
 \item{uniplot}{uniplot of the genetic correlation between locations}
-\item{MME}{variable of class \code{\link{MME}} for use with \code{\link{predict_MME}}}
 }
 }
 \description{
 Stage 2 analysis of multi-environment trials
 }
 \details{
-Stage 2 of the two-stage approach described by Damesa et al. 2017, using ASReml-R for variance component estimation (license is required). The variable \code{data} has two mandatory column names: id = individual (genotype identifier), and env = environment at which Stage 1 analysis was performed. The argument \code{traits} is a character vector that must match column names in \code{data}. Missing data are allowed in the multi-trait but not the single-trait analysis. For single-trait analysis, an additional random effect can be included to partition the residual and GxE effects. The variance-covariance matrix of this effect must be named Omega (following notation from Damesa et al. 2017) and defined globally in the workspace, rather than passing it to the function (this is due to limitations with ASReml-R). The function \code{\link{Stage2_prep}} can be used to prepare both \code{data} and Omega. By default, the model includes independent random effects for genotype (id). Additional genetic effects with specific covariance structure (such as the G matrix for genomic breeding values) can be included using the argument \code{kernels}, which is a vector of variable names (for example, "G") defined in the global environment. (Do not use the name "I" for a kernel; it is reserved for the independent genetic effect.) All individuals in \code{data} must be present in the kernel matrices, but the kernels can contain individuals not in \code{data} to make predictions for unphenotyped individuals using \code{\link{predict_MME}}. All kernel matrices must have the same rownames attribute. For numerical stability when inverting the kernel matrices, a small positive number (1e-5) is added to the diagonal elements. By default, the workspace memory for ASReml-R is set at 500mb. If you get an error about insufficient memory, try increasing it. ASReml-R version 4.1.0.148 or later is required. For kernel matrix K, the variance reported in \code{vars} equal the variance component times the mean of the diagonal elements of ZKZ', to facilitate proper calculation of the proportion of variance.
+Stage 2 of the two-stage approach described by Damesa et al. 2017, using ASReml-R for variance component estimation. The variable \code{data} has three mandatory column: id, env, BLUE. Optionally, \code{data} can have a column labeled "loc", which changes the main effect for genotype into a separable genotype-within-location effect, using a FA2 covariance model for the locations. Optionally, \code{data} can have a column labeled "trait", which introduces an unstructured covariance model for the traits. The multi-location and multi-trait analyses cannot be combined. Missing data are allowed in the multi-trait but not the single-trait analysis. 
+
+The argument \code{vcov} is used to partition the macro- and micro-environmental variation, which are called GxE and residual in the output. \code{vcov} is a named list of variance-covariance matrices for the BLUEs within each environment, with id on the rownames. The order in \code{vcov} and \code{data} should match. Both \code{data} and \code{vcov} can be created using the function \code{\link{Stage1}}. 
+
+Because ASReml-R can only use relationship matrices defined in the global environment, this function creates and then removes global variables when either \code{vcov} or \code{geno} is used.
+
+The argument \code{geno} is used to partition genetic values into additive and non-additive (g.resid) components. Any individuals in \code{data} that are not present in \code{geno} are discarded. For kernel matrix K, the variance reported in \code{vars} equal the variance component times the mean of the diagonal elements of ZKZ', to facilitate proper calculation of the proportion of variance.
+
+By default, the workspace memory for ASReml-R is set at 500mb. If you get an error about insufficient memory, try increasing it. ASReml-R version 4.1.0.148 or later is required.
 }
 \references{
 Damesa et al. 2017. Agronomy Journal 109: 845-857. doi:10.2134/agronj2016.07.0395

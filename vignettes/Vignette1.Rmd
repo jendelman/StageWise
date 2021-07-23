@@ -1,0 +1,287 @@
+---
+title: "Vignette 1: StageWise analysis of a single trait at one location"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{StageWise Vignette1}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE,warning=FALSE,comment="##",
+                      fig.width=4,fig.height=4,dpi=150)
+```
+
+There are four core functions in the package:
+
+* `read_geno`
+
+* `Stage1`
+
+* `Stage2`
+
+* `blup`
+
+Both `Stage1` and `Stage2` utilize ASReml-R (version 4.1.0.148 or later), which requires a license from [VSN International](https://www.vsni.co.uk/software/asreml-r). 
+
+### Marker data
+
+The first function, `read_geno`, reads bi-allelic marker data as a CSV file. If you intend to run GWAS, use the option `map=TRUE` and use the first three columns of the input file for marker name, chromosome, and position, followed by columns for the individuals. If you will only use the software for genomic prediction, you can use `map=FALSE`, in which case the first column is the marker name and subsequent columns are individuals. The marker data should represent allele dosage, with numeric values between 0 and ploidy allowed.
+
+The example dataset contains marker data for 958 tetraploid potato clones from the US round white market class, which is used to make potato chips. It is an updated version of the dataset published by [Endelman et al. (2018)](https://doi.org/10.1534/genetics.118.300685). Our genotyping platform for tetraploid potato has been an Infinium SNP array. Most of the clones in this dataset were genotyped with Version 3 (V3) of the array, but some were genotyped with an earlier version (V2). Data from the two different versions were combined using the function `merge_impute` from R package [polyBreedR](https://github.com/jendelman/polyBreedR). The imputation procedure is based on BLUP and generates fractional values of allele dosage, which poses no difficulty for estimating breeding values. 
+
+```{r}
+geno.file <- system.file("vignette_data", "geno1.csv", package = "StageWise")
+geno <- read.csv(geno.file,check.names=F)
+geno[1:4,1:6]
+
+library(StageWise)
+geno <- read_geno(filename=geno.file,ploidy=4,map=TRUE)
+``` 
+
+The function `read_geno` computes the additive relationship (G) matrix and its inverse, which can take some time for large datasets. These matrices and other information needed for the `Stage2` and `blup` functions are stored in the returned object as an S4 class. 
+
+### Stage 1
+
+In Stage 1, the data for each environment are analyzed independently, which allows for the selection of different models tailored to different experimental designs and patterns of spatial variation. As there are many publications and software resources on this topic, there was no reason to duplicate this functionality in StageWise, and the `Stage2` function can easily accommodate the output from other software (more below). 
+
+For completeness, however, a simple `Stage1` function is provided to analyze datasets with at least some replicated entries. (If your data are unreplicated within environment, this is discussed below for `Stage2`.)  There are two required columns in the CSV file of phenotype data used in `Stage1`: 'id' contains the individual identifier and is matched against the information from the genotype input file; and 'env' is the name of the environment, which is typically a location x year combination. (This vignette illustrates the analysis of multiple years from one location, or when multiple locations are similar enough that the genotype x location effect can be neglected. For the analysis of correlated locations, consult [Vignette 2](https://jendelman.github.io/StageWise/Vignette2.html) after you complete this vignette.) The other columns in the input file contain traits, cofactors, or covariates.
+
+The phenotypes for this tutorial are based on six years (2015-2020) of variety trials at the Hancock Research Station of the University of Wisconsin. A mixture of augmented and partially replicated designs have been used with incomplete blocks. Four traits are included: 
+
+* total yield ($Mg$ $ha^{-1}$) 
+
+* vine maturity (1=early to 9=late)
+
+* specific gravity
+
+* fry color, measured in units of Hunter Lightness ($L$) after 6 months of storage
+
+The data file also contains the stand count for each plot (out of 15 total plants), which is included as a covariate in the Stage 1 model. 
+
+```{r, fig.width=4,fig.height=3}
+pheno.file <- system.file("vignette_data", "pheno1.csv", package = "StageWise")
+pheno <- read.csv(pheno.file)
+head(pheno)
+
+library(ggplot2)
+ggplot(data=pheno,aes(x=env)) + geom_bar() + ylab("Number of plots") + 
+  xlab("Environment") + theme(axis.text.x=element_text(angle=45,hjust=1,size=10)) + theme_bw()
+```
+
+As is typical of breeding trials, the majority of clones were tested in one year and then dropped, but there is sufficient replication across years to estimate genotype x env interactions.
+```{r}
+tab <- table(pheno$id,pheno$env)
+env.per.id <- apply(tab,1,function(x){sum(x>0)})
+replicated <- names(env.per.id)[env.per.id > 1]
+
+#Number of clones tested in more than one env
+sapply(tapply(pheno$id,pheno$env,intersect,y=replicated),length)
+```
+
+A data frame with variables 'name', 'fixed', and 'factor' is used to specify which columns of the input file should be included as covariates or cofactors, and whether the effects are fixed or random. For analysis of the trait 'total.yield', 'block' and 'stand.count' will be included as fixed effects, and as cofactor and covariate, respectively:
+```{r}
+effects <- data.frame(name=c('block','stand.count'),
+                      fixed=c(TRUE,TRUE),
+                      factor=c(TRUE,FALSE))
+effects
+
+ans1 <- Stage1(filename=pheno.file,
+               traits='total.yield',effects=effects)
+```
+
+The `Stage1` function returns a list with several types of results. List element 'blue' is a data frame of the individual BLUEs per environment, and 'H2' is the broad-sense heritability on a plot basis per environment.
+
+```{r}
+head(ans1$blue)
+ans1$H2
+```
+
+To check for outliers and normality of the residuals, use the plots contained in list element 'resid':
+
+```{r}
+ans1$resid$boxplot
+ans1$resid$qqplot
+```
+
+
+### Stage 2
+
+The `Stage2` function uses the BLUEs from Stage 1 as the response variable, as well as their variance-covariance matrix to partition micro-environmental variation from GxE. These two pieces of information are contained in the output from `Stage1` as 'blue' and 'vcov', respectively, and they are also easily extracted from ASReml-R, [sommer](), [SpATS](), etc., if one of these packages has been used for Stage 1 analysis (e.g., to use spatial models). 
+
+It is also possible to run `Stage2` without the covariance of the BLUEs from Stage 1, which is necessary when there are no replicated entries within environment. In this case, use `vcov=NULL`. The benefit of including the covariance information is reflected in the lower value of AIC, which is a penalized likelihood to measure goodness-of-fit.
+
+```{r}
+ans2a <- Stage2(data=ans1$blue,vcov=NULL)
+ans2b <- Stage2(data=ans1$blue,vcov=ans1$vcov)
+
+data.frame(vcov=c(FALSE,TRUE),AIC=c(ans2a$aic,ans2b$aic))
+```
+
+The above Stage 2 analysis did not include the marker data. To partition the genotype effects into additive and residual genetic (including non-additive) effects, the output from `read_geno` is included in the function call, and the resulting model has even lower AIC:
+
+```{r}
+ans2c <- Stage2(data=ans1$blue,vcov=ans1$vcov,geno=geno)
+ans2c$aic
+```
+
+Several other pieces of information are in the list output from `Stage2`. The variance components are contained in 'vars' as an S4 class, which is used by the `blup` function. The `summary` command can be used to report the partitioning of variance:
+
+```{r}
+summary(ans2a$vars)
+summary(ans2b$vars)
+summary(ans2c$vars)
+```
+
+The above results show the progression of variance partitioning as more effects are included in the model. Including the covariance of the BLUEs enables splitting of the multi-environment residual into GxE and within-environment residual, and in this example we also observe some reapportionment of the main effect for genotype vs. GxE. When the marker data are included, the genotype effect is separated into additive and residual genetic (g.resid) components; the latter is a random effect with zero covariance, which includes non-additive effects but also potentially additive effects because the G matrix computed from markers is only an estimate of the true covariance matrix. The residual variance changed when the marker data were included because some entries in the phenotype dataset are not present in the genotype file and were therefore automatically excluded by `Stage2`. 
+
+Using the proportion of additive variance from the summary table, the average narrow-sense (genomic) heritability based on data from one environment is estimated at 0.29:
+
+```{r}
+v <- summary(ans2c$vars)
+v/sum(v)
+```
+
+Let's see how this compares with the other 3 traits:
+
+```{r}
+h2 <- matrix(nrow=4,ncol=4)
+traits <- c("total.yield","spec.grav","fry.color","vine.maturity")
+colnames(h2) <- traits
+rownames(h2) <- rownames(v)
+
+#initialize lists 
+ans1 <- ans2 <- vector("list",length = 4)
+names(ans1) <- names(ans2) <- traits
+for (i in 1:4) {
+  ans1[[i]] <- Stage1(pheno.file,traits=traits[i],effects=effects)
+  ans2[[i]] <- Stage2(data=ans1[[i]]$blue,vcov=ans1[[i]]$vcov,geno=geno)
+  v <- summary(ans2[[i]]$vars)
+  h2[,i] <- v/sum(v)
+}
+round(h2,2)
+```
+
+Specific gravity had the highest narrow-sense (0.46) and broad-sense (0.66) heritability of the four traits.
+
+`Stage2` also returns the fixed effect estimates for each environment and the predicted random effects, or BLUPs. The additive effects approximate the breeding values and can be used for genomic selection of parents. For variety selection based on total genotypic value, the additive and residual genetic effects should be added together (which is done automatically by the `blup` function discussed below). 
+
+```{r}
+ans2[["total.yield"]]$fixed$env
+head(ans2[["total.yield"]]$random)
+
+BV <- data.frame(id=character(0))
+for (i in 1:4) {
+  tmp <- ans2[[i]]$random[,c("id","add")]
+  colnames(tmp) <- c("id",traits[i])
+  BV <- merge(BV,tmp,all=T)
+}
+BV.mat <- as.matrix(BV[,-1])
+rownames(BV.mat) <- BV[,1]
+
+round(cor(BV.mat,use = "pairwise.complete"),2)
+```
+
+The above matrix shows the pairwise correlations of the predicted additive values, which can provide a rough estimate of the genetic correlation. For a more accurate estimate of the correlations, a multivariate analysis can be conducted, which is the topic of [Vignette 3](https://jendelman.github.io/StageWise/Vignette3.html). The result indicates a substantial (r = 0.46) correlation between yield and late maturity, which is an undesirable tradeoff present in many crops. A selection index is the most efficient way to optimize this tradeoff and is discussed in Vignette 3.
+
+### Marker-based vs. Marker-assisted genomic predictions
+
+The `Stage2` function returns the predicted random effects for all individuals in the training set (i.e., those with phenotypes and genotypes). It also returns the estimated variances in 'vars', which can be passed to the function `blup` to make predictions for individuals that were not in the training set. This is called marker-based prediction, as opposed to marker-assisted prediction for the training set individuals. The simplest way to make this prediction is to include the genotypes of the selection candidates in the same marker data file as the training set. The function call for this scenario is
+
+```{r}
+blup1 <- blup(data=ans1$total.yield$blue,
+              vcov=ans1$total.yield$vcov,
+              geno=geno,
+              vars=ans2$total.yield$vars,
+              reliability=TRUE)
+head(blup1)
+```
+
+The argument `reliability=TRUE` indicates that the function should return not only the predicted breeding values (BV) and genotypic values (GV) but also their reliability (designated r2), which is the squared correlation between the true and predicted values (assuming the model is correct). The reliability calculation requires inversion of the coefficient matrix of the mixed model equations, which is more computationally demanding than the BLUP calculation and can be skipped by using `reliability=FALSE`. 
+
+Previous studies have shown that the reliability of genomic prediction depends largely on the number of close relationships for each individual, which can be quantified by the 95th (or other suitably high) percentile of its G matrix coefficients. 
+
+```{r, fig.height=3,fig.width=4}
+tab <- table(pheno$id)
+Gtmp <- G
+diag(Gtmp) <- NA
+data2 <- data.frame(id=rownames(G),
+                    G95=apply(Gtmp,1,quantile,probs=0.95,na.rm=T),
+                    plots=as.integer(tab[rownames(G)]))
+
+combo <- merge(data2,add.pred)
+ggplot(combo,aes(x=G95,y=r2,colour=plots)) + geom_point() +
+  scale_y_continuous("Reliability",limits=c(0.4,1),breaks=seq(0.4,1,by=0.2),labels=seq(0.4,1,by=0.2))
+```
+
+
+Inversion of the MME coefficient matrix enables computation of the reliability ($r^2$) of the BLUPs, which is the expected squared correlation between the true and predicted values. This quantity is analogus to narrow-sense $h^2$ and is an alternative to cross-validation (CV) for assessing genomic prediction accuracy. Cross-validation tends to underestimate prediction accuracy because the data used for validation are not true breeding values (to compensate, the correlation can be divided by narrow-sense $h$). On the other hand, reliability from the MME tends to overestimate accuracy because it assumes the model is correct.
+
+```{r,fig.height=4,fig.width=4}
+add.pred <- predict_MME(data=ans2$MME,weights=c(I=0,G=1))
+head(add.pred[order(add.pred$blup,decreasing=T),]) #Top yielders
+
+clonal.pred <- predict_MME(data=ans2$MME,weights=c(I=1,G=1))
+
+combo <- merge(clonal.pred,add.pred,by="id")
+
+ggplot(data=combo,aes(x=blup.x,y=blup.y)) + geom_point() + ylab(expression("Additive Yield"~(Mg~ha^-1))) + 
+  xlab("Clonal Yield"~(Mg~ha^-1)) + geom_abline(slope=1,intercept=0,colour="red") + stat_smooth(method=lm) + theme_bw()
+```
+
+The above plot compares the predicted additive and clonal values. The slope of the regression line (blue) is less than 1 (shown in red) and represents the additive proportion of the clonal value.
+
+Previous studies have shown that the reliability of genomic prediction depends largely on the number of close relationships for each clone, which can be quantified by the 95th (or other suitably high) percentile of its G coefficients. 
+
+```{r, fig.height=3,fig.width=4}
+tab <- table(pheno$id)
+Gtmp <- G
+diag(Gtmp) <- NA
+data2 <- data.frame(id=rownames(G),
+                    G95=apply(Gtmp,1,quantile,probs=0.95,na.rm=T),
+                    plots=as.integer(tab[rownames(G)]))
+
+combo <- merge(data2,add.pred)
+ggplot(combo,aes(x=G95,y=r2,colour=plots)) + geom_point() +
+  scale_y_continuous("Reliability",limits=c(0.4,1),breaks=seq(0.4,1,by=0.2),labels=seq(0.4,1,by=0.2))
+```
+
+Because these are *marker-assisted* predictions, meaning they also utilize phenotypic data for the selection candidates, the number of phenotype measurements (i.e., plots) for each clone also contributes to accuracy (see above figure). The average reliability of the predicted additive values for FY3 entries, based on a single plot, is 0.62 vs. only 0.31 for the narrow-sense $h^2$.
+
+```{r}
+#Average reliability based on one plot
+mean(combo$r2[combo$plots==1])
+```
+
+polyBreedR has two ways to make *marker-based* predictions, i.e., for individuals without phenotype data. In a real situation (as opposed to cross-validation), the G matrix will contain individuals for which BLUEs are not available in the data frame provided to `Stage2`, and predictions for these individuals will be present in the output from `predict_MME`. For cross-validation exercises, it is more efficient to mask the phenotypes of individuals using the argument "mask" in `predict_MME`, rather than re-estimating variances for each partition of the dataset using `Stage2`. 
+
+To illustrate, we will mask phenotypes for the clones in the 2020 preliminary yield trial (Field Year 3), which all start with the prefix "W17". 
+
+```{r,fig.height=3,fig.width=4}
+W17 <- blue$id[grep("W17",blue$id,fixed=T)]
+add.pred.W17 <- predict_MME(data=ans2$MME,weights=c(I=0,G=1),
+                            mask=data.frame(id=W17))
+
+combo <- merge(add.pred.W17,add.pred,by="id")[,c("id","r2.x","r2.y")]
+combo$group <- ifelse(combo$id %in% W17,"W17","Remainder") 
+ggplot(combo,aes(x=r2.x,y=r2.y,colour=group)) + geom_point() + geom_abline(intercept=0,slope=1) + 
+  xlab(expression(r^2~"(-W17 phenotypes)")) + ylab(expression(r^2~"(+W17 phenotypes)")) + scale_colour_brewer(palette="Set1")
+```
+
+The above figure compares the reliability of the predicted additive values with (y-axis) and without (x-axis) phenotypes for the W17 group (black line = slope of 1). The reliability is substantially higher for the W17 clones when their phenotype data are included, which reinforces the difference between marker-assisted and marker-based predictions. For the rest of the population, there is a slight advantage to including the W17 phenotypes because they increase the training population size.
+
+To estimate accuracy by cross-validation, the correlation between the predicted and observed values for the W17 group is divided by the square-root of the narrow-sense $h^2$. The result of 0.49 is lower than the square-root of the mean reliability = 0.72, and the true value may be somewhere in between.
+
+```{r}
+#Predictive ability
+pred.ability <- cor(blue$total.yield[match(W17,blue$id)],add.pred.W17$blup[match(W17,add.pred.W17$id)])
+
+#Prediction accuracy by cross-validation
+pred.ability/sqrt(0.31)
+
+#Compared to square root of mean reliability
+sqrt(mean(add.pred.W17$r2[match(W17,add.pred.W17$id)]))
+```
+
+### Marker effects and GWAS
+

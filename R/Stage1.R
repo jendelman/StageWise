@@ -2,17 +2,15 @@
 #' 
 #' Computes genotype BLUEs within each environment using ASReml-R
 #' 
-#' The variable \code{data} must have one column labeled "id" for the individuals and one labeled "env" for the environments. The data for each environment are analyzed independently with a linear mixed model. Although not used in Stage1, to include a genotype x location effect in \code{\link{Stage2}}, a column labeled "loc" should be included in \code{data}. 
+#' The input file must have one column labeled "id" for the individuals and one labeled "env" for the environments. The data for each environment are analyzed independently with a linear mixed model. Although not used in Stage1, to include a genotype x location effect in \code{\link{Stage2}}, a column labeled "loc" should be present in the input file. 
 #' 
 #' Including multiple traits in \code{trait} triggers a multivariate analysis, but for computational reasons, only 2 traits are analyzed at a time. With more than 2 traits, the software analyzes all pairs of traits. For single trait analysis, broad-sense H2 on a plot basis is computed from the variance components for each env, with genotype as a random effect. The residuals from this analysis are also returned as a table and plots.
 #' 
-#' Argument \code{effects} is used to specify other i.i.d. effects besides genotype and has three columns: name, fixed, factor. The "name" column is a string that must match a column in \code{data}. The fixed column is a logical variable to indicate whether the effect is fixed (TRUE) or random (FALSE). The factor column is a logical variable to indicate whether the effect is a factor (TRUE) or numeric (FALSE). 
+#' Argument \code{effects} is used to specify other i.i.d. effects besides genotype and has three columns: name, fixed, factor. The "name" column is a string that must match a column in the input file. The fixed column is a logical variable to indicate whether the effect is fixed (TRUE) or random (FALSE). The factor column is a logical variable to indicate whether the effect is a factor (TRUE) or numeric (FALSE). 
 #' 
 #' Missing response values are omitted for single-trait analysis but retained for multi-trait analysis (unless both traits are missing), to allow for prediction in Stage 2. By default, the workspace and pworkspace limits for ASReml-R are set at 500mb. If you get an error about insufficient memory, try increasing the appropriate value (workspace for variance estimation and pworkspace for BLUE computation).
 #' 
-#' @references Damesa et al. 2017. Agronomy Journal 109: 845-857. doi:10.2134/agronj2016.07.0395
-#' 
-#' @param data input data frame (see Details)
+#' @param filename Name of CSV file
 #' @param traits trait names (see Details)
 #' @param effects data frame specifying other effects in the model (see Details)
 #' @param workspace memory limit for ASRreml-R variance estimation
@@ -27,13 +25,17 @@
 #' \item{resid}{list containing boxplot, qqplot, and table of residuals (only for single trait)}
 #' }
 #' 
-#' @importFrom stats complete.cases
-#' @importFrom utils combn
+#' @importFrom utils combn read.csv
 #' @import asreml
+#' @import ggplot2
+#' @importFrom rlang .data
+#' @importFrom stats resid
 #' @export
 
-Stage1 <- function(data,traits,effects=NULL,silent=TRUE,workspace="500mb",pworkspace="500mb") {
+Stage1 <- function(filename,traits,effects=NULL,
+                   silent=TRUE,workspace="500mb",pworkspace="500mb") {
   
+  data <- read.csv(file=filename,check.names=F)
   stopifnot(requireNamespace("asreml"))
   stopifnot(traits %in% colnames(data))
   n.trait <- length(traits)
@@ -113,6 +115,9 @@ Stage1 <- function(data,traits,effects=NULL,silent=TRUE,workspace="500mb",pworks
   if (n.trait==1) {
     H2 <- data.frame(env=envs,H2=as.numeric(NA))
   }
+  if ("loc" %in% colnames(data)) {
+    H2$loc <- data$loc[match(H2$env,data$env)]
+  }
 
   blue.out <- NULL
   blup.resid <- NULL
@@ -157,7 +162,7 @@ Stage1 <- function(data,traits,effects=NULL,silent=TRUE,workspace="500mb",pworks
     
     blue.out <- rbind(blue.out,data.frame(env=envs[j],tmp))
     vcov[[j]] <- predans$vcov
-    rownames(vcov[[j]]) <- colnames(vcov[[j]]) <- paste(tmp$id,tmp$env,sep=":")
+    dimnames(vcov[[j]]) <- list(tmp$id,tmp$id)
     
     if (n.trait==1) {
       ans <- eval(parse(text=blup.model))
@@ -178,13 +183,14 @@ Stage1 <- function(data,traits,effects=NULL,silent=TRUE,workspace="500mb",pworks
                           resid=resid(ans)))
     } 
   }
+  
   if ("loc" %in% colnames(data)) {
-    blue.out$loc <- as.character(data$loc[match(data$env,data$loc)])
+    blue.out$loc <- as.character(data$loc[match(blue.out$env,data$env)])
   }
   if (n.trait==1) {
-    p1 <- ggplot(data=blup.resid,aes(y=resid,x=env)) + ylab("Residual") + xlab("") +
+    p1 <- ggplot(data=blup.resid,aes(y=.data$resid,x=.data$env)) + ylab("Residual") + xlab("") +
       stat_boxplot(outlier.color="red") + theme_bw() + theme(axis.text.x=element_text(angle=90,vjust=0.5))
-    p2 <- ggplot(data=blup.resid,aes(sample=resid)) + stat_qq() + stat_qq_line() + facet_wrap(~env) + theme_bw() + xlab("Expected") + ylab("Observed")
+    p2 <- ggplot(data=blup.resid,aes(sample=.data$resid)) + stat_qq() + stat_qq_line() + facet_wrap(~env) + theme_bw() + xlab("Expected") + ylab("Observed")
     
     return(list(blue=blue.out,vcov=vcov,resid=list(boxplot=p1,qqplot=p2,table=blup.resid),H2=H2))
   } else {

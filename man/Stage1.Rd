@@ -5,7 +5,7 @@
 \title{Stage 1 analysis of multi-environment trials}
 \usage{
 Stage1(
-  data,
+  filename,
   traits,
   effects = NULL,
   silent = TRUE,
@@ -14,7 +14,7 @@ Stage1(
 )
 }
 \arguments{
-\item{data}{input data frame (see Details)}
+\item{filename}{Name of CSV file}
 
 \item{traits}{trait names (see Details)}
 
@@ -39,14 +39,11 @@ List containing
 Computes genotype BLUEs within each environment using ASReml-R
 }
 \details{
-The variable \code{data} must have one column labeled "id" for the individuals and one labeled "env" for the environments. The data for each environment are analyzed independently with a linear mixed model. Although not used in Stage1, to include a genotype x location effect in \code{\link{Stage2}}, a column labeled "loc" should be included in \code{data}. 
+The input file must have one column labeled "id" for the individuals and one labeled "env" for the environments. The data for each environment are analyzed independently with a linear mixed model. Although not used in Stage1, to include a genotype x location effect in \code{\link{Stage2}}, a column labeled "loc" should be present in the input file. 
 
 Including multiple traits in \code{trait} triggers a multivariate analysis, but for computational reasons, only 2 traits are analyzed at a time. With more than 2 traits, the software analyzes all pairs of traits. For single trait analysis, broad-sense H2 on a plot basis is computed from the variance components for each env, with genotype as a random effect. The residuals from this analysis are also returned as a table and plots.
 
-Argument \code{effects} is used to specify other i.i.d. effects besides genotype and has three columns: name, fixed, factor. The "name" column is a string that must match a column in \code{data}. The fixed column is a logical variable to indicate whether the effect is fixed (TRUE) or random (FALSE). The factor column is a logical variable to indicate whether the effect is a factor (TRUE) or numeric (FALSE). 
+Argument \code{effects} is used to specify other i.i.d. effects besides genotype and has three columns: name, fixed, factor. The "name" column is a string that must match a column in the input file. The fixed column is a logical variable to indicate whether the effect is fixed (TRUE) or random (FALSE). The factor column is a logical variable to indicate whether the effect is a factor (TRUE) or numeric (FALSE). 
 
 Missing response values are omitted for single-trait analysis but retained for multi-trait analysis (unless both traits are missing), to allow for prediction in Stage 2. By default, the workspace and pworkspace limits for ASReml-R are set at 500mb. If you get an error about insufficient memory, try increasing the appropriate value (workspace for variance estimation and pworkspace for BLUE computation).
-}
-\references{
-Damesa et al. 2017. Agronomy Journal 109: 845-857. doi:10.2134/agronj2016.07.0395
 }

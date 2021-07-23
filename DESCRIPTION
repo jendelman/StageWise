@@ -9,5 +9,14 @@ License: GPL-3
 LazyData: true
 RoxygenNote: 7.1.1
 Encoding: UTF-8
-Imports: Matrix, ggplot2, asreml
+Imports: Matrix, ggplot2, methods, asreml, ggrepel, rlang
 Suggests: knitr, rmarkdown
+Collate: 
+    'Stage1.R'
+    'Stage2.R'
+    'blup.R'
+    'class_geno.R'
+    'class_var.R'
+    'private_functions.R'
+    'read_geno.R'
+    'summary.var.R'
