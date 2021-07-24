@@ -2,7 +2,7 @@
 #' 
 #' BLUPs from Stage2
 #' 
-#' Index coefficients in \code{index.coeff} are normalized to sum to 1. When \code{gwas=TRUE}, GWAS -log10(p) scores are computed by standardizing the marker effects. When \code{geno} is not NULL, both breeding value (BV) and (GV) values for the individuals are predicted; otherwise, only GV are returned.
+#' The argument \code{mask} can be used to mask all observations for a particular individual, or by including a column named 'env', only the observations in particular environments can be masked. This is useful for cross-validation to test the accuracy of predicting into new environments. Index coefficients in \code{index.coeff} are normalized to sum to 1. When \code{gwas.ncore} is greater than 0, -log10(p) scores are computed by standardizing the marker effects. When \code{geno} is not NULL, both breeding value (BV) and (GV) values for the individuals are predicted; otherwise, only GV are returned.
 #' 
 #' @param data data frame of BLUEs from Stage 1 
 #' @param vcov list of variance-covariance matrices for the BLUEs
@@ -33,13 +33,13 @@ blup <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,reliability=FALSE,
   
   if (!is.null(mask)) {
     stopifnot(is.element("id",colnames(mask)))
-    ix <- which(as.character(data$id) %in% as.character(mask$id))
+    ix <- which(data$id %in% as.character(mask$id))
     if ("env" %in% colnames(mask)) {
-      ix2 <- which(as.character(data@data$env) %in% as.character(mask$env))
+      ix2 <- which(data$env %in% as.character(mask$env))
       ix <- intersect(ix,ix2)
     }
     if ("trait" %in% colnames(mask)) {
-      ix2 <- which(as.character(data@data$trait) %in% as.character(mask$trait))
+      ix2 <- which(data$trait %in% as.character(mask$trait))
       ix <- intersect(ix,ix2)
     }
     data <- data[-ix,]
@@ -278,8 +278,13 @@ blup <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,reliability=FALSE,
     } else {
       Ct <- Z%*%geno@coeff
     }
-    out2[[2]] <- data.frame(marker=colnames(geno@coeff),
+    if (nrow(geno@map)==0) {
+      out2[[2]] <- data.frame(marker=colnames(geno@coeff),
                               add.effect=as.numeric(crossprod(Ct,solve(V,y2))))
+    } else {
+      out2[[2]] <- data.frame(geno@map,
+                              add.effect=as.numeric(crossprod(Ct,solve(V,y2))))
+    }
     
     if (gwas.ncore > 0) {
       Vinv <- solve(V)
@@ -299,7 +304,7 @@ blup <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,reliability=FALSE,
         })
         std.effect <- out2[[2]]$add.effect/se
       }
-      out2[[2]]$score <- -log10(pnorm(q=abs(std.effect),lower.tail=FALSE)*2)
+      out2[[2]]$gwas.score <- -log10(pnorm(q=abs(std.effect),lower.tail=FALSE)*2)
     }
     return(out2)
   }

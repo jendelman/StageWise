@@ -26,7 +26,7 @@ Both `Stage1` and `Stage2` utilize ASReml-R (version 4.1.0.148 or later), which 
 
 ### Marker data
 
-The first function, `read_geno`, reads bi-allelic marker data as a CSV file. If you intend to run GWAS, use the option `map=TRUE` and use the first three columns of the input file for marker name, chromosome, and position, followed by columns for the individuals. If you will only use the software for genomic prediction, you can use `map=FALSE`, in which case the first column is the marker name and subsequent columns are individuals. The marker data should represent allele dosage, with numeric values between 0 and ploidy allowed.
+The first function, `read_geno`, reads bi-allelic marker data as a CSV file. If you intend to run GWAS, the option `map=TRUE` indicates the first three columns of the input file are the marker name, chromosome, and position, followed by columns for the individuals. Map information is not used for genomic prediction and can be omitted by using `map=FALSE`, in which case the first column is the marker name and subsequent columns are individuals. The marker data should represent allele dosage, with numeric values between 0 and ploidy allowed.
 
 The example dataset contains marker data for 958 tetraploid potato clones from the US round white market class, which is used to make potato chips. It is an updated version of the dataset published by [Endelman et al. (2018)](https://doi.org/10.1534/genetics.118.300685). Our genotyping platform for tetraploid potato has been an Infinium SNP array. Most of the clones in this dataset were genotyped with Version 3 (V3) of the array, but some were genotyped with an earlier version (V2). Data from the two different versions were combined using the function `merge_impute` from R package [polyBreedR](https://github.com/jendelman/polyBreedR). The imputation procedure is based on BLUP and generates fractional values of allele dosage, which poses no difficulty for estimating breeding values. 
 
@@ -164,29 +164,11 @@ round(h2,2)
 
 Specific gravity had the highest narrow-sense (0.46) and broad-sense (0.66) heritability of the four traits.
 
-`Stage2` also returns the fixed effect estimates for each environment and the predicted random effects, or BLUPs. The additive effects approximate the breeding values and can be used for genomic selection of parents. For variety selection based on total genotypic value, the additive and residual genetic effects should be added together (which is done automatically by the `blup` function discussed below). 
+`Stage2` returns the fixed effect estimates for each environment under 'fixed', and the predicted random effects for the individuals in the training set are returned under 'random'. This can be useful with very large datasets to avoid further computation, but this information (and a lot more) is also available with the function `blup`, which is described next.
 
-```{r}
-ans2[["total.yield"]]$fixed$env
-head(ans2[["total.yield"]]$random)
+### BLUP Reliability
 
-BV <- data.frame(id=character(0))
-for (i in 1:4) {
-  tmp <- ans2[[i]]$random[,c("id","add")]
-  colnames(tmp) <- c("id",traits[i])
-  BV <- merge(BV,tmp,all=T)
-}
-BV.mat <- as.matrix(BV[,-1])
-rownames(BV.mat) <- BV[,1]
-
-round(cor(BV.mat,use = "pairwise.complete"),2)
-```
-
-The above matrix shows the pairwise correlations of the predicted additive values, which can provide a rough estimate of the genetic correlation. For a more accurate estimate of the correlations, a multivariate analysis can be conducted, which is the topic of [Vignette 3](https://jendelman.github.io/StageWise/Vignette3.html). The result indicates a substantial (r = 0.46) correlation between yield and late maturity, which is an undesirable tradeoff present in many crops. A selection index is the most efficient way to optimize this tradeoff and is discussed in Vignette 3.
-
-### Marker-based vs. Marker-assisted genomic predictions
-
-The `Stage2` function returns the predicted random effects for all individuals in the training set (i.e., those with phenotypes and genotypes). It also returns the estimated variances in 'vars', which can be passed to the function `blup` to make predictions for individuals that were not in the training set. This is called marker-based prediction, as opposed to marker-assisted prediction for the training set individuals. The simplest way to make this prediction is to include the genotypes of the selection candidates in the same marker data file as the training set. The function call for this scenario is
+The `blup` function needs the same phenotype information supplied to `Stage2`, i.e, the Stage 1 BLUEs and their covariances, which is then combined with the variance component estimates to make predictions for all individuals in the genotype file, regardless of whether they have been phenotyped. 
 
 ```{r}
 blup1 <- blup(data=ans1$total.yield$blue,
@@ -197,91 +179,68 @@ blup1 <- blup(data=ans1$total.yield$blue,
 head(blup1)
 ```
 
-The argument `reliability=TRUE` indicates that the function should return not only the predicted breeding values (BV) and genotypic values (GV) but also their reliability (designated r2), which is the squared correlation between the true and predicted values (assuming the model is correct). The reliability calculation requires inversion of the coefficient matrix of the mixed model equations, which is more computationally demanding than the BLUP calculation and can be skipped by using `reliability=FALSE`. 
+The argument `reliability=TRUE` indicates the function should return not only the predicted breeding values (BV) and genotypic values (GV) but also their reliability (designated r2), which is the squared correlation between the true and predicted values (assuming the model is correct). Calculating reliability requires inversion of the coefficient matrix of the mixed model equations, which is more computationally demanding than just solving the linear system to compute the BLUPs. To skip the reliability calculation, use `reliability=FALSE`. 
 
-Previous studies have shown that the reliability of genomic prediction depends largely on the number of close relationships for each individual, which can be quantified by the 95th (or other suitably high) percentile of its G matrix coefficients. 
-
-```{r, fig.height=3,fig.width=4}
-tab <- table(pheno$id)
-Gtmp <- G
-diag(Gtmp) <- NA
-data2 <- data.frame(id=rownames(G),
-                    G95=apply(Gtmp,1,quantile,probs=0.95,na.rm=T),
-                    plots=as.integer(tab[rownames(G)]))
-
-combo <- merge(data2,add.pred)
-ggplot(combo,aes(x=G95,y=r2,colour=plots)) + geom_point() +
-  scale_y_continuous("Reliability",limits=c(0.4,1),breaks=seq(0.4,1,by=0.2),labels=seq(0.4,1,by=0.2))
-```
-
-
-Inversion of the MME coefficient matrix enables computation of the reliability ($r^2$) of the BLUPs, which is the expected squared correlation between the true and predicted values. This quantity is analogus to narrow-sense $h^2$ and is an alternative to cross-validation (CV) for assessing genomic prediction accuracy. Cross-validation tends to underestimate prediction accuracy because the data used for validation are not true breeding values (to compensate, the correlation can be divided by narrow-sense $h$). On the other hand, reliability from the MME tends to overestimate accuracy because it assumes the model is correct.
-
-```{r,fig.height=4,fig.width=4}
-add.pred <- predict_MME(data=ans2$MME,weights=c(I=0,G=1))
-head(add.pred[order(add.pred$blup,decreasing=T),]) #Top yielders
-
-clonal.pred <- predict_MME(data=ans2$MME,weights=c(I=1,G=1))
-
-combo <- merge(clonal.pred,add.pred,by="id")
-
-ggplot(data=combo,aes(x=blup.x,y=blup.y)) + geom_point() + ylab(expression("Additive Yield"~(Mg~ha^-1))) + 
-  xlab("Clonal Yield"~(Mg~ha^-1)) + geom_abline(slope=1,intercept=0,colour="red") + stat_smooth(method=lm) + theme_bw()
-```
-
-The above plot compares the predicted additive and clonal values. The slope of the regression line (blue) is less than 1 (shown in red) and represents the additive proportion of the clonal value.
-
-Previous studies have shown that the reliability of genomic prediction depends largely on the number of close relationships for each clone, which can be quantified by the 95th (or other suitably high) percentile of its G coefficients. 
+Previous studies have shown that the reliability of genomic prediction depends largely on the number of close relationships for each individual, which can be quantified by the 95th (or other suitably high) percentile of its G matrix coefficients. An S4 method has been written to use the function `quantile` on the object returned by `read_geno`:
 
 ```{r, fig.height=3,fig.width=4}
-tab <- table(pheno$id)
-Gtmp <- G
-diag(Gtmp) <- NA
-data2 <- data.frame(id=rownames(G),
-                    G95=apply(Gtmp,1,quantile,probs=0.95,na.rm=T),
-                    plots=as.integer(tab[rownames(G)]))
+G95 <- quantile(geno,probs=0.95)
+head(G95)
 
-combo <- merge(data2,add.pred)
-ggplot(combo,aes(x=G95,y=r2,colour=plots)) + geom_point() +
-  scale_y_continuous("Reliability",limits=c(0.4,1),breaks=seq(0.4,1,by=0.2),labels=seq(0.4,1,by=0.2))
+plot.data <- merge(blup1,G95)
+ggplot(plot.data,aes(x=G,y=BV.r2)) + geom_point() +
+  ylab("BV Reliability") + xlab("95% G") + theme_bw()
 ```
 
-Because these are *marker-assisted* predictions, meaning they also utilize phenotypic data for the selection candidates, the number of phenotype measurements (i.e., plots) for each clone also contributes to accuracy (see above figure). The average reliability of the predicted additive values for FY3 entries, based on a single plot, is 0.62 vs. only 0.31 for the narrow-sense $h^2$.
+It is also possible to mask the phenotypes for some individuals before making the predictions, which can be used to simulate a particular breeding strategy or to perform cross-validation. All else being equal, predictions for individuals without phenotypes, which is called marker-based selection, have lower reliability than predictions for individuals with phenotypes, which is called marker-assisted selection. To illustrate, we will mask the phenotypes for the most recent cohort of breeding lines in the dataset (which have identifiers that begin with "W17") and compare with the original prediction.
 
 ```{r}
-#Average reliability based on one plot
-mean(combo$r2[combo$plots==1])
-```
+id <- ans1$total.yield$blue$id
+mask <- data.frame(id=id[grep("W17",id)])
+nrow(mask)
 
-polyBreedR has two ways to make *marker-based* predictions, i.e., for individuals without phenotype data. In a real situation (as opposed to cross-validation), the G matrix will contain individuals for which BLUEs are not available in the data frame provided to `Stage2`, and predictions for these individuals will be present in the output from `predict_MME`. For cross-validation exercises, it is more efficient to mask the phenotypes of individuals using the argument "mask" in `predict_MME`, rather than re-estimating variances for each partition of the dataset using `Stage2`. 
+blup2 <- blup(data=ans1$total.yield$blue,
+              vcov=ans1$total.yield$vcov,
+              geno=geno,
+              vars=ans2$total.yield$vars,
+              reliability=TRUE,
+              mask=mask)
 
-To illustrate, we will mask phenotypes for the clones in the 2020 preliminary yield trial (Field Year 3), which all start with the prefix "W17". 
+#marker-based selection (MBS)
+tmp1 <- blup2[blup2$id %in% mask$id,c("id","BV.r2")]
+colnames(tmp1) <- c("id","MBS")
 
-```{r,fig.height=3,fig.width=4}
-W17 <- blue$id[grep("W17",blue$id,fixed=T)]
-add.pred.W17 <- predict_MME(data=ans2$MME,weights=c(I=0,G=1),
-                            mask=data.frame(id=W17))
+#marker-assisted selection (MAS)
+tmp2 <- blup1[blup1$id %in% mask$id,c("id","BV.r2")]
+colnames(tmp2) <- c("id","MAS")
 
-combo <- merge(add.pred.W17,add.pred,by="id")[,c("id","r2.x","r2.y")]
-combo$group <- ifelse(combo$id %in% W17,"W17","Remainder") 
-ggplot(combo,aes(x=r2.x,y=r2.y,colour=group)) + geom_point() + geom_abline(intercept=0,slope=1) + 
-  xlab(expression(r^2~"(-W17 phenotypes)")) + ylab(expression(r^2~"(+W17 phenotypes)")) + scale_colour_brewer(palette="Set1")
-```
+plot.data <- merge(tmp1,tmp2)
+head(plot.data)
 
-The above figure compares the reliability of the predicted additive values with (y-axis) and without (x-axis) phenotypes for the W17 group (black line = slope of 1). The reliability is substantially higher for the W17 clones when their phenotype data are included, which reinforces the difference between marker-assisted and marker-based predictions. For the rest of the population, there is a slight advantage to including the W17 phenotypes because they increase the training population size.
-
-To estimate accuracy by cross-validation, the correlation between the predicted and observed values for the W17 group is divided by the square-root of the narrow-sense $h^2$. The result of 0.49 is lower than the square-root of the mean reliability = 0.72, and the true value may be somewhere in between.
-
-```{r}
-#Predictive ability
-pred.ability <- cor(blue$total.yield[match(W17,blue$id)],add.pred.W17$blup[match(W17,add.pred.W17$id)])
-
-#Prediction accuracy by cross-validation
-pred.ability/sqrt(0.31)
-
-#Compared to square root of mean reliability
-sqrt(mean(add.pred.W17$r2[match(W17,add.pred.W17$id)]))
+ggplot(plot.data,aes(x=MBS,y=MAS)) + geom_point() + theme_bw() + 
+  xlab("MBS Reliability") + ylab("MAS Reliability") + coord_fixed(ratio=1) + ylim(0.3,0.8) + xlim(0.3,0.8) + geom_line(data=data.frame(x=c(0.3,0.8),y=c(0.3,0.8)),mapping=aes(x=x,y=y),linetype=2)
 ```
 
 ### Marker effects and GWAS
 
+Using the argument `marker.effects=TRUE` with the `blup` function leads to the prediction of marker effects in addition to breeding values, but be aware this involves inversion of the phenotype covariance matrix, which can be computationally demanding for large datasets. The marker effects can also be standardized to compute GWAS -log(p) scores that are equivalent to the traditional fixed effect method ([Duarte et al. (2014)](http://www.biomedcentral.com/1471-2105/15/246); [Bernal Rubio et al. 2016](https://doi.org/10.1111/age.12378)). This calculation is easily parallelized, and the argument `gwas.ncore` is used to tell the function how many cores to use (the default is 0, which skips computing the GWAS scores).
+
+Here is the code to calculate GWAS scores for vine maturity, which are returned in the second element of a list. `gwas_threshold` computes the -log10(p) threshold for QTL discovery based on an effective number of markers ([Moskvina and Schmidt, 2008](https://doi.org/10.1002/gepi.20331)), and `manhattan_plot` visualizes the result. 
+
+```{r}
+blup3 <- blup(data=ans1$vine.maturity$blue,
+              vcov=ans1$vine.maturity$vcov,
+              geno=geno,
+              vars=ans2$vine.maturity$vars,
+              reliability=FALSE,
+              marker.effects=TRUE,
+              gwas.ncore=2)
+head(blup3[[1]])
+head(blup3[[2]])
+
+gwas_threshold(geno,alpha=0.05,n.core=2)
+manhattan_plot(blup3[[2]],thresh=5.1,rotate=TRUE)
+```
+
+
+Add marker as fixed effect to Stage2...

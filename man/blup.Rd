@@ -42,5 +42,5 @@ Data frame containing the BLUPs for the individuals, unless marker.effects = TRU
 BLUPs from Stage2
 }
 \details{
-Index coefficients in \code{index.coeff} are normalized to sum to 1. When \code{gwas=TRUE}, GWAS -log10(p) scores are computed by standardizing the marker effects. When \code{geno} is not NULL, both breeding value (BV) and (GV) values for the individuals are predicted; otherwise, only GV are returned.
+The argument \code{mask} can be used to mask all observations for a particular individual, or by including a column named 'env', only the observations in particular environments can be masked. This is useful for cross-validation to test the accuracy of predicting into new environments. Index coefficients in \code{index.coeff} are normalized to sum to 1. When \code{gwas.ncore} is greater than 0, -log10(p) scores are computed by standardizing the marker effects. When \code{geno} is not NULL, both breeding value (BV) and (GV) values for the individuals are predicted; otherwise, only GV are returned.
 }

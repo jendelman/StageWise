@@ -1,3 +1,26 @@
+Keff <- function(r2,alpha) {
+  m <- nrow(r2)
+  if (m > 1) {
+    Q <- sqrt(r2)
+    Q[upper.tri(Q,diag=T)] <- NA
+    rmax <- apply(Q[-1,],1,max,na.rm=T)
+    kappa <- sqrt(1-rmax^(-1.31*log10(alpha)))
+    return(1+sum(kappa))
+  } else {
+    return(1)
+  }
+}
+
+get_x <- function(map) {
+  #takes a map with chrom and position and returns x axis values for plotting multiple chromosomes
+  a <- tapply(map[,2],map[,1],max)
+  n <- length(a)
+  m <- tapply(map[,2],map[,1],length)
+  b <- c(0,apply(array(1:(n-1)),1,function(k){sum(a[1:k])}))
+  x <- map[,2] + rep(b,times=m)
+  return(x)
+}
+
 uniplot <- function(z) {
   x <- seq(-1,1,by=0.01)
   y1 <- sqrt(1-x^2)
