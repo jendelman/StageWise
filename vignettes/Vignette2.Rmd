@@ -1,0 +1,98 @@
+---
+title: "Vignette 2: Single trait analysis at correlated locations"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{StageWise Vignette1}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message=FALSE,warning=FALSE,comment="##",
+                      fig.width=4,fig.height=4,dpi=150)
+```
+
+This vignette builds on the information in [Vignette 1](https://jendelman.github.io/StageWise/Vignette1.html), which covered analysis at a single location. This vignette illustrates how to model the covariance between multiple locations, using a dataset of potato yield trials across 9 locations and 6 years and a population size of 336 genotypes ([Schmitz Carley et al. 2019](https://doi.org/10.2135/cropsci2018.05.0314)). 
+
+```{r}
+library(StageWise)
+geno.file <- system.file("vignette_data", "geno2.csv", package = "StageWise")
+geno <- read_geno(filename=geno.file,ploidy=4,map=FALSE)
+
+pheno.file <- system.file("vignette_data", "pheno2.csv", package = "StageWise")
+pheno <- read.csv(pheno.file)
+head(pheno)
+table(pheno$loc)
+``` 
+
+The input file contains not only a column named 'env' for environment but also one named 'loc' for location. The location information is not explicitly used by `Stage1` but is automatically detected and retained in the output for use in `Stage2`.
+
+```{r, fig.width=4, fig.height=3}
+ans1 <- Stage1(filename=pheno.file,
+               traits='Yield.Mg.ha')
+head(ans1$blue)
+
+library(ggplot2)
+ggplot(data=ans1$H2,aes(x=loc,y=H2)) + stat_boxplot(outlier.color="red") + xlab("Location") + ylab(expression(paste("Broad-sense ",H^2," (plot basis)")))
+```
+
+The above figure shows the variation in broad-sense heritability across locations and years. 
+
+When the data frame of BLUEs passed to `Stage2` has a column labeled 'loc', genotype x location effects are included using a separable covariance structure. If marker data are included, the genetic covariance between locations for the additive effects follows a 2nd order factor-analytic (FA2) model, and the location covariance for the residual genetic effects is compound symmetric. If marker data are not included, an FA2 model is used for the genetic covariance between locations. For large datasets with many locations (such as this one), I recommend first analyzing it without marker data, as the computation proceeds more quickly. 
+
+Here is a joint analysis of all 9 locations without using the marker data, and the code also illustrates the `silent=FALSE` option to see the convergence progress with ASReml-R.
+```{r,include=FALSE}
+load("~/Box Sync/Endelman/Software/StageWise/Vignette2.rda")
+```
+```{r, eval=FALSE}
+ans2a <- Stage2(data=ans1$blue,
+                vcov=ans1$vcov,silent=FALSE)
+```
+```{r}
+summary(ans2a$vars)
+```
+
+As in the single location analysis, running the `summary` command on the 'vars' output shows the partitioning of variance, but now a g x loc effect is also present. In published analyses of multi-location, multi-year trials, it is common to see g x loc, g x year and g x loc x year effects, but g x year effects are typically small compared to the other two and (unlike g x loc) have little practical importance; this is why they are not modeled explicitly in `Stage2`. 
+
+The `summary` command also returns the correlation matrix between the locations. One way to visualize this information is with a dendrogram, which shows that the TX site, and to a lesser extent the FL and CA sites, are different than the other six. 
+
+```{r}
+plot(hclust(as.dist(1-summary(ans2a$vars)[[2]])),
+     hang = -1,xlab="")
+```
+
+Although the FA2 model should have enough complexity for a set of correlated locations used by a single breeding program, it may be inadequate when analyzing disparate locations, such as in this dataset. The inadequacy of the FA2 model can be assessed using a  uniplot ([Cullis et al. 2010](https://doi.org/10.1139/G10-080)), which is returned by `Stage2`:
+
+```{r, fig.width=3,fig.height=3}
+ans2a$uniplot
+```
+
+The distance of each location from the perimeter of the unit circle (radius = 1) is the proportion of the location-specific variance explained by the latent factors. Thus, locations on the perimeter are fully explained by the FA2 model. With the exception of TX and FL, the FA2 model appears to provide a good representation of the covariance structure.  
+
+For locations on the circle perimeter, the cosine of the angle between them equals the correlation (recall cos(0) = 1). Focusing on the 6 highly correlated locations-WI,MI,NC,OR,NY,MO-we will now add the marker data to `Stage2` to estimate the additive correlation and predict breeding values.
+
+```{r}
+locs <- c("WI","MI","OR","NY","NC","MO")
+data <- ans1$blue[ans1$blue$loc %in% locs,]
+tmp <- sapply(strsplit(names(ans1$vcov),split="_"),"[[",1)
+vcov <- ans1$vcov[tmp %in% locs]
+```
+```{r,eval=FALSE}
+ans2b <- Stage2(data=data,vcov=vcov,geno=geno,silent=FALSE)
+```
+```{r}
+summary(ans2b$vars)
+ans2b$uniplot
+```
+
+
+```{r}
+index.coeff=c(1,1,1,1,0,1)/5
+names(index.coeff) <- locs
+blup1 <- blup(data=data,vcov=vcov,geno=geno,
+              vars=ans2b$vars,index.coeff=index.coeff)
+index.coeff=c(1,1,1,rep(0,6))/3
+names(index.coeff) <- rownames(ans2a$vars@g.resid)
+blup1 <- blup(data=ans1$blue,vcov=ans1$vcov,vars=ans2a$vars,index.coeff=index.coeff)
+```
+

@@ -1,9 +1,9 @@
 Package: StageWise
-Title: Two-stage analysis of multi-environment trials for plant breeding
-Version: 0.02
+Title: Two-stage analysis of multi-environment trials for genomic selection
+Version: 0.03
 Author: Jeffrey B. Endelman
 Maintainer: Jeffrey Endelman <endelman@wisc.edu>
-Description: Two-stage analysis of multi-environment trials for plant breeding
+Description: Two-stage analysis of multi-environment trials for genomic selection
 Depends: R (>= 4.0)
 License: GPL-3
 LazyData: true
@@ -15,7 +15,9 @@ Collate:
     'Stage1.R'
     'Stage2.R'
     'blup.R'
+    'blup_prep.R'
     'class_geno.R'
+    'class_prep.R'
     'class_var.R'
     'gwas_threshold.R'
     'manhattan_plot.R'

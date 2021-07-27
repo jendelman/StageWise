@@ -13,7 +13,6 @@
 #' 
 #' @export
 #' @import ggplot2
-#' @importFrom tidyr pivot_longer
 #' @importFrom rlang .data
 
 manhattan_plot <- function(data,chrom=NULL,thresh=NULL,rotate=FALSE) {

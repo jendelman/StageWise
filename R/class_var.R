@@ -8,7 +8,8 @@
 #' @slot fixed.marker.var variance of marker fixed effects
 #' @slot fixed.marker.cov contribution of marker fixed effects to additive covariance between locations
 #' 
-#' @importFrom methods new
+#' @import methods
+#' @import Matrix
 #' @export
 class_var <- setClass("class_var",slots=c(add="Matrix",g.resid="Matrix",resid="Matrix",
                                             meanG="numeric",meanOmega="numeric",

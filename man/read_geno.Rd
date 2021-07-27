@@ -4,7 +4,7 @@
 \alias{read_geno}
 \title{Read marker genotype data}
 \usage{
-read_geno(filename, ploidy, map)
+read_geno(filename, ploidy, map, eigen.tol = 1e-09)
 }
 \arguments{
 \item{filename}{Name of CSV file}
@@ -12,6 +12,8 @@ read_geno(filename, ploidy, map)
 \item{ploidy}{2,4,6,etc. (even numbers)}
 
 \item{map}{TRUE/FALSE}
+
+\item{eigen.tol}{1e-9}
 }
 \value{
 Variable of class \code{\link{class_geno}}.
@@ -20,5 +22,5 @@ Variable of class \code{\link{class_geno}}.
 Read marker genotype data
 }
 \details{
-First three columns of the file: marker, chrom, position. Subsequent columns contain the allele dosage for individuals/clones, coded 0,1,2,...ploidy (fractional values are allowed). Additive coefficients are computed by subtracting the population mean from each marker, and the additive (genomic) relationship matrix is computed as G = tcrossprod(coeff)/scale. The scale parameter ensures the mean of the diagonal elements of G equals 1 under panmictic equilibrium. Missing genotype data is replaced with the population mean. For numerical conditioning, the inverse of G is computed after adding 1e-6 to the diagonal elements.
+First three columns of the file: marker, chrom, position. Subsequent columns contain the allele dosage for individuals/clones, coded 0,1,2,...ploidy (fractional values are allowed). Additive coefficients are computed by subtracting the population mean from each marker, and the additive (genomic) relationship matrix is computed as G = tcrossprod(coeff)/scale. The scale parameter ensures the mean of the diagonal elements of G equals 1 under panmictic equilibrium. Missing genotype data is replaced with the population mean. For numerical conditioning, eigenvalues of G smaller than \code{eigen.tol} are replaced by \code{eigen.tol}.
 }

@@ -10,8 +10,10 @@
 #'
 #' @include class_var.R
 #' @name summary
+#' @exportMethod summary
 NULL
 
+setGeneric("summary")
 setMethod("summary",c(object="class_var"),
           definition=function(object){
             cor.mat <- NULL

@@ -6,7 +6,7 @@
 \arguments{
 \item{x}{object of \code{\link{class_geno}}}
 
-\item{probs}{probability}
+\item{prob}{probability}
 }
 \value{
 data frame with the quantile of the G matrix coefficients for each id
@@ -15,5 +15,5 @@ data frame with the quantile of the G matrix coefficients for each id
 G matrix quantile
 }
 \details{
-Unlike the generic method, this method only accepts a single probability, not a vector
+Unlike the S3 method, \code{prob} must have length = 1
 }

@@ -1,3 +1,11 @@
+kron <- function(eigen.A,B) {
+  eigen.B <- eigen(B)
+  V <- as(Matrix(eigen.B$vectors,dimnames=list(rownames(B),rownames(B))),"dgeMatrix")
+  half <- kronecker(eigen.A$vectors,V,make.dimnames=T) %*%
+    kronecker(Diagonal(x=sqrt(eigen.A$values)),Diagonal(x=sqrt(eigen.B$values)))
+  return(list(half=half,full=tcrossprod(half)))
+}
+
 Keff <- function(r2,alpha) {
   m <- nrow(r2)
   if (m > 1) {
@@ -35,7 +43,7 @@ uniplot <- function(z) {
 coerce_dpo <- function(x) {
   d <- Diagonal(x=1/sqrt(diag(x)))
   x2 <- crossprod(d,x%*%d)
-  eg <- eigen(x2)
+  eg <- eigen(x2,symmetric=TRUE)
   lambda <- ifelse(eg$values < .Machine$double.eps*2,.Machine$double.eps*2,eg$values)
   d <- Diagonal(x=sqrt(diag(x)))
   x3 <- tcrossprod(Matrix(d %*% eg$vectors %*% Diagonal(x=sqrt(lambda))))

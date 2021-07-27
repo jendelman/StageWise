@@ -2,45 +2,27 @@
 % Please edit documentation in R/blup.R
 \name{blup}
 \alias{blup}
-\title{BLUPs from Stage2}
+\title{BLUP}
 \usage{
-blup(
-  data,
-  vcov = NULL,
-  geno = NULL,
-  vars,
-  mask = NULL,
-  reliability = FALSE,
-  index.coeff = NULL,
-  marker.effects = FALSE,
-  gwas.ncore = 0
-)
+blup(data, geno = NULL, what, index.coeff = NULL, gwas.ncore = 0)
 }
 \arguments{
-\item{data}{data frame of BLUEs from Stage 1}
-
-\item{vcov}{list of variance-covariance matrices for the BLUEs}
+\item{data}{object of \code{\link{class_prep}} from \code{\link{blup_prep}}}
 
 \item{geno}{object of \code{\link{class_geno}} from \code{\link{read_geno}}}
 
-\item{vars}{object of \code{\link{class_var}} from \code{\link{Stage2}}}
+\item{what}{"id" or "marker"}
 
-\item{mask}{(optional) data frame with column "id" and optional columns "env", "trait"}
+\item{index.coeff}{index coefficients for the locations or traits}
 
-\item{reliability}{TRUE/FALSE whether to compute reliability}
-
-\item{index.coeff}{index coefficients for the locations or traits (must sum to 1)}
-
-\item{marker.effects}{TRUE/FALSE}
-
-\item{gwas.ncore}{Number of cores to use for GWAS (default is 0 = no GWAS)}
+\item{gwas.ncore}{Number of cores to use for GWAS (default is 0 = no GWAS) if \code{what="markers"}}
 }
 \value{
-Data frame containing the BLUPs for the individuals, unless marker.effects = TRUE, in which case a list of two data frames: one for the individuals and one for the markers.
+Data frames of BLUPs
 }
 \description{
-BLUPs from Stage2
+BLUP
 }
 \details{
-The argument \code{mask} can be used to mask all observations for a particular individual, or by including a column named 'env', only the observations in particular environments can be masked. This is useful for cross-validation to test the accuracy of predicting into new environments. Index coefficients in \code{index.coeff} are normalized to sum to 1. When \code{gwas.ncore} is greater than 0, -log10(p) scores are computed by standardizing the marker effects. When \code{geno} is not NULL, both breeding value (BV) and (GV) values for the individuals are predicted; otherwise, only GV are returned.
+Argument \code{index.coeff} should be a named vector, matching the names of the locations or traits. Index coefficients are normalized to have unit sum.
 }

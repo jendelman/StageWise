@@ -11,14 +11,14 @@ S4 class for marker genotype data
 \section{Slots}{
 
 \describe{
+\item{\code{map}}{Marker map positions}
+
 \item{\code{coeff}}{Coefficients of the marker effects (dim: indiv x marker)}
 
 \item{\code{scale}}{Scaling factor between markers and indiv}
 
 \item{\code{G}}{Additive (genomic) relationship matrix}
 
-\item{\code{Ginv}}{Inverse G matrix}
-
-\item{\code{map}}{Marker map positions}
+\item{\code{eigen.G}}{list of eigenvalues and eigenvectors}
 }}
 

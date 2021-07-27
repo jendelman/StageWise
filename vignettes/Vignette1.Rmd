@@ -1,5 +1,5 @@
 ---
-title: "Vignette 1: StageWise analysis of a single trait at one location"
+title: "Vignette 1: Single trait analysis at one location"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{StageWise Vignette1}
@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE,message=FALSE,warning=FALSE,comment="##",
                       fig.width=4,fig.height=4,dpi=150)
 ```
 
-There are four core functions in the package:
+There are five main functions in the package:
 
 * `read_geno`
 
@@ -20,13 +20,15 @@ There are four core functions in the package:
 
 * `Stage2`
 
+* `blup_prep`
+
 * `blup`
 
 Both `Stage1` and `Stage2` utilize ASReml-R (version 4.1.0.148 or later), which requires a license from [VSN International](https://www.vsni.co.uk/software/asreml-r). 
 
 ### Marker data
 
-The first function, `read_geno`, reads bi-allelic marker data as a CSV file. If you intend to run GWAS, the option `map=TRUE` indicates the first three columns of the input file are the marker name, chromosome, and position, followed by columns for the individuals. Map information is not used for genomic prediction and can be omitted by using `map=FALSE`, in which case the first column is the marker name and subsequent columns are individuals. The marker data should represent allele dosage, with numeric values between 0 and ploidy allowed.
+The `read_geno` function reads bi-allelic marker data as a CSV file. If you intend to run GWAS, the option `map=TRUE` indicates the first three columns of the input file are the marker name, chromosome, and position, followed by columns for the individuals. Map information is not used for genomic prediction and can be omitted by using `map=FALSE`, in which case the first column is the marker name and subsequent columns are individuals. The marker data should represent allele dosage, with numeric values between 0 and ploidy allowed.
 
 The example dataset contains marker data for 958 tetraploid potato clones from the US round white market class, which is used to make potato chips. It is an updated version of the dataset published by [Endelman et al. (2018)](https://doi.org/10.1534/genetics.118.300685). Our genotyping platform for tetraploid potato has been an Infinium SNP array. Most of the clones in this dataset were genotyped with Version 3 (V3) of the array, but some were genotyped with an earlier version (V2). Data from the two different versions were combined using the function `merge_impute` from R package [polyBreedR](https://github.com/jendelman/polyBreedR). The imputation procedure is based on BLUP and generates fractional values of allele dosage, which poses no difficulty for estimating breeding values. 
 
@@ -49,35 +51,28 @@ For completeness, however, a simple `Stage1` function is provided to analyze dat
 
 The phenotypes for this tutorial are based on six years (2015-2020) of variety trials at the Hancock Research Station of the University of Wisconsin. A mixture of augmented and partially replicated designs have been used with incomplete blocks. Four traits are included: 
 
-* total yield ($Mg$ $ha^{-1}$) 
+* total yield (Mg per ha) 
 
 * vine maturity (1=early to 9=late)
 
 * specific gravity
 
-* fry color, measured in units of Hunter Lightness ($L$) after 6 months of storage
+* fry color, measured in units of Hunter Lightness (L) after 6 months of storage
 
 The data file also contains the stand count for each plot (out of 15 total plants), which is included as a covariate in the Stage 1 model. 
 
-```{r, fig.width=4,fig.height=3}
+```{r, fig.width=4,fig.height=4}
 pheno.file <- system.file("vignette_data", "pheno1.csv", package = "StageWise")
 pheno <- read.csv(pheno.file)
 head(pheno)
 
 library(ggplot2)
-ggplot(data=pheno,aes(x=env)) + geom_bar() + ylab("Number of plots") + 
-  xlab("Environment") + theme(axis.text.x=element_text(angle=45,hjust=1,size=10)) + theme_bw()
+ggplot(data=pheno,aes(x=env)) + geom_bar() + 
+  ylab("Number of plots") + xlab("Environment") + theme_bw() + 
+  theme(axis.text.x=element_text(angle=90,vjust=0.5,size=10)) 
 ```
 
 As is typical of breeding trials, the majority of clones were tested in one year and then dropped, but there is sufficient replication across years to estimate genotype x env interactions.
-```{r}
-tab <- table(pheno$id,pheno$env)
-env.per.id <- apply(tab,1,function(x){sum(x>0)})
-replicated <- names(env.per.id)[env.per.id > 1]
-
-#Number of clones tested in more than one env
-sapply(tapply(pheno$id,pheno$env,intersect,y=replicated),length)
-```
 
 A data frame with variables 'name', 'fixed', and 'factor' is used to specify which columns of the input file should be included as covariates or cofactors, and whether the effects are fixed or random. For analysis of the trait 'total.yield', 'block' and 'stand.count' will be included as fixed effects, and as cofactor and covariate, respectively:
 ```{r}
@@ -90,7 +85,7 @@ ans1 <- Stage1(filename=pheno.file,
                traits='total.yield',effects=effects)
 ```
 
-The `Stage1` function returns a list with several types of results. List element 'blue' is a data frame of the individual BLUEs per environment, and 'H2' is the broad-sense heritability on a plot basis per environment.
+The `Stage1` function returns a list with several results. List element 'blue' is a data frame of the individual BLUEs per environment, and 'H2' is the broad-sense heritability on a plot basis per environment.
 
 ```{r}
 head(ans1$blue)
@@ -107,9 +102,9 @@ ans1$resid$qqplot
 
 ### Stage 2
 
-The `Stage2` function uses the BLUEs from Stage 1 as the response variable, as well as their variance-covariance matrix to partition micro-environmental variation from GxE. These two pieces of information are contained in the output from `Stage1` as 'blue' and 'vcov', respectively, and they are also easily extracted from ASReml-R, [sommer](), [SpATS](), etc., if one of these packages has been used for Stage 1 analysis (e.g., to use spatial models). 
+The `Stage2` function uses the BLUEs from Stage 1 as the response variable, as well as their variance-covariance matrix to partition micro-environmental variation from GxE. These two pieces of information are contained in the output from `Stage1` as 'blue' and 'vcov', respectively, and they are also easily extracted from ASReml-R, [sommer](https://cran.r-project.org/web/packages/sommer/index.html), [SpATS](https://cran.r-project.org/web/packages/SpATS/index.html), etc., if one of these packages has been used for Stage 1 analysis (e.g., to use spatial models). 
 
-It is also possible to run `Stage2` without the covariance of the BLUEs from Stage 1, which is necessary when there are no replicated entries within environment. In this case, use `vcov=NULL`. The benefit of including the covariance information is reflected in the lower value of AIC, which is a penalized likelihood to measure goodness-of-fit.
+It is also possible to run `Stage2` without the covariance of the BLUEs from Stage 1, e.g.,  when there are no replicated entries within environment. In this case, use `vcov=NULL`. The benefit of including the covariance information is reflected in the lower value of AIC, which is a penalized likelihood to measure goodness-of-fit.
 
 ```{r}
 ans2a <- Stage2(data=ans1$blue,vcov=NULL)
@@ -125,7 +120,7 @@ ans2c <- Stage2(data=ans1$blue,vcov=ans1$vcov,geno=geno)
 ans2c$aic
 ```
 
-Several other pieces of information are in the list output from `Stage2`. The variance components are contained in 'vars' as an S4 class, which is used by the `blup` function. The `summary` command can be used to report the partitioning of variance:
+Several other pieces of information are in the list output from `Stage2`. The variance components are contained in 'vars' as an S4 class, which is used by the `blup_prep` function. The `summary` command can be used to report the partitioning of variance:
 
 ```{r}
 summary(ans2a$vars)
@@ -135,7 +130,7 @@ summary(ans2c$vars)
 
 The above results show the progression of variance partitioning as more effects are included in the model. Including the covariance of the BLUEs enables splitting of the multi-environment residual into GxE and within-environment residual, and in this example we also observe some reapportionment of the main effect for genotype vs. GxE. When the marker data are included, the genotype effect is separated into additive and residual genetic (g.resid) components; the latter is a random effect with zero covariance, which includes non-additive effects but also potentially additive effects because the G matrix computed from markers is only an estimate of the true covariance matrix. The residual variance changed when the marker data were included because some entries in the phenotype dataset are not present in the genotype file and were therefore automatically excluded by `Stage2`. 
 
-Using the proportion of additive variance from the summary table, the average narrow-sense (genomic) heritability based on data from one environment is estimated at 0.29:
+By calculating the proportion of additive variance from the summary table, the average narrow-sense (genomic) heritability based on data from one environment is estimated at 0.29:
 
 ```{r}
 v <- summary(ans2c$vars)
@@ -171,12 +166,11 @@ Specific gravity had the highest narrow-sense (0.46) and broad-sense (0.66) heri
 The `blup` function needs the same phenotype information supplied to `Stage2`, i.e, the Stage 1 BLUEs and their covariances, which is then combined with the variance component estimates to make predictions for all individuals in the genotype file, regardless of whether they have been phenotyped. 
 
 ```{r}
-blup1 <- blup(data=ans1$total.yield$blue,
-              vcov=ans1$total.yield$vcov,
+prep1 <- blup_prep(data=ans1$blue,
+              vcov=ans1$vcov,
               geno=geno,
-              vars=ans2$total.yield$vars,
-              reliability=TRUE)
-head(blup1)
+              vars=ans2c$vars)
+blup1 <- blup(prep1,geno=geno,what="id")
 ```
 
 The argument `reliability=TRUE` indicates the function should return not only the predicted breeding values (BV) and genotypic values (GV) but also their reliability (designated r2), which is the squared correlation between the true and predicted values (assuming the model is correct). Calculating reliability requires inversion of the coefficient matrix of the mixed model equations, which is more computationally demanding than just solving the linear system to compute the BLUPs. To skip the reliability calculation, use `reliability=FALSE`. 
@@ -184,7 +178,7 @@ The argument `reliability=TRUE` indicates the function should return not only th
 Previous studies have shown that the reliability of genomic prediction depends largely on the number of close relationships for each individual, which can be quantified by the 95th (or other suitably high) percentile of its G matrix coefficients. An S4 method has been written to use the function `quantile` on the object returned by `read_geno`:
 
 ```{r, fig.height=3,fig.width=4}
-G95 <- quantile(geno,probs=0.95)
+G95 <- quantile(geno,p=0.95)
 head(G95)
 
 plot.data <- merge(blup1,G95)
@@ -194,17 +188,17 @@ ggplot(plot.data,aes(x=G,y=BV.r2)) + geom_point() +
 
 It is also possible to mask the phenotypes for some individuals before making the predictions, which can be used to simulate a particular breeding strategy or to perform cross-validation. All else being equal, predictions for individuals without phenotypes, which is called marker-based selection, have lower reliability than predictions for individuals with phenotypes, which is called marker-assisted selection. To illustrate, we will mask the phenotypes for the most recent cohort of breeding lines in the dataset (which have identifiers that begin with "W17") and compare with the original prediction.
 
-```{r}
-id <- ans1$total.yield$blue$id
-mask <- data.frame(id=id[grep("W17",id)])
+```{r, fig.height=3,fig.width=3}
+id <- ans1$blue$id
+mask <- data.frame(id=id[substr(id,1,3)=="W17"])
 nrow(mask)
 
-blup2 <- blup(data=ans1$total.yield$blue,
-              vcov=ans1$total.yield$vcov,
+prep2 <- blup_prep(data=ans1$blue,
+              vcov=ans1$vcov,
               geno=geno,
-              vars=ans2$total.yield$vars,
-              reliability=TRUE,
+              vars=ans2c$vars,
               mask=mask)
+blup2 <- blup(prep2,geno=geno,what="id")
 
 #marker-based selection (MBS)
 tmp1 <- blup2[blup2$id %in% mask$id,c("id","BV.r2")]
@@ -223,18 +217,16 @@ ggplot(plot.data,aes(x=MBS,y=MAS)) + geom_point() + theme_bw() +
 
 ### Marker effects and GWAS
 
-Using the argument `marker.effects=TRUE` with the `blup` function leads to the prediction of marker effects in addition to breeding values, but be aware this involves inversion of the phenotype covariance matrix, which can be computationally demanding for large datasets. The marker effects can also be standardized to compute GWAS -log(p) scores that are equivalent to the traditional fixed effect method ([Duarte et al. (2014)](http://www.biomedcentral.com/1471-2105/15/246); [Bernal Rubio et al. 2016](https://doi.org/10.1111/age.12378)). This calculation is easily parallelized, and the argument `gwas.ncore` is used to tell the function how many cores to use (the default is 0, which skips computing the GWAS scores).
+Using the argument `marker.effects=TRUE` with the `blup` function leads to the prediction of marker effects in addition to breeding values, but be aware this involves inversion of the phenotype covariance matrix, which can be computationally demanding for large datasets. The marker effects can be standardized to compute GWAS -log10(p) scores that are equivalent to the traditional fixed effect method ([Duarte et al. (2014)](http://www.biomedcentral.com/1471-2105/15/246); [Bernal Rubio et al. 2016](https://doi.org/10.1111/age.12378)). This calculation is easily parallelized, and the argument `gwas.ncore` is used to tell the function how many cores to use (the default is 0, which skips computing the GWAS scores).
 
-Here is the code to calculate GWAS scores for vine maturity, which are returned in the second element of a list. `gwas_threshold` computes the -log10(p) threshold for QTL discovery based on an effective number of markers ([Moskvina and Schmidt, 2008](https://doi.org/10.1002/gepi.20331)), and `manhattan_plot` visualizes the result. 
+Here is the code to calculate GWAS scores for vine maturity, which are returned in the second element of a list. `gwas_threshold` computes the -log10(p) threshold for QTL discovery based on an effective number of markers ([Moskvina and Schmidt, 2008](https://doi.org/10.1002/gepi.20331)), and `manhattan_plot` displays the result. 
 
-```{r}
-blup3 <- blup(data=ans1$vine.maturity$blue,
+```{r,fig.height=3,fig.width=4}
+prep3 <- blup_prep(data=ans1$vine.maturity$blue,
               vcov=ans1$vine.maturity$vcov,
               geno=geno,
-              vars=ans2$vine.maturity$vars,
-              reliability=FALSE,
-              marker.effects=TRUE,
-              gwas.ncore=2)
+              vars=ans2$vine.maturity$vars)
+blup3 <- 
 head(blup3[[1]])
 head(blup3[[2]])
 
@@ -242,5 +234,31 @@ gwas_threshold(geno,alpha=0.05,n.core=2)
 manhattan_plot(blup3[[2]],thresh=5.1,rotate=TRUE)
 ```
 
+### Stage 2 analysis with marker fixed effects
 
-Add marker as fixed effect to Stage2...
+The GWAS peak on chr05 is near the gene *CDF1*, which is known to have a large effect on potato maturity [(Kloosterman et al. 2013)](https://doi.org/10.1038/nature11912). Our original Stage 2 analysis using the G matrix is equivalent to modeling marker effects as random effects, which works well for small QTL. For major QTL, however, it can be advantageous to include a linked marker as a fixed effect. 
+
+The following code extracts the most significant marker for the large QTL on chr05 and passes it to `Stage2` as a fixed effect.
+```{r}
+k <- which.max(blup3[[2]]$gwas.score)
+blup3[[2]][k,]
+
+ans3 <- Stage2(data=ans1[["vine.maturity"]]$blue,
+               vcov=ans1[["vine.maturity"]]$vcov,
+               geno=geno,
+               fix.eff.marker="solcap_snp_c2_22964")
+
+# Fixed effect for the marker
+ans3$fixed$marker
+
+# Proportion of variance
+v <- summary(ans3$vars)
+v/sum(v)
+```
+
+The fixed effect estimate of -0.63 for solcap_snp_c2_22964 means that, on average, each additional copy of the alternate allele reduced vine maturity by 0.63 (on a 1-9 visual scale). According to the proportion of variance table, the solcap_snp_c2_22964 marker accounted for 0.087/(0.087 + 0.229) = 28% of the breeding value.
+
+
+
+
+

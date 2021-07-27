@@ -47,11 +47,8 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
   
   if (!is.null(geno)) {
     stopifnot(inherits(geno,"class_geno"))
-    id <- sort(intersect(data$id,rownames(geno@Ginv)))
+    id <- sort(intersect(data$id,rownames(geno@G)))
     .GlobalEnv$asremlG <- geno@G[id,id] + Diagonal(length(id))*1e-6
-    #Ginv <<- as.numeric(Ginv[upper.tri(geno@G[id,id],diag=TRUE)])
-    #attr(Ginv,"INVERSE") <- TRUE
-    #attr(Ginv,"rowNames") <- id
     meanG <- mean(diag(.GlobalEnv$asremlG))
     data <- data[data$id %in% id,]
   } else {
