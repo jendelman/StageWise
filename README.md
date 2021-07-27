@@ -23,7 +23,8 @@ which is suitable for many crops but not recommended when there are
 multiple heterotic groups. The example datasets are for tetraploid
 potato, but the software works for diploids and higher polyploids too.
 The ASReml-R package is used for variance component estimation, which
-requires a license from [VSN International](https://www.vsni.co.uk).
+requires a license from [VSN
+International](https://www.vsni.co.uk/software/asreml-r).
 
 Funding for software development has come from USDA NIFA Hatch Project
 1013047 and SCRI Project 2020-51181-32156, and the datasets were
@@ -41,14 +42,15 @@ There are three vignettes in the package:
 
 -   [Vignette 1](https://jendelman.github.io/StageWise/Vignette1.html)
     illustrates the analysis of a single trait across multiple years at
-    one location.
+    one location, or for multiple locations when the genotype x location
+    effect is negligible.
 
 -   [Vignette 2](https://jendelman.github.io/StageWise/Vignette2.html)
-    illustrates the analysis of a dataset with multiple locations
-    (across multiple years).
+    illustrates the analysis of a dataset with correlated locations (for
+    one trait).
 
--   [Vignette 3](https://jendelman.github.io/StageWise/Vignette3.html)
-    illustrates the analysis of correlated traits (at one location).
+-   Vignette 3 (in progress) illustrates the analysis of correlated
+    traits (at one location).
 
 For a complete specification of package functions, consult the
 [reference manual.](https://jendelman.github.io/StageWise/manual.pdf)
