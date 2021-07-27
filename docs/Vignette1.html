@@ -163,7 +163,6 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 ## 3 solcap_snp_c2_36615 chr01   510745        1        0     2.03
 ## 4 solcap_snp_c2_36658 chr01   527068        4        3     3.00</code></pre>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(StageWise)</span></code></pre></div>
-<pre><code>## Offline License checked out Tue Jul 27 10:24:16 2021</code></pre>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>geno <span class="ot">&lt;-</span> <span class="fu">read_geno</span>(<span class="at">filename=</span>geno.file,<span class="at">ploidy=</span><span class="dv">4</span>,<span class="at">map=</span><span class="cn">TRUE</span>)</span></code></pre></div>
 <p>The function <code>read_geno</code> computes the additive relationship (G) matrix and its inverse, which can take some time for large datasets. These matrices and other information needed for the <code>Stage2</code> function are stored in the returned object as an S4 class.</p>
 </div>
@@ -276,7 +275,6 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>               <span class="at">traits=</span><span class="st">&#39;total.yield&#39;</span>,<span class="at">effects=</span>effects)</span></code></pre></div>
 <pre><code>## Traits: total.yield
 ## Env: Hancock15
-## Offline License checked out Tue Jul 27 10:24:29 2021
 ## Env: Hancock16
 ## Env: Hancock17
 ## Env: Hancock18

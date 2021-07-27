@@ -143,7 +143,6 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 
 <p>This vignette builds on the information in <a href="https://jendelman.github.io/StageWise/Vignette1.html">Vignette 1</a>, which covered analysis at a single location. This vignette illustrates how to model the covariance between multiple locations, using a dataset of potato yield trials across 9 locations and 6 years and a population size of 336 genotypes (<a href="https://doi.org/10.2135/cropsci2018.05.0314">Schmitz Carley et al. 2019</a>).</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(StageWise)</span></code></pre></div>
-<pre><code>## Offline License checked out Tue Jul 27 10:38:33 2021</code></pre>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>geno.file <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;vignette_data&quot;</span>, <span class="st">&quot;geno2.csv&quot;</span>, <span class="at">package =</span> <span class="st">&quot;StageWise&quot;</span>)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>geno <span class="ot">&lt;-</span> <span class="fu">read_geno</span>(<span class="at">filename=</span>geno.file,<span class="at">ploidy=</span><span class="dv">4</span>,<span class="at">map=</span><span class="cn">FALSE</span>)</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -166,7 +165,6 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>               <span class="at">traits=</span><span class="st">&#39;Yield.Mg.ha&#39;</span>)</span></code></pre></div>
 <pre><code>## Traits: Yield.Mg.ha
 ## Env: CA_2011
-## Offline License checked out Tue Jul 27 10:38:35 2021
 ## Env: CA_2012
 ## Env: CA_2013
 ## Env: CA_2014
