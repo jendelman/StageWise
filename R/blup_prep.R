@@ -112,10 +112,10 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
       Z <- sparse.model.matrix(~id:loc-1,data,sep="__")
       colnames(Z) <- sub("loc__","",colnames(Z),fixed=T)
       colnames(Z) <- sub("id__","",colnames(Z),fixed=T)
-      # loc.id <- data.frame(as.matrix(expand.grid(locations,id))[,c(2,1)])
-      # colnames(loc.id) <- c("id","loc")
-      # Znames <- apply(loc.id,1,paste,collapse=":")
-      # Z <- Z[,Znames]
+      loc.id <- data.frame(as.matrix(expand.grid(locations,id))[,c(2,1)])
+      colnames(loc.id) <- c("id","loc")
+      Znames <- apply(loc.id,1,paste,collapse=":")
+      Z <- Z[,Znames]
       eigen.I <- list(values=rep(1,n.id),vectors=as(Diagonal(n.id,1),"dgeMatrix"))
       dimnames(eigen.I$vectors) <- list(id,id)
       
@@ -189,7 +189,7 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
   
   #which way to invert V
   success <- TRUE
-  if (m < n) {
+  if ((m < n) & (n.loc==1)) {
     cholR <- chol(Rinv)
     GZR <- tcrossprod(GZ,cholR)
     Q <- tcrossprod(GZR) + Gmat
@@ -202,7 +202,7 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
     }
   } 
      
-  if (m >= n | !success) {
+  if ((m >= n) | !success | (n.loc > 1)) {
     if (is.null(geno)) {
       V <- tcrossprod(Z%*%Gmat.half) + Rmat
     } else {
@@ -217,9 +217,10 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
   W <- forceSymmetric(solve(crossprod(X,Vinv%*%X)))
   XV <- crossprod(X,Vinv)
   Pmat <- Vinv - crossprod(chol(W)%*%XV)
-  fixed <- W%*%XV%*%data$BLUE
-  random <- GZ%*%Pmat%*%data$BLUE
+  fixed <- as.numeric(W%*%XV%*%data$BLUE)
+  names(fixed) <- colnames(X)
+  random <- as.numeric(GZ%*%Pmat%*%data$BLUE)
   new(Class="class_prep",y=data$BLUE,id=id,Z=Z,var.u=Gmat,Pmat=Pmat,Vinv=Vinv,
-      fixed=as.numeric(fixed),random=as.numeric(random),add=!is.null(geno),loc.env=loc.env,
+      fixed=fixed,random=random,add=!is.null(geno),loc.env=loc.env,
       fixed.marker=as.character(rownames(vars@fixed.marker.var)))
 }    

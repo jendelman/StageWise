@@ -39,6 +39,9 @@ Stage1 <- function(filename,traits,effects=NULL,
   stopifnot(requireNamespace("asreml"))
   stopifnot(traits %in% colnames(data))
   n.trait <- length(traits)
+  if (n.trait > 1) {
+    stop("Multiple traits not supported yet. Check back soon.")
+  }
   if (n.trait > 2) {
     trait2 <- combn(traits,2)
     ans <- apply(trait2,2,function(traits){Stage1(data,traits,effects,silent,workspace,pworkspace)})

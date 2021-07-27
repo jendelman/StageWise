@@ -23,7 +23,7 @@ There are three vignettes in the package:
 
 * [Vignette 2](https://jendelman.github.io/StageWise/Vignette2.html) illustrates the analysis of a dataset with correlated locations (for one trait).
 
-* [Vignette 3](https://jendelman.github.io/StageWise/Vignette3.html) illustrates the analysis of correlated traits (at one location).
+* Vignette 3 (in progress) illustrates the analysis of correlated traits (at one location).
 
 For a complete specification of package functions, consult the [reference manual.](https://jendelman.github.io/StageWise/manual.pdf)
 

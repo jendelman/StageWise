@@ -41,14 +41,9 @@ The above figure shows the variation in broad-sense heritability across location
 When the data frame of BLUEs passed to `Stage2` has a column labeled 'loc', genotype x location effects are included using a separable covariance structure. If marker data are included, the genetic covariance between locations for the additive effects follows a 2nd order factor-analytic (FA2) model, and the location covariance for the residual genetic effects is compound symmetric. If marker data are not included, an FA2 model is used for the genetic covariance between locations. For large datasets with many locations (such as this one), I recommend first analyzing it without marker data, as the computation proceeds more quickly. 
 
 Here is a joint analysis of all 9 locations without using the marker data, and the code also illustrates the `silent=FALSE` option to see the convergence progress with ASReml-R.
-```{r,include=FALSE}
-load("~/Box Sync/Endelman/Software/StageWise/Vignette2.rda")
-```
-```{r, eval=FALSE}
+```{r}
 ans2a <- Stage2(data=ans1$blue,
                 vcov=ans1$vcov,silent=FALSE)
-```
-```{r}
 summary(ans2a$vars)
 ```
 
@@ -67,32 +62,51 @@ Although the FA2 model should have enough complexity for a set of correlated loc
 ans2a$uniplot
 ```
 
-The distance of each location from the perimeter of the unit circle (radius = 1) is the proportion of the location-specific variance explained by the latent factors. Thus, locations on the perimeter are fully explained by the FA2 model. With the exception of TX and FL, the FA2 model appears to provide a good representation of the covariance structure.  
+The distance of each location from the perimeter of the unit circle (radius = 1) is the proportion of the location-specific variance explained by the latent factors. Thus, locations on the perimeter are fully explained by the FA2 model. With the exception of TX and FL, the FA2 model appears to provide a good representation of the covariance structure.
 
 For locations on the circle perimeter, the cosine of the angle between them equals the correlation (recall cos(0) = 1). Focusing on the 6 highly correlated locations-WI,MI,NC,OR,NY,MO-we will now add the marker data to `Stage2` to estimate the additive correlation and predict breeding values.
 
-```{r}
+```{r,fig.width=3,fig.height=3}
 locs <- c("WI","MI","OR","NY","NC","MO")
 data <- ans1$blue[ans1$blue$loc %in% locs,]
 tmp <- sapply(strsplit(names(ans1$vcov),split="_"),"[[",1)
 vcov <- ans1$vcov[tmp %in% locs]
-```
-```{r,eval=FALSE}
 ans2b <- Stage2(data=data,vcov=vcov,geno=geno,silent=FALSE)
-```
-```{r}
 summary(ans2b$vars)
 ans2b$uniplot
 ```
 
+The correlation matrix and uniplot show that breeding values for yield in NC were somewhat different compared to the other five sites. 
 
-```{r}
-index.coeff=c(1,1,1,1,0,1)/5
-names(index.coeff) <- locs
-blup1 <- blup(data=data,vcov=vcov,geno=geno,
-              vars=ans2b$vars,index.coeff=index.coeff)
-index.coeff=c(1,1,1,rep(0,6))/3
-names(index.coeff) <- rownames(ans2a$vars@g.resid)
-blup1 <- blup(data=ans1$blue,vcov=ans1$vcov,vars=ans2a$vars,index.coeff=index.coeff)
+Compared to the single location analysis in Vignette 1, an additional argument is needed for the `blup` function to specify the index coefficients for the locations. The following code illustrates three different indices. The first is for performance in WI, the second for NC, and the third is an average of the five states with similar ranking (WI,MI,NY,OR,MO):
+
+```{r,fig.width=3,fig.height=3}
+prep1 <- blup_prep(data=data,vcov=vcov,geno=geno,vars=ans2b$vars)
+
+index1 <- c(1,0,0,0,0,0)  #WI only
+index2 <- c(0,0,0,0,1,0)  #NC only
+index3 <- c(1/5, 1/5, 1/5, 1/5, 0, 1/5)  #5 state average
+names(index1) <- names(index2) <- names(index3) <- locs
+cbind(index1,index2,index3)
+
+pred1 <- blup(data=prep1,geno=geno,index.coeff=index1,what="id")
+pred2 <- blup(data=prep1,geno=geno,index.coeff=index2,what="id")
+pred3 <- blup(data=prep1,geno=geno,index.coeff=index3,what="id")
+
+tmp <- merge(pred2[,c("id","BV","BV.r2")],pred1[,c("id","BV","BV.r2")],by="id")
+cor(tmp$BV.x,tmp$BV.y)  #correlation between WI and NC GEBVs
+
+ggplot(tmp,aes(x=BV.r2.x,y=BV.r2.y)) + geom_point() + coord_fixed(ratio=1) + xlim(0.3,0.8) + ylim(0.3,0.8) + geom_line(data=data.frame(x=c(0.3,0.8),y=c(0.3,0.8)),mapping=aes(x=x,y=y),linetype=2) + theme_bw() + 
+  xlab("NC") + ylab("WI") + ggtitle("BV Reliability")
+```
+
+The above figure shows that because NC was less correlated than WI to the other 4 sites, the reliability of the NC predictions were lower than for WI. The result below shows there is little difference between the five-state average and WI alone because the correlations are so high.
+
+```{r,fig.width=3,fig.height=3}
+tmp <- merge(pred3[,c("id","BV","BV.r2")],pred1[,c("id","BV","BV.r2")],by="id")
+cor(tmp$BV.x,tmp$BV.y)
+
+ggplot(tmp,aes(x=BV.r2.x,y=BV.r2.y)) + geom_point() + coord_fixed(ratio=1) + xlim(0.3,0.8) + ylim(0.3,0.8) + geom_line(data=data.frame(x=c(0.3,0.8),y=c(0.3,0.8)),mapping=aes(x=x,y=y),linetype=2) + theme_bw() + 
+  xlab("5 stage average") + ylab("WI") + ggtitle("BV Reliability")
 ```
 
