@@ -31,6 +31,8 @@ S4 class to prepare for blup
 
 \item{\code{loc.env}}{data frame with loc, env}
 
+\item{\code{index.scale}}{sqrt of genetic variances for the locations/traits}
+
 \item{\code{fixed.marker}}{names of fixed effect markers}
 }}
 

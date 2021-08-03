@@ -78,14 +78,14 @@ ans2b$uniplot
 
 The correlation matrix and uniplot show that breeding values for yield in NC were somewhat different compared to the other five sites. 
 
-Compared to the single location analysis in Vignette 1, an additional argument is needed for the `blup` function to specify the index coefficients for the locations. The following code illustrates three different indices. The first is for performance in WI, the second for NC, and the third is an average of the five states with similar ranking (WI,MI,NY,OR,MO):
+Compared to the single location analysis in Vignette 1, an additional argument is needed for the `blup` function to specify the index coefficients for the locations. The index coefficients are interpreted as the relative weight for each location after standardization to unit variance. Thus, the coefficients supplied to the function are divided by the square root of the genetic variance estimates and then rescaled to have unit sum. The following code illustrates three different indices. The first is for performance in WI, the second for NC, and the third is an average of the five states with similar ranking (WI,MI,NY,OR,MO):
 
 ```{r,fig.width=3,fig.height=3}
 prep1 <- blup_prep(data=data,vcov=vcov,geno=geno,vars=ans2b$vars)
 
 index1 <- c(1,0,0,0,0,0)  #WI only
 index2 <- c(0,0,0,0,1,0)  #NC only
-index3 <- c(1/5, 1/5, 1/5, 1/5, 0, 1/5)  #5 state average
+index3 <- c(1,1,1,1,0,1)  #5 state average
 names(index1) <- names(index2) <- names(index3) <- locs
 cbind(index1,index2,index3)
 

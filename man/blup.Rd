@@ -24,5 +24,5 @@ Data frames of BLUPs
 BLUP
 }
 \details{
-Argument \code{what="id"} leads to prediction of breeding values (BV) and genotypic values (GV), including the average fixed effect of the environments and any fixed effect markers.  For argument \code{what="marker"}, fixed effects are not included in the BLUP. Argument \code{index.coeff} should be a named vector, matching the names of the locations or traits. Index coefficients are normalized to have unit sum.
+Argument \code{what="id"} leads to prediction of breeding values (BV) and genotypic values (GV), including the average fixed effect of the environments and any fixed effect markers.  For argument \code{what="marker"}, fixed effects are not included in the BLUP. Argument \code{index.coeff} should be a named vector, matching the names of the locations or traits. Index coefficients are assumed to imply relative weights for the different locations or traits; as such, they are divided by the square root of the genetic variance estimate for that location/trait and then rescaled to have unit sum.
 }

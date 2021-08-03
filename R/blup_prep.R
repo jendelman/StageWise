@@ -123,12 +123,15 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
         tmp <- kron(eigen.A=eigen.I, B=vars@g.resid)
         Gmat.half <- tmp$half
         Gmat <- tmp$full
+        index.scale <- sqrt(diag(as.matrix(vars@g.resid)))
       } else {
         Gmat1 <- kron(eigen.A=geno@eigen.G, B=vars@add)
         Gmat2 <- kron(eigen.A=eigen.I, B=cor2cov(vars@g.resid))
         Gmat <- as(bdiag(Gmat1$full,Gmat2$full),"symmetricMatrix")
+        index.scale <- sqrt(diag(as.matrix(vars@add)))
       } 
     } else {
+      index.scale <- numeric(0)
       Z <- sparse.model.matrix(~id-1,data,sep="__")
       colnames(Z) <- sub("id__","",colnames(Z),fixed=T)
       #Z <- Z[,id]
@@ -222,5 +225,6 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
   random <- as.numeric(GZ%*%Pmat%*%data$BLUE)
   new(Class="class_prep",y=data$BLUE,id=id,Z=Z,var.u=Gmat,Pmat=Pmat,Vinv=Vinv,
       fixed=fixed,random=random,add=!is.null(geno),loc.env=loc.env,
-      fixed.marker=as.character(rownames(vars@fixed.marker.var)))
+      fixed.marker=as.character(rownames(vars@fixed.marker.var)),
+      index.scale=index.scale)
 }    

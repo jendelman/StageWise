@@ -2,7 +2,7 @@
 #' 
 #' BLUP
 #' 
-#' Argument \code{what="id"} leads to prediction of breeding values (BV) and genotypic values (GV), including the average fixed effect of the environments and any fixed effect markers.  For argument \code{what="marker"}, fixed effects are not included in the BLUP. Argument \code{index.coeff} should be a named vector, matching the names of the locations or traits. Index coefficients are normalized to have unit sum.
+#' Argument \code{what="id"} leads to prediction of breeding values (BV) and genotypic values (GV), including the average fixed effect of the environments and any fixed effect markers.  For argument \code{what="marker"}, fixed effects are not included in the BLUP. Argument \code{index.coeff} should be a named vector, matching the names of the locations or traits. Index coefficients are assumed to imply relative weights for the different locations or traits; as such, they are divided by the square root of the genetic variance estimate for that location/trait and then rescaled to have unit sum.
 #' 
 #' @param data object of \code{\link{class_prep}} from \code{\link{blup_prep}}
 #' @param geno object of \code{\link{class_geno}} from \code{\link{read_geno}}
@@ -25,19 +25,17 @@ blup <- function(data,geno=NULL,what,index.coeff=NULL,gwas.ncore=0L) {
   
   if (nrow(data@loc.env) > 0) {
     locations <- sort(unique(data@loc.env$loc))
+    data@index.scale <- data@index.scale[locations]
     data@loc.env$loc <- factor(data@loc.env$loc,levels=locations)
     n.loc <- length(locations)
     if (is.null(index.coeff)) {
-      index.coeff <- rep(1/n.loc,n.loc)
-      names(index.coeff) <- locations
+      index.coeff <- 1/data@index.scale
     } else {
-      index.coeff <- index.coeff/sum(index.coeff)
       ix <- match(locations,names(index.coeff))
-      if (any(is.na(ix))) {
-        stop("Check names of locations in index.coeff")
-      }
-      index.coeff <- index.coeff[ix]
+      if (any(is.na(ix))) {stop("Check names of locations in index.coeff")}
+      index.coeff <- index.coeff[ix]/data@index.scale
     }
+    index.coeff <- index.coeff/sum(index.coeff)
     n.env <- length(data@fixed) - n.loc*n.mark
     fix.value <- sum(index.coeff*tapply(data@fixed[data@loc.env$env],data@loc.env$loc,mean))
   } else {

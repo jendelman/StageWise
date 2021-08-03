@@ -1,6 +1,6 @@
 Package: StageWise
 Title: Two-stage analysis of multi-environment trials for genomic selection
-Version: 0.03
+Version: 0.04
 Author: Jeffrey B. Endelman
 Maintainer: Jeffrey Endelman <endelman@wisc.edu>
 Description: Two-stage analysis of multi-environment trials for genomic selection
