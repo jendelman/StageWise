@@ -14,6 +14,8 @@
 #' 
 #' Argument \code{workspace} is a vector of length two containing the workspace and pworkspace limits for ASReml-R, with default values of 500mb. If you get an error about insufficient memory, try increasing the appropriate value (workspace for variance estimation and pworkspace for BLUE computation).
 #' 
+#' For multiple traits, only "asreml" is supported, and only the BLUE model is run, so the returned object does not contain H2 or resid.
+#' 
 #' @param filename Name of CSV file
 #' @param traits trait names (see Details)
 #' @param effects data frame specifying other effects in the model (see Details)
@@ -46,19 +48,21 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   data <- read.csv(file=filename,check.names=F)
   solver <- toupper(solver)
   stopifnot(solver %in% c("ASREML","SPATS"))
+  stopifnot(traits %in% colnames(data))
+  n.trait <- length(traits)
+  
   if (solver=="ASREML") {
     stopifnot(requireNamespace("asreml"))
-    asreml::asreml.options(maxit=30,workspace=workspace[1],pworkspace=workspace[2],trace=!silent)
+    asreml::asreml.options(maxit=50,workspace=workspace[1],pworkspace=workspace[2],trace=!silent)
   }
   if (solver=="SPATS") {
+    if (n.trait > 1) {
+      stop("Use asreml for multiple traits")
+    }
     stopifnot(requireNamespace("SpATS"))
     stopifnot(spline %in% colnames(data))
   }
-  stopifnot(traits %in% colnames(data))
-  n.trait <- length(traits)
-  if (n.trait > 1) {
-    stop("Multiple traits not supported yet. Check back soon.")
-  }
+  
   if (!is.null(effects)) {
     stopifnot(effects$names %in% colnames(data))
   }
@@ -78,7 +82,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   if (n.trait == 1) {
     if (solver=="ASREML") {
       model <- sub("traits",traits,
-                 "asreml(data=data1,na.action=na.method(y='omit',x='omit'),fixed=traits~FIX,random=~RANDOM,residual=~idv(units))",fixed=T)
+                 "asreml(data=data1,na.action=na.method(x='omit'),fixed=traits~FIX,random=~RANDOM,residual=~idv(units))",fixed=T)
       effect.table[1,1] <- "id"
       effect.table[2,2] <- "id"
     }
@@ -87,18 +91,23 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
                    "SpATS(data=data1,response='traits',genotype='id',fixed=~FIX,random=~RANDOM,spatial=~SAP(spline.x,spline.y),genotype.as.random=GARgar",fixed=T)
   } else {
     model <- sub("response",paste(traits,collapse=","),
-                 "asreml(data=data1,fixed=cbind(response)~FIX,random=~RANDOM,residual=~id(units):corh(trait))",fixed=T)
+                 "asreml(data=data1,na.action=na.method(x='omit'),fixed=cbind(response)~FIX,random=~RANDOM,residual=~id(units):us(trait))",fixed=T)
     effect.table[1,1] <- "id:trait"
-    effect.table[2,] <- NA
   }
 
   factor.vars <- "id"
+
   if (!is.null(effects)) {
+    if (n.trait > 1) {
+      effects$name2 <- apply(array(effects$name),1,paste,"trait",sep=":")
+    } else {
+      effects$name2 <- effects$name
+    }
     for (i in 1:nrow(effects)) {
       if (effects$fixed[i]) {
-        effect.table[,1] <- paste(effect.table[,1],effects$name[i],sep="+")
+        effect.table[,1] <- paste(effect.table[,1],effects$name2[i],sep="+")
       } else {
-        effect.table[,2] <- paste(effect.table[,2],effects$name[i],sep="+")
+        effect.table[,2] <- paste(effect.table[,2],effects$name2[i],sep="+")
       }
     }
     factor.vars <- c(factor.vars,effects$name[which(effects$factor)])
@@ -217,39 +226,44 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
       predans <- predict.asreml(ans,classify="id:trait",vcov = TRUE)
       tmp <- predans$pvals[,c("id","trait","predicted.value")]
       colnames(tmp) <- c("id","trait","BLUE")
+      vcov[[j]] <- predans$vcov
+      tmp$id <- as.character(tmp$id)
+      id.trait <- apply(tmp[,1:2],1,paste,collapse=":")
+      dimnames(vcov[[j]]) <- list(id.trait,id.trait)
+      blue.out <- rbind(blue.out,data.frame(env=envs[j],tmp))
     }
     
-    ans <- try(eval(parse(text=blup.model)),silent=TRUE)
-    if (class(ans)=="try-error") {
-      stop("BLUP model failed to converge.")
-    }
-    if ((solver=="ASREML")&&(!ans$converge)) {
-      stop("BLUP model failed to converge.")
-    }
     if (n.trait==1) {
-      residuals <- resid(ans)
-      blup.resid <- rbind(blup.resid,
+      ans <- try(eval(parse(text=blup.model)),silent=TRUE)
+      if (class(ans)=="try-error") {
+        stop("BLUP model failed to converge.")
+      }
+      if ((solver=="ASREML")&&(!ans$converge)) {
+        stop("BLUP model failed to converge.")
+      }
+      if (n.trait==1) {
+        residuals <- resid(ans)
+        blup.resid <- rbind(blup.resid,
                           data.frame(id=as.character(data1$id),env=envs[j],resid=residuals))
-      if (solver=="ASREML") {
-        vc <- summary(ans)$varcomp
-        Vg <- vc[match("id",rownames(vc)),1]
-        Ve <- vc[match("units!units",rownames(vc)),1]
-        H2$H2[j] <- round(Vg/(Vg+Ve),2)
-      }
-      if (solver=="SPATS") {
-        H2$H2[j] <- round(as.numeric(getHeritability(ans)),2)
-        x.coord <- ans$data[,ans$terms$spatial$terms.formula$x.coord]
-        y.coord <- ans$data[,ans$terms$spatial$terms.formula$y.coord]
-        fit.spatial.trend <- obtain.spatialtrend(ans)
-        p1.data <- data.frame(x=x.coord,y=y.coord,z=residuals)
-        p1 <- ggplot(p1.data,aes(x=.data$x,y=.data$y,fill=.data$z)) + geom_tile() + scale_fill_viridis_c(name="") + xlab(spline[1]) + ylab(spline[2]) + ggtitle("Residuals")
-        p2.data <-data.frame(expand.grid(x=fit.spatial.trend$col.p, y=fit.spatial.trend$row.p), z=as.numeric(t(fit.spatial.trend$fit)))
-        p2 <- ggplot(p2.data,aes(x=.data$x,y=.data$y,fill=.data$z)) + geom_tile() + scale_fill_viridis_c(name="") + xlab(spline[1]) + theme(axis.text.y = element_blank(),axis.ticks.y=element_blank(),axis.title.y=element_blank()) + ggtitle("Spatial Trend")
-        spatial.plot[[j]] <- ggarrange(p1,p2,common.legend = TRUE,legend = "right")
-      }
-    } else {
-      #to do
-    } 
+        if (solver=="ASREML") {
+          vc <- summary(ans)$varcomp
+          Vg <- vc[match("id",rownames(vc)),1]
+          Ve <- vc[match("units!units",rownames(vc)),1]
+          H2$H2[j] <- round(Vg/(Vg+Ve),2)
+        }
+        if (solver=="SPATS") {
+          H2$H2[j] <- round(as.numeric(getHeritability(ans)),2)
+          x.coord <- ans$data[,ans$terms$spatial$terms.formula$x.coord]
+          y.coord <- ans$data[,ans$terms$spatial$terms.formula$y.coord]
+          fit.spatial.trend <- obtain.spatialtrend(ans)
+          p1.data <- data.frame(x=x.coord,y=y.coord,z=residuals)
+          p1 <- ggplot(p1.data,aes(x=.data$x,y=.data$y,fill=.data$z)) + geom_tile() + scale_fill_viridis_c(name="") + xlab(spline[1]) + ylab(spline[2]) + ggtitle("Residuals")
+          p2.data <-data.frame(expand.grid(x=fit.spatial.trend$col.p, y=fit.spatial.trend$row.p), z=as.numeric(t(fit.spatial.trend$fit)))
+          p2 <- ggplot(p2.data,aes(x=.data$x,y=.data$y,fill=.data$z)) + geom_tile() + scale_fill_viridis_c(name="") + xlab(spline[1]) + theme(axis.text.y = element_blank(),axis.ticks.y=element_blank(),axis.title.y=element_blank()) + ggtitle("Spatial Trend")
+          spatial.plot[[j]] <- ggarrange(p1,p2,common.legend = TRUE,legend = "right")
+        }
+      } 
+    }
   }
   
   if ("loc" %in% colnames(data)) {
@@ -266,6 +280,6 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
       return(list(blue=blue.out,vcov=vcov,H2=H2,
                   resid=list(boxplot=p1,qqplot=p2,spatial=spatial.plot,table=blup.resid)))
   } else {
-    # to do
+    return(list(blue=blue.out,vcov=vcov))
   }
 }
