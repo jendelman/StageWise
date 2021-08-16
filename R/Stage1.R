@@ -1,52 +1,64 @@
 #' Stage 1 analysis of multi-environment trials
 #' 
-#' Computes genotype BLUEs within each environment using ASReml-R
+#' Computes genotype BLUEs within each environment
 #' 
 #' The input file must have one column labeled "id" for the individuals and one labeled "env" for the environments. The data for each environment are analyzed independently with a linear mixed model. Although not used in Stage1, to include a genotype x location effect in \code{\link{Stage2}}, a column labeled "loc" should be present in the input file. 
 #' 
-#' Including multiple traits in \code{trait} triggers a multivariate analysis, but for computational reasons, only 2 traits are analyzed at a time. With more than 2 traits, the software analyzes all pairs of traits. For single trait analysis, broad-sense H2 on a plot basis is computed from the variance components for each env, with genotype as a random effect. The residuals from this analysis are also returned as a table and plots.
-#' 
 #' Argument \code{effects} is used to specify other i.i.d. effects besides genotype and has three columns: name, fixed, factor. The "name" column is a string that must match a column in the input file. The fixed column is a logical variable to indicate whether the effect is fixed (TRUE) or random (FALSE). The factor column is a logical variable to indicate whether the effect is a factor (TRUE) or numeric (FALSE). 
 #' 
-#' Missing response values are omitted for single-trait analysis but retained for multi-trait analysis (unless both traits are missing), to allow for prediction in Stage 2. By default, the workspace and pworkspace limits for ASReml-R are set at 500mb. If you get an error about insufficient memory, try increasing the appropriate value (workspace for variance estimation and pworkspace for BLUE computation).
+#' Argument \code{solver} specifies which software to use for REML. Current options are "asreml" and "spats". For "spats", the argument \code{spline} must be a vector of length two, with the names of the x and y variables (respectively) for the 2D spline.
+#' 
+#' The heritability and residuals in the output are based on a random effects model for id.
+#' 
+#' Missing response values are omitted for single-trait analysis but retained for multi-trait analysis (unless both traits are missing), to allow for prediction in Stage 2. 
+#' 
+#' Argument \code{workspace} is a vector of length two containing the workspace and pworkspace limits for ASReml-R, with default values of 500mb. If you get an error about insufficient memory, try increasing the appropriate value (workspace for variance estimation and pworkspace for BLUE computation).
 #' 
 #' @param filename Name of CSV file
 #' @param traits trait names (see Details)
 #' @param effects data frame specifying other effects in the model (see Details)
-#' @param workspace memory limit for ASRreml-R variance estimation
-#' @param pworkspace memory limit for ASRreml-R BLUE computation
-#' @param silent TRUE/FALSE, whether to suppress ASReml-R output
+#' @param solver one of the following: "asreml","spats"
+#' @param spline vector of variable names for 2D spline with SpATS
+#' @param silent TRUE/FALSE, whether to suppress REML output
+#' @param workspace memory limits for ASRreml-R
 #' 
 #' @return List containing
 #' \describe{
 #' \item{blue}{data frame of BLUEs for all environments}
 #' \item{vcov}{list of variance-covariance matrices for the BLUEs, one per env}
-#' \item{H2}{broad-sense H2 on a plot basis (only for single trait)}
-#' \item{resid}{list containing boxplot, qqplot, and table of residuals (only for single trait)}
+#' \item{H2}{broad-sense H2 on a plot basis}
+#' \item{resid}{list containing diagnostic plots and data frame of residuals}
 #' }
 #' 
 #' @importFrom utils combn read.csv
-#' @import asreml
 #' @import ggplot2
+#' @import asreml
+#' @import SpATS
+#' @importFrom ggpubr ggarrange
 #' @importFrom rlang .data
 #' @importFrom stats resid
+#' @importFrom spam as.dgCMatrix.spam
 #' @export
 
-Stage1 <- function(filename,traits,effects=NULL,
-                   silent=TRUE,workspace="500mb",pworkspace="500mb") {
+Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
+                   spline=NULL,silent=TRUE,workspace=c("500mb","500mb")) {
   
   data <- read.csv(file=filename,check.names=F)
-  stopifnot(requireNamespace("asreml"))
+  solver <- toupper(solver)
+  stopifnot(solver %in% c("ASREML","SPATS"))
+  if (solver=="ASREML") {
+    stopifnot(requireNamespace("asreml"))
+    asreml::asreml.options(maxit=30,workspace=workspace[1],pworkspace=workspace[2],trace=!silent)
+  }
+  if (solver=="SPATS") {
+    stopifnot(requireNamespace("SpATS"))
+    stopifnot(spline %in% colnames(data))
+  }
   stopifnot(traits %in% colnames(data))
   n.trait <- length(traits)
   if (n.trait > 1) {
     stop("Multiple traits not supported yet. Check back soon.")
   }
-  if (n.trait > 2) {
-    trait2 <- combn(traits,2)
-    ans <- apply(trait2,2,function(traits){Stage1(data,traits,effects,silent,workspace,pworkspace)})
-    return(ans)
-  } else {
   if (!is.null(effects)) {
     stopifnot(effects$names %in% colnames(data))
   }
@@ -54,28 +66,30 @@ Stage1 <- function(filename,traits,effects=NULL,
   
   data$env <- as.character(data$env)
   data$id <- as.character(data$id)
-  if (n.trait > 1) {
-    iz <- apply(data[,traits],1,function(z){!all(is.na(z))})
-    data <- data[iz,]
-  }
   envs <- unique(data$env)
   n.env <- length(envs)
   
-  #prepare asreml command
-  asreml.options(maxit=30,workspace=workspace,pworkspace=pworkspace,trace=!silent)
+  iz <- apply(as.matrix(data[,traits]),1,function(z){!all(is.na(z))})
+  data <- data[iz,]
+  
   effect.table <- matrix("",nrow=2,ncol=2)
   rownames(effect.table) <- c("blue","blup")
   colnames(effect.table) <- c("fixed","random")
-  if (n.trait > 1) {
+  if (n.trait == 1) {
+    if (solver=="ASREML") {
+      model <- sub("traits",traits,
+                 "asreml(data=data1,na.action=na.method(y='omit',x='omit'),fixed=traits~FIX,random=~RANDOM,residual=~idv(units))",fixed=T)
+      effect.table[1,1] <- "id"
+      effect.table[2,2] <- "id"
+    }
+    if (solver=="SPATS") 
+      model <- sub("traits",traits,
+                   "SpATS(data=data1,response='traits',genotype='id',fixed=~FIX,random=~RANDOM,spatial=~SAP(spline.x,spline.y),genotype.as.random=GARgar",fixed=T)
+  } else {
     model <- sub("response",paste(traits,collapse=","),
-                  "asreml(data=data1,na.action=na.method(y='include',x='omit'),fixed=cbind(response)~FIX,random=~RANDOM,residual=~id(units):corh(trait))",fixed=T)
+                 "asreml(data=data1,fixed=cbind(response)~FIX,random=~RANDOM,residual=~id(units):corh(trait))",fixed=T)
     effect.table[1,1] <- "id:trait"
     effect.table[2,] <- NA
-  } else {
-    model <- sub("response",traits,
-                 "asreml(data=data1,na.action=na.method(y='omit',x='omit'),fixed=response~FIX,random=~RANDOM,residual=~idv(units))",fixed=T)
-    effect.table[1,1] <- "id"
-    effect.table[2,2] <- "id"
   }
 
   factor.vars <- "id"
@@ -94,23 +108,50 @@ Stage1 <- function(filename,traits,effects=NULL,
   }
   n.numeric <- length(numeric.vars)
   
+  #eliminate leading "+"
+  effect.table <- apply(effect.table,c(1,2),function(z){if(substr(z,1,1)=="+"){substr(z,2,nchar(z))}else{z}})
+  
+  #BLUE model
   if (effect.table[1,2]=="") {
     blue.model <- sub("random=~RANDOM,","",model,fixed=T)
   } else {
     blue.model <- sub("RANDOM",effect.table[1,2],model,fixed=T)
   }
-  blue.model <- sub("FIX",effect.table[1,1],blue.model,fixed=T)
-  
-  tmp <- effect.table[2,1]
-  if (tmp=="") {
-    blup.model <- sub("FIX","1",model,fixed=T)
+  if (effect.table[1,1]=="") {
+    blue.model <- sub("fixed=~FIX,","",blue.model,fixed=T)
   } else {
-    if (substr(tmp,1,1)=="+") {
-      tmp <- substr(tmp,2,nchar(tmp))
-    } 
-    blup.model <- sub("FIX",tmp,model,fixed=T)
+    blue.model <- sub("FIX",effect.table[1,1],blue.model,fixed=T)
   }
-  blup.model <- sub("RANDOM",effect.table[2,2],blup.model,fixed=T)
+  
+  #BLUP model
+  if (solver=="ASREML" & effect.table[2,1]=="") {
+    effect.table[2,1] <- "1"
+  }
+  if (effect.table[2,2]=="") {
+    blup.model <- sub("random=~RANDOM,","",model,fixed=T)
+  } else {
+    blup.model <- sub("RANDOM",effect.table[2,2],model,fixed=T)
+  }
+  if (effect.table[2,1]=="") {
+    blup.model <- sub("fixed=~FIX,","",blup.model,fixed=T)
+  } else {
+    blup.model <- sub("FIX",effect.table[2,1],blup.model,fixed=T)
+  }
+  if (solver=="SPATS") {
+    blup.model <- sub("GARgar","TRUE",blup.model,fixed=T)
+    blue.model <- sub("GARgar","FALSE",blue.model,fixed=T)
+    blup.model <- sub("spline.x",spline[1],blup.model,fixed=T)
+    blup.model <- sub("spline.y",spline[2],blup.model,fixed=T)
+    blue.model <- sub("spline.x",spline[1],blue.model,fixed=T)
+    blue.model <- sub("spline.y",spline[2],blue.model,fixed=T)
+    if (silent) {
+      blup.model <- paste0(blup.model,",control=list(monitoring=0))")
+      blue.model <- paste0(blue.model,",control=list(monitoring=0))")
+    } else {
+      blup.model <- paste0(blup.model,")")
+      blue.model <- paste0(blue.model,")")
+    }
+  }
   
   resid.blup <- NULL
   vcov <- vector("list",n.env)
@@ -124,6 +165,10 @@ Stage1 <- function(filename,traits,effects=NULL,
 
   blue.out <- NULL
   blup.resid <- NULL
+  if (solver=="SPATS") {
+    spatial.plot <- vector("list",n.env)
+    names(spatial.plot) <- envs
+  }
   cat(sub("X",paste(traits,collapse=" "),"Traits: X\n"))
   for (j in 1:n.env) {
     cat(sub("X",envs[j],"Env: X\n"))
@@ -142,48 +187,68 @@ Stage1 <- function(filename,traits,effects=NULL,
       }
     }
     
-    ans <- eval(parse(text=blue.model))
-    while (!ans$converge) {
-      cat("Fixed effects model failed to converge. Do you wish to continue running? y/n \n")
-      input <- readLines(n=1)
-      if (input=="y") {
-        ans <- update.asreml(ans)
-      } else {
-        return()
-      }
+    ans <- try(eval(parse(text=blue.model)),silent=TRUE)
+    if (class(ans)=="try-error") {
+      stop("BLUE model failed to converge.")
     }
-    if (n.trait > 1) {
+    if ((solver=="ASREML")&&(!ans$converge)) {
+      stop("BLUE model failed to converge.")
+    }
+    if (n.trait==1) {
+      if (solver=="ASREML") {
+        predans <- predict.asreml(ans,classify="id",vcov = TRUE)
+        tmp <- predans$pvals[,c("id","predicted.value")]
+        colnames(tmp) <- c("id","BLUE")
+        vcov[[j]] <- predans$vcov
+      }
+      if (solver=="SPATS") {
+        predans <- predict.SpATS(object=ans,which="id",predFixed="marginal",
+                                   return.vcov.matrix = TRUE)
+        tmp <- predans[,c("id","predicted.values")]
+        colnames(tmp) <- c("id","BLUE")
+        tmp2 <- Matrix(spam::as.dgCMatrix.spam(attr(predans,"vcov")))
+        vcov[[j]] <- as(forceSymmetric(tmp2),"dspMatrix")
+      }
+      tmp$id <- as.character(tmp$id)
+      dimnames(vcov[[j]]) <- list(tmp$id,tmp$id)
+      blue.out <- rbind(blue.out,data.frame(env=envs[j],tmp))
+      
+    } else {
       predans <- predict.asreml(ans,classify="id:trait",vcov = TRUE)
       tmp <- predans$pvals[,c("id","trait","predicted.value")]
       colnames(tmp) <- c("id","trait","BLUE")
-    } else {
-      predans <- predict.asreml(ans,classify="id",vcov = TRUE)
-      tmp <- predans$pvals[,c("id","predicted.value")]
-      colnames(tmp) <- c("id","BLUE")
     }
-    tmp$id <- as.character(tmp$id)
     
-    blue.out <- rbind(blue.out,data.frame(env=envs[j],tmp))
-    vcov[[j]] <- predans$vcov
-    dimnames(vcov[[j]]) <- list(tmp$id,tmp$id)
-    
+    ans <- try(eval(parse(text=blup.model)),silent=TRUE)
+    if (class(ans)=="try-error") {
+      stop("BLUP model failed to converge.")
+    }
+    if ((solver=="ASREML")&&(!ans$converge)) {
+      stop("BLUP model failed to converge.")
+    }
     if (n.trait==1) {
-      ans <- eval(parse(text=blup.model))
-      while (!ans$converge) {
-        cat("Random effects model failed to converge. Do you wish to continue running? y/n \n")
-        input <- readLines(n=1)
-        if (input=="y") {
-          ans <- update.asreml(ans)
-        } else {
-          return()
-        }
+      residuals <- resid(ans)
+      blup.resid <- rbind(blup.resid,
+                          data.frame(id=as.character(data1$id),env=envs[j],resid=residuals))
+      if (solver=="ASREML") {
+        vc <- summary(ans)$varcomp
+        Vg <- vc[match("id",rownames(vc)),1]
+        Ve <- vc[match("units!units",rownames(vc)),1]
+        H2$H2[j] <- round(Vg/(Vg+Ve),2)
       }
-      vc <- summary(ans)$varcomp
-      Vg <- vc[match("id",rownames(vc)),1]
-      Ve <- vc[match("units!units",rownames(vc)),1]
-      H2$H2[j] <- round(Vg/(Vg+Ve),2)
-      blup.resid <- rbind(blup.resid,data.frame(id=as.character(data1$id),env=envs[j],
-                          resid=resid(ans)))
+      if (solver=="SPATS") {
+        H2$H2[j] <- round(as.numeric(getHeritability(ans)),2)
+        x.coord <- ans$data[,ans$terms$spatial$terms.formula$x.coord]
+        y.coord <- ans$data[,ans$terms$spatial$terms.formula$y.coord]
+        fit.spatial.trend <- obtain.spatialtrend(ans)
+        p1.data <- data.frame(x=x.coord,y=y.coord,z=residuals)
+        p1 <- ggplot(p1.data,aes(x=.data$x,y=.data$y,fill=.data$z)) + geom_tile() + scale_fill_viridis_c(name="") + xlab(spline[1]) + ylab(spline[2]) + ggtitle("Residuals")
+        p2.data <-data.frame(expand.grid(x=fit.spatial.trend$col.p, y=fit.spatial.trend$row.p), z=as.numeric(t(fit.spatial.trend$fit)))
+        p2 <- ggplot(p2.data,aes(x=.data$x,y=.data$y,fill=.data$z)) + geom_tile() + scale_fill_viridis_c(name="") + xlab(spline[1]) + theme(axis.text.y = element_blank(),axis.ticks.y=element_blank(),axis.title.y=element_blank()) + ggtitle("Spatial Trend")
+        spatial.plot[[j]] <- ggarrange(p1,p2,common.legend = TRUE,legend = "right")
+      }
+    } else {
+      #to do
     } 
   }
   
@@ -194,10 +259,13 @@ Stage1 <- function(filename,traits,effects=NULL,
     p1 <- ggplot(data=blup.resid,aes(y=.data$resid,x=.data$env)) + ylab("Residual") + xlab("") +
       stat_boxplot(outlier.color="red") + theme_bw() + theme(axis.text.x=element_text(angle=90,vjust=0.5))
     p2 <- ggplot(data=blup.resid,aes(sample=.data$resid)) + stat_qq() + stat_qq_line() + facet_wrap(~env) + theme_bw() + xlab("Expected") + ylab("Observed")
-    
-    return(list(blue=blue.out,vcov=vcov,resid=list(boxplot=p1,qqplot=p2,table=blup.resid),H2=H2))
+    if (solver=="ASREML")
+      return(list(blue=blue.out,vcov=vcov,H2=H2,
+                  resid=list(boxplot=p1,qqplot=p2,table=blup.resid)))
+    if (solver=="SPATS")
+      return(list(blue=blue.out,vcov=vcov,H2=H2,
+                  resid=list(boxplot=p1,qqplot=p2,spatial=spatial.plot,table=blup.resid)))
   } else {
-    return(list(blue=blue.out,vcov=vcov))
-  }
+    # to do
   }
 }

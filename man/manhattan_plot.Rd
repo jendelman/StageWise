@@ -4,7 +4,7 @@
 \alias{manhattan_plot}
 \title{Create Manhattan plot}
 \usage{
-manhattan_plot(data, chrom = NULL, thresh = NULL, rotate = FALSE)
+manhattan_plot(data, chrom = NULL, thresh = NULL, rotate.label = FALSE)
 }
 \arguments{
 \item{data}{data frame with columns for marker, chrom, position, and gwas.score}
@@ -13,7 +13,7 @@ manhattan_plot(data, chrom = NULL, thresh = NULL, rotate = FALSE)
 
 \item{thresh}{optional, to include horizontal line at discovery threshold}
 
-\item{rotate}{TRUE/FALSE whether to rotate x-axis labels to be perpendicular}
+\item{rotate.label}{TRUE/FALSE whether to rotate x-axis labels to be perpendicular}
 }
 \value{
 ggplot2 object

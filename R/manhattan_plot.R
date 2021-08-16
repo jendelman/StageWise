@@ -7,7 +7,7 @@
 #' @param data data frame with columns for marker, chrom, position, and gwas.score
 #' @param chrom optional, to plot only one chromosome
 #' @param thresh optional, to include horizontal line at discovery threshold
-#' @param rotate TRUE/FALSE whether to rotate x-axis labels to be perpendicular 
+#' @param rotate.label TRUE/FALSE whether to rotate x-axis labels to be perpendicular 
 #' 
 #' @return ggplot2 object
 #' 
@@ -15,7 +15,7 @@
 #' @import ggplot2
 #' @importFrom rlang .data
 
-manhattan_plot <- function(data,chrom=NULL,thresh=NULL,rotate=FALSE) {
+manhattan_plot <- function(data,chrom=NULL,thresh=NULL,rotate.label=FALSE) {
 		
   stopifnot(c("chrom","position","gwas.score") %in% colnames(data))
   if (is.null(chrom)) {
@@ -28,7 +28,7 @@ manhattan_plot <- function(data,chrom=NULL,thresh=NULL,rotate=FALSE) {
   }
   plot.data <- data.frame(x=x,y=data$gwas.score[ix],
                           color=factor(ifelse(as.integer(factor(data$chrom[ix]))%%2==1,1,0)))
-  if (rotate) {
+  if (rotate.label) {
     angle <- 90
   } else {
     angle <- 0

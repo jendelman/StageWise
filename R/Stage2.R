@@ -32,6 +32,8 @@
 #' @import Matrix
 #' @import ggplot2
 #' @import ggrepel
+#' @import asreml
+#' 
 #' @export
 
 Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,workspace="500mb") {

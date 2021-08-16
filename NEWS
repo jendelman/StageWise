@@ -1,2 +1,6 @@
+Changes in 0.05
+* Added SpATS option to Stage 1 and updated vignette
+* {-1,0,1} coding allowed for diploids in read_geno
+
 Changes in 0.04
 * Changed scaling of index coefficients

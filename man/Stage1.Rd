@@ -8,9 +8,10 @@ Stage1(
   filename,
   traits,
   effects = NULL,
+  solver = "asreml",
+  spline = NULL,
   silent = TRUE,
-  workspace = "500mb",
-  pworkspace = "500mb"
+  workspace = c("500mb", "500mb")
 )
 }
 \arguments{
@@ -20,30 +21,36 @@ Stage1(
 
 \item{effects}{data frame specifying other effects in the model (see Details)}
 
-\item{silent}{TRUE/FALSE, whether to suppress ASReml-R output}
+\item{solver}{one of the following: "asreml","spats"}
 
-\item{workspace}{memory limit for ASRreml-R variance estimation}
+\item{spline}{vector of variable names for 2D spline with SpATS}
 
-\item{pworkspace}{memory limit for ASRreml-R BLUE computation}
+\item{silent}{TRUE/FALSE, whether to suppress REML output}
+
+\item{workspace}{memory limits for ASRreml-R}
 }
 \value{
 List containing
 \describe{
 \item{blue}{data frame of BLUEs for all environments}
 \item{vcov}{list of variance-covariance matrices for the BLUEs, one per env}
-\item{H2}{broad-sense H2 on a plot basis (only for single trait)}
-\item{resid}{list containing boxplot, qqplot, and table of residuals (only for single trait)}
+\item{H2}{broad-sense H2 on a plot basis}
+\item{resid}{list containing diagnostic plots and data frame of residuals}
 }
 }
 \description{
-Computes genotype BLUEs within each environment using ASReml-R
+Computes genotype BLUEs within each environment
 }
 \details{
 The input file must have one column labeled "id" for the individuals and one labeled "env" for the environments. The data for each environment are analyzed independently with a linear mixed model. Although not used in Stage1, to include a genotype x location effect in \code{\link{Stage2}}, a column labeled "loc" should be present in the input file. 
 
-Including multiple traits in \code{trait} triggers a multivariate analysis, but for computational reasons, only 2 traits are analyzed at a time. With more than 2 traits, the software analyzes all pairs of traits. For single trait analysis, broad-sense H2 on a plot basis is computed from the variance components for each env, with genotype as a random effect. The residuals from this analysis are also returned as a table and plots.
-
 Argument \code{effects} is used to specify other i.i.d. effects besides genotype and has three columns: name, fixed, factor. The "name" column is a string that must match a column in the input file. The fixed column is a logical variable to indicate whether the effect is fixed (TRUE) or random (FALSE). The factor column is a logical variable to indicate whether the effect is a factor (TRUE) or numeric (FALSE). 
 
-Missing response values are omitted for single-trait analysis but retained for multi-trait analysis (unless both traits are missing), to allow for prediction in Stage 2. By default, the workspace and pworkspace limits for ASReml-R are set at 500mb. If you get an error about insufficient memory, try increasing the appropriate value (workspace for variance estimation and pworkspace for BLUE computation).
+Argument \code{solver} specifies which software to use for REML. Current options are "asreml" and "spats". For "spats", the argument \code{spline} must be a vector of length two, with the names of the x and y variables (respectively) for the 2D spline.
+
+The heritability and residuals in the output are based on a random effects model for id.
+
+Missing response values are omitted for single-trait analysis but retained for multi-trait analysis (unless both traits are missing), to allow for prediction in Stage 2. 
+
+Argument \code{workspace} is a vector of length two containing the workspace and pworkspace limits for ASReml-R, with default values of 500mb. If you get an error about insufficient memory, try increasing the appropriate value (workspace for variance estimation and pworkspace for BLUE computation).
 }
