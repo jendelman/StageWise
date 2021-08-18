@@ -53,4 +53,6 @@ The heritability and residuals in the output are based on a random effects model
 Missing response values are omitted for single-trait analysis but retained for multi-trait analysis (unless both traits are missing), to allow for prediction in Stage 2. 
 
 Argument \code{workspace} is a vector of length two containing the workspace and pworkspace limits for ASReml-R, with default values of 500mb. If you get an error about insufficient memory, try increasing the appropriate value (workspace for variance estimation and pworkspace for BLUE computation).
+
+For multiple traits, only "asreml" is supported, and only the BLUE model is run, so the returned object does not contain H2 or resid.
 }

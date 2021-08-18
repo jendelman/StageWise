@@ -6,7 +6,7 @@
 #' 
 #' @param object object of \code{\link{class_var}}
 #'
-#' @return For univariate analysis, a matrix of variances. For multi-location or multi-trait analysis, a list containing the variance matrix and the correlation matrix.
+#' @return For univariate analysis, a data frame of variances. For multi-location or multi-trait analysis, a list containing the variance data frame and the correlation matrix.
 #'
 #' @include class_var.R
 #' @name summary
@@ -17,6 +17,41 @@ setGeneric("summary")
 setMethod("summary",c(object="class_var"),
           definition=function(object){
             cor.mat <- NULL
+            if (ncol(object@resid)>1) {
+              traits <- rownames(object@resid)
+              #multiple traits
+              if (is.na(object@meanG)) {
+                cor.mat <- round(cov_to_cor(object@g.resid),2)
+                vtab <- data.frame(matrix(c(diag(object@g.resid),diag(object@resid)),nrow=2,byrow = T))
+                colnames(vtab) <- traits
+                if (any(!is.na(object@meanOmega))) {
+                  vtab <- rbind(vtab,object@meanOmega)
+                  rownames(vtab) <- c("genotype","g x env","residual")
+                } else {
+                  rownames(vtab) <- c("genotype","residual")
+                }
+              } else {
+                add.cov <- object@add
+                if (nrow(object@fixed.marker.cov)>0)
+                  add.cov <- add.cov + object@fixed.marker.cov
+                cor.mat <- round(cov_to_cor(add.cov),2)
+                vtab <- data.frame(matrix(c(diag(object@add)*object@meanG,diag(object@g.resid),diag(object@resid)),nrow=3,byrow = T))
+                colnames(vtab) <- traits
+                if (any(!is.na(object@meanOmega))) {
+                  vtab <- rbind(vtab,object@meanOmega)
+                  rownames(vtab) <- c("additive","g.resid","g x env","residual")
+                } else {
+                  rownames(vtab) <- c("additive","g.resid","residual")
+                }
+              }
+              
+              if (nrow(object@fixed.marker.var)>0) {
+                  vtab <- rbind(object@fixed.marker.var,vtab)
+              }
+              return(list(vtab,cor.mat))
+            }
+            
+            #single trait
             if (!is.na(object@meanG)) {
               if (nrow(object@add) > 1) {
                 #multiple locations
@@ -34,6 +69,7 @@ setMethod("summary",c(object="class_var"),
                 V1 <- matrix(c(Va,VaL,Vr,VrL),ncol=1)
                 rownames(V1) <- c("additive","add x loc","g.resid","g.resid x loc")
               } else {
+                #one location
                 Va <- as.numeric(object@add)*object@meanG
                 Vr <- as.numeric(object@g.resid)
                 
@@ -78,8 +114,8 @@ setMethod("summary",c(object="class_var"),
             
             colnames(vtab) <- "Variance"
             if (!is.null(cor.mat)) {
-              return(list(vtab,as.matrix(cor.mat)))
+              return(list(as.data.frame(vtab),as.matrix(cor.mat)))
             } else {
-              return(vtab)
+              return(as.data.frame(vtab))
             }
           })

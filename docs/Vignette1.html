@@ -163,7 +163,6 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 ## 3 solcap_snp_c2_36615 chr01   510745        1        0     2.03
 ## 4 solcap_snp_c2_36658 chr01   527068        4        3     3.00</code></pre>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(StageWise)</span></code></pre></div>
-<pre><code>## Online License checked out Mon Aug 16 17:25:56 2021</code></pre>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>geno <span class="ot">&lt;-</span> <span class="fu">read_geno</span>(<span class="at">filename=</span>geno.file,<span class="at">ploidy=</span><span class="dv">4</span>,<span class="at">map=</span><span class="cn">TRUE</span>)</span></code></pre></div>
 <p>The function <code>read_geno</code> computes the additive relationship (G) matrix and its inverse, which can take some time for large datasets. These matrices and other information needed for the <code>Stage2</code> function are stored in the returned object as an S4 class.</p>
 </div>
@@ -370,7 +369,6 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>                <span class="at">effects=</span>effects,<span class="at">solver=</span><span class="st">&quot;asreml&quot;</span>)</span></code></pre></div>
 <pre><code>## Traits: total.yield
 ## Env: Hancock15
-## Online License checked out Mon Aug 16 17:26:08 2021
 ## Env: Hancock16
 ## Env: Hancock17
 ## Env: Hancock18
@@ -485,7 +483,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <span id="cb45-12"><a href="#cb45-12" aria-hidden="true" tabindex="-1"></a>                                <span class="at">fixed=</span><span class="fu">c</span>(<span class="cn">FALSE</span>,<span class="cn">TRUE</span>),</span>
 <span id="cb45-13"><a href="#cb45-13" aria-hidden="true" tabindex="-1"></a>                                <span class="at">factor=</span><span class="fu">c</span>(<span class="cn">TRUE</span>,<span class="cn">FALSE</span>)))</span>
 <span id="cb45-14"><a href="#cb45-14" aria-hidden="true" tabindex="-1"></a>  ans2[[i]] <span class="ot">&lt;-</span> <span class="fu">Stage2</span>(<span class="at">data=</span>ans1[[i]]<span class="sc">$</span>blue,<span class="at">vcov=</span>ans1[[i]]<span class="sc">$</span>vcov,<span class="at">geno=</span>geno)</span>
-<span id="cb45-15"><a href="#cb45-15" aria-hidden="true" tabindex="-1"></a>  v <span class="ot">&lt;-</span> <span class="fu">summary</span>(ans2[[i]]<span class="sc">$</span>vars)</span>
+<span id="cb45-15"><a href="#cb45-15" aria-hidden="true" tabindex="-1"></a>  v <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(<span class="fu">summary</span>(ans2[[i]]<span class="sc">$</span>vars))</span>
 <span id="cb45-16"><a href="#cb45-16" aria-hidden="true" tabindex="-1"></a>  h2[,i] <span class="ot">&lt;-</span> v<span class="sc">/</span><span class="fu">sum</span>(v)</span>
 <span id="cb45-17"><a href="#cb45-17" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
 <pre><code>## Traits: total.yield
@@ -686,17 +684,17 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <span id="cb66-6"><a href="#cb66-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Fixed effect for the marker</span></span>
 <span id="cb66-7"><a href="#cb66-7" aria-hidden="true" tabindex="-1"></a>ans2d<span class="sc">$</span>fixed<span class="sc">$</span>marker</span></code></pre></div>
 <pre><code>##                marker     effect
-## 1 solcap_snp_c2_22964 -0.7590724</code></pre>
+## 1 solcap_snp_c2_22964 -0.7778389</code></pre>
 <div class="sourceCode" id="cb68"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Proportion of variance</span></span>
 <span id="cb68-2"><a href="#cb68-2" aria-hidden="true" tabindex="-1"></a>v <span class="ot">&lt;-</span> <span class="fu">summary</span>(ans2d<span class="sc">$</span>vars)</span>
 <span id="cb68-3"><a href="#cb68-3" aria-hidden="true" tabindex="-1"></a><span class="fu">round</span>(v<span class="sc">/</span><span class="fu">sum</span>(v),<span class="dv">3</span>)</span></code></pre></div>
 <pre><code>##                     Variance
-## solcap_snp_c2_22964    0.120
-## additive               0.235
-## g.resid                0.178
-## g x env                0.116
-## residual               0.350</code></pre>
-<p>The fixed effect estimate of -0.74 for solcap_snp_c2_22964 means that, on average, each additional copy of the alternate allele reduced vine maturity by 0.74 (on a 1-9 visual scale). According to the proportion of variance table, the solcap_snp_c2_22964 marker accounted for 0.111/(0.111 + 0.199) = 36% of the breeding value.</p>
+## solcap_snp_c2_22964    0.128
+## additive               0.227
+## g.resid                0.170
+## g x env                0.107
+## residual               0.368</code></pre>
+<p>The fixed effect estimate of -0.78 for solcap_snp_c2_22964 means that, on average, each additional copy of the alternate allele reduced vine maturity by 0.78 (on a 1-9 visual scale). According to the proportion of variance table, the solcap_snp_c2_22964 marker accounted for 0.128/(0.128 + 0.227) = 36% of the breeding value.</p>
 </div>
 
 

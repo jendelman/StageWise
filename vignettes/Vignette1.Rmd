@@ -188,7 +188,7 @@ for (i in 1:4) {
                                 fixed=c(FALSE,TRUE),
                                 factor=c(TRUE,FALSE)))
   ans2[[i]] <- Stage2(data=ans1[[i]]$blue,vcov=ans1[[i]]$vcov,geno=geno)
-  v <- summary(ans2[[i]]$vars)
+  v <- as.matrix(summary(ans2[[i]]$vars))
   h2[,i] <- v/sum(v)
 }
 round(h2,2)
@@ -308,7 +308,7 @@ v <- summary(ans2d$vars)
 round(v/sum(v),3)
 ```
 
-The fixed effect estimate of -0.74 for solcap_snp_c2_22964 means that, on average, each additional copy of the alternate allele reduced vine maturity by 0.74 (on a 1-9 visual scale). According to the proportion of variance table, the solcap_snp_c2_22964 marker accounted for 0.111/(0.111 + 0.199) = 36% of the breeding value.
+The fixed effect estimate of -0.78 for solcap_snp_c2_22964 means that, on average, each additional copy of the alternate allele reduced vine maturity by 0.78 (on a 1-9 visual scale). According to the proportion of variance table, the solcap_snp_c2_22964 marker accounted for 0.128/(0.128 + 0.227) = 36% of the breeding value.
 
 
 

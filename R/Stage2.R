@@ -4,14 +4,14 @@
 #' 
 #' Stage 2 of the two-stage approach described by Damesa et al. 2017, using ASReml-R for variance component estimation. The variable \code{data} has three mandatory column: id, env, BLUE. Optionally, \code{data} can have a column labeled "loc", which changes the main effect for genotype into a separable genotype-within-location effect, using a FA2 covariance model for the locations. Optionally, \code{data} can have a column labeled "trait", which uses an unstructured covariance model. The multi-location and multi-trait analyses cannot be combined. Missing data are allowed in the multi-trait but not the single-trait analysis. The argument \code{geno} is used to partition genetic values into additive and non-additive (g.resid) components. Any individuals in \code{data} that are not present in \code{geno} are discarded. 
 #' 
-#' The argument \code{vcov} is used to partition the macro- and micro-environmental variation, which are called GxE and residual in the output. \code{vcov} is a named list of variance-covariance matrices for the BLUEs within each environment, with id on the rownames. The order in \code{vcov} and \code{data} should match. Both \code{data} and \code{vcov} can be created using the function \code{\link{Stage1}}. 
+#' The argument \code{vcov} is used to partition the macro- and micro-environmental variation, which are called GxE and residual in the output. \code{vcov} is a named list of variance-covariance matrices for the BLUEs within each environment, with id for rownames (single trait) or id:trait. The order in \code{vcov} and \code{data} should match. Both \code{data} and \code{vcov} can be created using the function \code{\link{Stage1}}. 
 #' 
 #' Because ASReml-R can only use relationship matrices defined in the global environment, this function creates and then removes global variables when either \code{vcov} or \code{geno} is used. By default, the workspace memory for ASReml-R is set at 500mb. If you get an error about insufficient memory, try increasing it. ASReml-R version 4.1.0.148 or later is required. 
 #' 
 #' @references Damesa et al. 2017. Agronomy Journal 109: 845-857. doi:10.2134/agronj2016.07.0395
 #' 
 #' @param data data frame of BLUEs from Stage 1 (see Details)
-#' @param vcov list of variance-covariance matrices for the BLUEs
+#' @param vcov named list of variance-covariance matrices for the BLUEs
 #' @param geno output from \code{\link{read_geno}}
 #' @param fix.eff.marker markers in \code{geno} to include as additive fixed effect covariates
 #' @param silent TRUE/FALSE, whether to suppress ASReml-R output
@@ -41,7 +41,15 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
   stopifnot(inherits(data,"data.frame"))
   stopifnot(c("id","env","BLUE") %in% colnames(data))
   data$id <- as.character(data$id)
-  data$env <- factor(as.character(data$env))
+  data$env <- as.character(data$env)
+  envs <- unique(data$env)
+  n.env <- length(envs)
+  
+  data$env.id <- apply(data[,c("env","id")],1,paste,collapse=":")
+  missing <- which(is.na(data$BLUE))
+  if (length(missing) > 0) {
+    data <- data[!(data$env.id %in% data$env.id[missing]),]
+  }
   
   if (!is.null(geno)) {
     stopifnot(inherits(geno,"class_geno"))
@@ -62,29 +70,36 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     data <- merge(data,dat2,by="id")
   }
   
+  data$env <- factor(data$env)
+  stopifnot(table(data$env)>0)
   id <- sort(unique(data$id))
   data$id <- factor(data$id,levels=id)
-  stopifnot(table(data$env)>0)
-  
-  if ("loc" %in% colnames(data)) {
-    data$loc <- factor(as.character(data$loc))
-    data <- data[order(data$loc),]
-    locations <- levels(data$loc)
-    n.loc <- length(locations)
-    stopifnot(n.loc > 1)
-  } else {
-    n.loc <- 1
-  }
+  env.id <- sort(unique(data$env.id))
+  data$env.id <- factor(data$env.id,levels=env.id)
   
   if ("trait" %in% colnames(data)) {
-    stop("Multiple traits not supported yet. Check back soon.")
-    stopifnot(n.loc==1)
+    #stop("Multiple traits not supported yet. Check back soon.")
+    n.loc <- 1
+    data$trait <- as.character(data$trait)
+    data$env.id.trait <- apply(data[,c("env.id","trait")],1,paste,collapse=":")
+    env.id.trait <- unique(data$env.id.trait)
+    data$env.id.trait <- factor(data$env.id.trait,levels=env.id.trait)
     data$Trait <- factor(data$trait)
     traits <- levels(data$Trait)
     n.trait <- length(traits)
     stopifnot(n.trait > 1)
+    data <- data[order(data$env.id,data$Trait),]
   } else {
     n.trait <- 1
+    if ("loc" %in% colnames(data)) {
+      data$loc <- factor(as.character(data$loc))
+      data <- data[order(data$loc),]
+      locations <- levels(data$loc)
+      n.loc <- length(locations)
+      stopifnot(n.loc > 1)
+    } else {
+      n.loc <- 1
+    }
   }
 
   if (n.trait==1) {
@@ -103,7 +118,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
       model <- sub("FIX","env",model,fixed=T)
     }
   } else {
-    model <- "asreml(data=data,fixed=BLUE~FIX-1,random=~RANDOM,residual=~id(units):us(trait)"
+    model <- "asreml(data=data,fixed=BLUE~FIX-1,random=~RANDOM,residual=~id(env.id):us(Trait)"
     if (!is.null(fix.eff.marker)) {
       model <- sub("FIX",paste(paste0(c("env",fix.eff.marker),":Trait"),collapse="+"),model,fixed=T)
     } else {
@@ -135,19 +150,42 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
   
   if (!is.null(vcov)) {
     stopifnot(is.list(vcov))
+    stopifnot(length(vcov)==n.env)
     stopifnot(sort(levels(data$env))==sort(names(vcov)))
-    id.ix <- lapply(vcov,function(y){which(rownames(y) %in% id)})
-    omega.list<- mapply(FUN=function(Q,ix){as(Q[ix,ix],"dpoMatrix")},Q=vcov,ix=id.ix)
-    diagOmega <- unlist(mapply(FUN=function(Q,ix){diag(Q)[ix]},Q=vcov,ix=id.ix))
-    meanOmega <- mean(tapply(diagOmega,data$id,mean))
+    vcov <- mapply(FUN=function(x,y){
+      tmp <- paste(y,rownames(x),sep=":")
+      dimnames(x) <- list(tmp,tmp)
+      return(x)},x=vcov,y=as.list(names(vcov)))
+    if (n.trait==1) {
+      ix <- lapply(vcov,function(y){which(rownames(y) %in% env.id)})
+      random.effects <- paste0(random.effects,"+vm(env.id,source=asremlOmega)")
+    } else {
+      ix <- lapply(vcov,function(y){which(rownames(y) %in% env.id.trait)})
+      random.effects <- paste0(random.effects,"+vm(env.id.trait,source=asremlOmega)")
+    }
+    omega.list <- vector("list",n.env)
+    for (j in 1:n.env) {
+      omega.list[[j]] <- as(vcov[[j]][ix[[j]],ix[[j]]],"dpoMatrix")
+    }
     .GlobalEnv$asremlOmega <- direct_sum(lapply(omega.list,solve))
+    dname <- unlist(lapply(omega.list,rownames))
+    dimnames(.GlobalEnv$asremlOmega) <- list(dname,dname)
     attr(.GlobalEnv$asremlOmega,"INVERSE") <- TRUE
-    random.effects <- paste0(random.effects,"+vm(units,source=asremlOmega)")
+    
+    diagOmega <- unlist(lapply(omega.list,diag))
+    tmp <- strsplit(dname,split=":",fixed=T)
+    if (n.trait==1) {
+      tmp2 <- tapply(diagOmega,sapply(tmp,"[[",2),mean)
+      meanOmega <- mean(tmp2)
+    } else {
+      tmp2 <- tapply(diagOmega,list(sapply(tmp,"[[",2),sapply(tmp,"[[",3)),mean)
+      meanOmega <- apply(tmp2,2,mean)
+    }
   } else {
     meanOmega <- as.numeric(NA)
   }
   
-  asreml.options(workspace=workspace,maxit=30,trace=!silent)
+  asreml.options(workspace=workspace,maxit=50,trace=!silent)
   model <- sub(pattern="RANDOM",replacement=random.effects,model,fixed=T)
   if (!is.null(vcov)) {
     start.table <- eval(parse(text=paste0(model,",start.values = TRUE)")))$vparameters.table
@@ -196,8 +234,8 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
         rownames(beta.stat) <- fix.eff.marker
       } else {
         rownames(beta) <- gsub("loc_","",rownames(beta))
-        ix <- unlist(lapply(fix.eff.marker,grep,rownames(beta),fixed=T))
         loc.marker <- expand.grid(loc=locations,marker=fix.eff.marker,stringsAsFactors = FALSE)
+        ix <- match(apply(loc.marker,1,paste,collapse=":"),rownames(beta))
         out$fixed$marker <- data.frame(marker=loc.marker$marker,
                                        loc=loc.marker$loc,
                                        effect=as.numeric(beta[ix,1]))
@@ -221,6 +259,39 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     }
   } else {
     #multi-trait
+    beta <- sans$coef.fixed
+    rownames(beta) <- gsub("env_","",rownames(beta))
+    rownames(beta) <- gsub("Trait_","",rownames(beta))
+    tmp <- strsplit(rownames(beta),split=":",fixed=T)
+    out$fixed$env <- data.frame(env=sapply(tmp,"[[",1),trait=sapply(tmp,"[[",2),
+                                effect=as.numeric(beta[,1]))
+    
+    beta.stat <- matrix(NA,nrow=0,ncol=0)
+    marker.cov <- matrix(NA,nrow=0,ncol=0)
+    if (!is.null(fix.eff.marker)) {
+      var.x <- var(as.matrix(geno@coeff[,fix.eff.marker]))
+      trait.marker <- expand.grid(trait=traits,marker=fix.eff.marker,stringsAsFactors = FALSE)
+      ix <- match(apply(trait.marker,1,paste,collapse=":"),rownames(beta))
+      out$fixed$marker <- data.frame(marker=trait.marker$marker,
+                                       trait=trait.marker$trait,
+                                       effect=as.numeric(beta[ix,1]))
+      tmp <- expand.grid(1:n.trait,1:n.trait)
+      tmp <- tmp[tmp$Var2 >= tmp$Var1,]
+      tmp$value <- numeric(nrow(tmp))
+      x <- out$fixed$marker
+      for (i in 1:nrow(tmp)) {
+        lv <- matrix(x$effect[x$trait==traits[tmp$Var1[i]]],nrow=1)
+        rv <- matrix(x$effect[x$trait==traits[tmp$Var2[i]]],ncol=1)
+        tmp$value[i] <- lv %*% var.x %*% rv
+      }
+      marker.cov <- as.matrix(sparseMatrix(i=tmp$Var1,j=tmp$Var2,x=tmp$value,dims=c(n.trait,n.trait),
+                                             dimnames=list(traits,traits),symmetric=T))
+    
+      tmp <- diag(var.x)[out$fixed$marker$marker]*out$fixed$marker$effect^2
+      beta.stat <- matrix(tmp,ncol=n.trait,byrow = TRUE)
+      rownames(beta.stat) <- unique(names(tmp))
+      colnames(beta.stat) <- traits
+    }
   }
     
   #variances 
@@ -258,7 +329,17 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     }
   } else {
     #multi-trait
-
+    iv <- grep("env.id:Trait!",vc.names,fixed=T)
+    resid.vc <- f.us.trait(vc[iv,],traits)
+    vc <- vc[-iv,]
+    iv <- grep("id:Trait!",rownames(vc),fixed=T)
+    g.resid.vc <- f.us.trait(vc[iv,],traits)
+    vc <- vc[-iv,]
+    if (is.null(geno)) {
+      add.vc <- Matrix(NA,nrow=0,ncol=0)
+    } else {
+      add.vc <- f.us.trait(vc,traits)
+    }
   }
   
   out$vars <- new(Class="class_var",add=add.vc,g.resid=g.resid.vc,resid=resid.vc,
@@ -301,6 +382,18 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     }
   } else {
     #multi-trait
+    u <- sans$coef.random 
+    id.trait.names <- expand.grid(trait=traits,id=id,stringsAsFactors = F)[,c(2,1)]
+    id.trait <- expand.grid(paste0("Trait_",traits),paste0("id_",id),stringsAsFactors = F)[,c(2,1)]
+    ix <- match(apply(id.trait,1,paste,collapse=":"),rownames(u))
+    if (is.null(geno)) {
+      out$random <- data.frame(id.trait.names,value=as.numeric(u[ix,1]))
+    } else {
+      id.trait2 <- expand.grid(paste0("Trait_",traits),paste0("vm(id, source = asremlG, singG = \"PSD\")_",id),
+                               stringsAsFactors = F)[,c(2,1)]
+      ix2 <- match(apply(id.trait2,1,paste,collapse=":"),rownames(u))
+      out$random <- data.frame(id.trait.names,add=as.numeric(u[ix2,1]),g.resid=as.numeric(u[ix,1]))
+    }
   }
   
   if (!is.null(geno))

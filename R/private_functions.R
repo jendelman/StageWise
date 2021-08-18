@@ -66,10 +66,9 @@ f.id <- function(vc,lvls,keyword) {
   return(vc[ix,1])
 }
 
-f.cov.trait <- function(vc,traits) {
+f.us.trait <- function(vc,traits) {
   tmp <- expand.grid(traits,traits)
   tmp <- apply(tmp,2,as.character)[,c(2,1)]
-  #tmp <- tmp[tmp[,1] >= tmp[,2],]
   tmp2 <- apply(tmp,1,paste,collapse=":")
   ix <- sapply(as.list(tmp2),grep,x=rownames(vc),fixed=T)
   iv <- which(sapply(ix,length)>0)

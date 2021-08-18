@@ -1,3 +1,6 @@
+Changes in 0.06
+* Stage1 and Stage2 multi-trait completed
+
 Changes in 0.05
 * Added SpATS option to Stage 1 and updated vignette
 * {-1,0,1} coding allowed for diploids in read_geno
