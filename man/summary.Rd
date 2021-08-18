@@ -7,7 +7,7 @@
 \item{object}{object of \code{\link{class_var}}}
 }
 \value{
-For univariate analysis, a data frame of variances. For multi-location or multi-trait analysis, a list containing the variance data frame and the correlation matrix.
+For univariate analysis, a matrix with the proportion of variance. For multi-location or multi-trait analysis, a list containing the proportion of variance and the correlation matrix.
 }
 \description{
 Summarize variances and correlations

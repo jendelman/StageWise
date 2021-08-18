@@ -53,7 +53,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   
   if (solver=="ASREML") {
     stopifnot(requireNamespace("asreml"))
-    asreml::asreml.options(maxit=50,workspace=workspace[1],pworkspace=workspace[2],trace=!silent)
+    asreml::asreml.options(maxit=30,workspace=workspace[1],pworkspace=workspace[2],trace=!silent)
   }
   if (solver=="SPATS") {
     if (n.trait > 1) {

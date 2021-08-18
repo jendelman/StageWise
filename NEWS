@@ -1,5 +1,7 @@
 Changes in 0.06
 * Stage1 and Stage2 multi-trait completed
+* Changed summary output to proportion of variance
+* Monomorphic markers removed with read_geno
 
 Changes in 0.05
 * Added SpATS option to Stage 1 and updated vignette

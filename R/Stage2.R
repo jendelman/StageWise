@@ -185,7 +185,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     meanOmega <- as.numeric(NA)
   }
   
-  asreml.options(workspace=workspace,maxit=50,trace=!silent)
+  asreml.options(workspace=workspace,maxit=30,trace=!silent)
   model <- sub(pattern="RANDOM",replacement=random.effects,model,fixed=T)
   if (!is.null(vcov)) {
     start.table <- eval(parse(text=paste0(model,",start.values = TRUE)")))$vparameters.table

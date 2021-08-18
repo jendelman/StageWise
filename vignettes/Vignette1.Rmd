@@ -154,7 +154,7 @@ ans2c <- Stage2(data=stage1.blue,vcov=stage1.vcov,geno=geno)
 ans2c$aic
 ```
 
-Several other pieces of information are in the list output from `Stage2`. The variance components are contained in "vars" as an S4 class, which is used by the `blup_prep` function. The `summary` command can be used to report the partitioning of variance:
+Several other pieces of information are in the list output from `Stage2`. The variance components are contained in "vars" as an S4 class, which is used by the `blup_prep` function. The `summary` command can be used to see the proportion of variance for the different effects:
 
 ```{r}
 summary(ans2a$vars)
@@ -164,20 +164,13 @@ summary(ans2c$vars)
 
 The above results show the progression of variance partitioning as more effects are included in the model. Including the covariance of the BLUEs enables splitting of the multi-environment residual into GxE and within-environment residual, and in this example we also observe some reapportionment of the main effect for genotype vs. GxE. When the marker data are included, the genotype effect is separated into additive and residual genetic (g.resid) components; the latter is a random effect with zero covariance, which includes non-additive effects but also potentially additive effects because the G matrix computed from markers is only an estimate of the true covariance matrix. The residual variance changed when the marker data were included because some entries in the phenotype dataset are not present in the genotype file and were therefore automatically excluded by `Stage2`. 
 
-By calculating the proportion of additive variance from the summary table, the average narrow-sense (genomic) heritability based on data from one environment is estimated at 0.30:
-
-```{r}
-v <- summary(ans2c$vars)
-round(v/sum(v),2)
-```
-
 Let's see how this compares with the other 3 traits (using only the 2015-19 data for simplicity):
 
 ```{r}
 h2 <- matrix(nrow=4,ncol=4)
 traits <- c("total.yield","spec.grav","fry.color","vine.maturity")
 colnames(h2) <- traits
-rownames(h2) <- rownames(v)
+rownames(h2) <- rownames(summary(ans2c$vars))
 
 #initialize lists 
 ans1 <- ans2 <- vector("list",length = 4)
@@ -188,10 +181,9 @@ for (i in 1:4) {
                                 fixed=c(FALSE,TRUE),
                                 factor=c(TRUE,FALSE)))
   ans2[[i]] <- Stage2(data=ans1[[i]]$blue,vcov=ans1[[i]]$vcov,geno=geno)
-  v <- as.matrix(summary(ans2[[i]]$vars))
-  h2[,i] <- v/sum(v)
+  h2[,i] <- summary(ans2[[i]]$vars)
 }
-round(h2,2)
+h2
 ```
 
 Specific gravity had the highest heritability of the four traits.
@@ -304,8 +296,7 @@ ans2d <- Stage2(data=ans1$vine.maturity$blue,
 ans2d$fixed$marker
 
 # Proportion of variance
-v <- summary(ans2d$vars)
-round(v/sum(v),3)
+summary(ans2d$vars)
 ```
 
 The fixed effect estimate of -0.78 for solcap_snp_c2_22964 means that, on average, each additional copy of the alternate allele reduced vine maturity by 0.78 (on a 1-9 visual scale). According to the proportion of variance table, the solcap_snp_c2_22964 marker accounted for 0.128/(0.128 + 0.227) = 36% of the breeding value.

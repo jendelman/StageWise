@@ -2,7 +2,7 @@
 #' 
 #' Read marker genotype data
 #' 
-#' When \code{map=TRUE}, first three columns of the file are marker, chrom, position. When \code{map=FALSE}, the first column is marker. Subsequent columns contain the allele dosage for individuals/clones, coded 0,1,2,...ploidy (fractional values are allowed). The input file for diploids can also be coded using {-1,0,1} (fractional values allowed). Additive coefficients are computed by subtracting the population mean from each marker, and the additive (genomic) relationship matrix is computed as G = tcrossprod(coeff)/scale. The scale parameter ensures the mean of the diagonal elements of G equals 1 under panmictic equilibrium. Missing genotype data is replaced with the population mean. For numerical conditioning, eigenvalues of G smaller than \code{eigen.tol} are replaced by \code{eigen.tol}.
+#' When \code{map=TRUE}, first three columns of the file are marker, chrom, position. When \code{map=FALSE}, the first column is marker. Subsequent columns contain the allele dosage for individuals/clones, coded 0,1,2,...ploidy (fractional values are allowed). The input file for diploids can also be coded using {-1,0,1} (fractional values allowed). Additive coefficients are computed by subtracting the population mean from each marker, and the additive (genomic) relationship matrix is computed as G = tcrossprod(coeff)/scale. The scale parameter ensures the mean of the diagonal elements of G equals 1 under panmictic equilibrium. Missing genotype data is replaced with the population mean. For numerical conditioning, eigenvalues of G smaller than \code{eigen.tol} are replaced by \code{eigen.tol}. Monomorphic markers are removed.
 #'  
 #' @param filename Name of CSV file
 #' @param ploidy 2,4,6,etc. (even numbers)
@@ -32,10 +32,18 @@ read_geno <- function(filename,ploidy,map,eigen.tol=1e-9) {
   }
   rownames(geno) <- data[,1]
   id <- colnames(geno)
+  p <- apply(geno,1,mean,na.rm=T)/ploidy
+  ix <- which(p > 0 & p < 1)
+  stopifnot(length(ix) > 0)
+  geno <- geno[ix,]
+  p <- p[ix]
+  if (nrow(map)>0)
+    map <- map[ix,]
+  
   coeff <- Matrix(scale(t(geno),scale=F),
                   dimnames=list(id,rownames(geno)))
   coeff[which(is.na(coeff))] <- 0
-  p <- apply(geno,1,mean,na.rm=T)/ploidy
+  
   scale <- sum(ploidy*p*(1-p))
   G <- tcrossprod(coeff)/scale
   eigen.G <- eigen(G,symmetric=TRUE)

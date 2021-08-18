@@ -4,14 +4,16 @@
 \alias{gwas_threshold}
 \title{Compute GWAS discovery threshold}
 \usage{
-gwas_threshold(geno, n.core = 1, alpha = 0.05)
+gwas_threshold(geno, alpha = 0.05, exclude.chrom = NULL, n.core = 1)
 }
 \arguments{
 \item{geno}{object of \code{\link{class_geno}}}
 
-\item{n.core}{number of cores to use}
-
 \item{alpha}{genome-wide significance level}
+
+\item{exclude.chrom}{chromosomes to exclude}
+
+\item{n.core}{number of cores to use}
 }
 \value{
 -log10(p) threshold

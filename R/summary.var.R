@@ -6,7 +6,7 @@
 #' 
 #' @param object object of \code{\link{class_var}}
 #'
-#' @return For univariate analysis, a data frame of variances. For multi-location or multi-trait analysis, a list containing the variance data frame and the correlation matrix.
+#' @return For univariate analysis, a matrix with the proportion of variance. For multi-location or multi-trait analysis, a list containing the proportion of variance and the correlation matrix.
 #'
 #' @include class_var.R
 #' @name summary
@@ -48,7 +48,10 @@ setMethod("summary",c(object="class_var"),
               if (nrow(object@fixed.marker.var)>0) {
                   vtab <- rbind(object@fixed.marker.var,vtab)
               }
-              return(list(vtab,cor.mat))
+              vtab <- as.matrix(vtab)
+              pvar <- vtab %*% diag(1/apply(vtab,2,sum))
+              colnames(pvar) <- traits
+              return(list(pvar,cor.mat))
             }
             
             #single trait
@@ -112,10 +115,11 @@ setMethod("summary",c(object="class_var"),
               vtab <- rbind(x,vtab)
             }
             
-            colnames(vtab) <- "Variance"
+            pvar <- round(vtab / sum(vtab),3)
+            colnames(pvar) <- "Var. Proportion"
             if (!is.null(cor.mat)) {
-              return(list(as.data.frame(vtab),as.matrix(cor.mat)))
+              return(list(pvar,as.matrix(cor.mat)))
             } else {
-              return(as.data.frame(vtab))
+              return(pvar)
             }
           })
