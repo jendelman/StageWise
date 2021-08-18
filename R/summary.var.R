@@ -2,7 +2,7 @@
 #'
 #' Summarize variances and correlations
 #' 
-#' When reporting the partitioning of variance, the variance component for the additive effect is multiplied by the mean diagonal of the G matrix. 
+#' When reporting the partitioning of variance, the variance component for the additive effect is multiplied by the mean diagonal of the G matrix. When a G matrix has been included, the correlation matrix shown is for the additive value (plus any markers).
 #' 
 #' @param object object of \code{\link{class_var}}
 #'
@@ -51,7 +51,7 @@ setMethod("summary",c(object="class_var"),
               vtab <- as.matrix(vtab)
               pvar <- vtab %*% diag(1/apply(vtab,2,sum))
               colnames(pvar) <- traits
-              return(list(pvar,cor.mat))
+              return(list(round(pvar,3),cor.mat))
             }
             
             #single trait

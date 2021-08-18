@@ -130,11 +130,19 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     if (n.loc > 1) {
       random.effects <- ifelse(n.loc==2,"id:corh(loc)","id:fa(loc,2)")
     } else {
-      random.effects <- ifelse(n.trait>1,"id:us(Trait)","id")
+      if (n.trait > 1) {
+        random.effects <- ifelse(n.trait==2,"id:corh(Trait)","id:us(Trait)")
+      } else {
+        random.effects <- "id"
+      }
     }
   } else {
     if (n.trait > 1) {
-      random.effects <- "id:us(Trait)+vm(id,source=asremlG,singG='PSD'):us(Trait)"
+      if (n.trait==2) {
+        random.effects <- "id:corh(Trait)+vm(id,source=asremlG,singG='PSD'):corh(Trait)"
+      } else {
+        random.effects <- "id:us(Trait)+vm(id,source=asremlG,singG='PSD'):us(Trait)"
+      }
     } else {
       if (n.loc > 1) {
         if (n.loc==2) {
@@ -269,7 +277,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     beta.stat <- matrix(NA,nrow=0,ncol=0)
     marker.cov <- matrix(NA,nrow=0,ncol=0)
     if (!is.null(fix.eff.marker)) {
-      var.x <- var(as.matrix(geno@coeff[,fix.eff.marker]))
+      var.x <- var(as.matrix(geno@coeff[,fix.eff.marker,drop=FALSE]))
       trait.marker <- expand.grid(trait=traits,marker=fix.eff.marker,stringsAsFactors = FALSE)
       ix <- match(apply(trait.marker,1,paste,collapse=":"),rownames(beta))
       out$fixed$marker <- data.frame(marker=trait.marker$marker,
@@ -330,15 +338,15 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
   } else {
     #multi-trait
     iv <- grep("env.id:Trait!",vc.names,fixed=T)
-    resid.vc <- f.us.trait(vc[iv,],traits)
+    resid.vc <- f.cov.trait(vc[iv,],traits,us=TRUE)
     vc <- vc[-iv,]
     iv <- grep("id:Trait!",rownames(vc),fixed=T)
-    g.resid.vc <- f.us.trait(vc[iv,],traits)
+    g.resid.vc <- f.cov.trait(vc[iv,],traits,us=(n.trait>2))
     vc <- vc[-iv,]
     if (is.null(geno)) {
       add.vc <- Matrix(NA,nrow=0,ncol=0)
     } else {
-      add.vc <- f.us.trait(vc,traits)
+      add.vc <- f.cov.trait(vc,traits,us=(n.trait>2))
     }
   }
   

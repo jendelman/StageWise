@@ -13,5 +13,5 @@ For univariate analysis, a matrix with the proportion of variance. For multi-loc
 Summarize variances and correlations
 }
 \details{
-When reporting the partitioning of variance, the variance component for the additive effect is multiplied by the mean diagonal of the G matrix.
+When reporting the partitioning of variance, the variance component for the additive effect is multiplied by the mean diagonal of the G matrix. When a G matrix has been included, the correlation matrix shown is for the additive value (plus any markers).
 }

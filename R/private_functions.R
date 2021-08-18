@@ -66,19 +66,26 @@ f.id <- function(vc,lvls,keyword) {
   return(vc[ix,1])
 }
 
-f.us.trait <- function(vc,traits) {
-  tmp <- expand.grid(traits,traits)
-  tmp <- apply(tmp,2,as.character)[,c(2,1)]
-  tmp2 <- apply(tmp,1,paste,collapse=":")
-  ix <- sapply(as.list(tmp2),grep,x=rownames(vc),fixed=T)
-  iv <- which(sapply(ix,length)>0)
-  ix <- unlist(ix[iv])
-  tmp <- tmp[iv,]
-  n.lvl <- length(traits)
-  cov.mat <- matrix(0,nrow=n.lvl,n.lvl)
-  dimnames(cov.mat) <- list(traits,traits)
-  cov.mat[cbind(tmp[,1],tmp[,2])] <- vc[ix,1]
-  cov.mat[upper.tri(cov.mat,diag=F)] <- cov.mat[lower.tri(cov.mat,diag=F)]
+f.cov.trait <- function(vc,traits,us) {
+  n.trait <- length(traits)
+  if (us)  {
+    cov.mat <- matrix(0,nrow=n.trait,n.trait)
+    dimnames(cov.mat) <- list(traits,traits)
+    tmp <- expand.grid(traits,traits)
+    tmp <- apply(tmp,2,as.character)[,c(2,1)]
+    tmp2 <- apply(tmp,1,paste,collapse=":")
+    ix <- sapply(as.list(tmp2),grep,x=rownames(vc),fixed=T)
+    iv <- which(sapply(ix,length)>0)
+    ix <- unlist(ix[iv])
+    tmp <- tmp[iv,]
+    cov.mat[cbind(tmp[,1],tmp[,2])] <- vc[ix,1]
+    cov.mat[upper.tri(cov.mat,diag=F)] <- cov.mat[lower.tri(cov.mat,diag=F)]
+  } else {
+    iu <- apply(array(traits),1,grep,x=rownames(vc),fixed=T)
+    cov.mat <- diag(vc[iu,1])
+    dimnames(cov.mat) <- list(traits,traits)
+    cov.mat[1,2] <- cov.mat[2,1] <- vc[1,1]*sqrt(vc[iu[1],1]*vc[iu[2],1])
+  }
   return(coerce_dpo(cov.mat))
 }
 
