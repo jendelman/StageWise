@@ -34,7 +34,6 @@
 #' 
 #' @importFrom utils combn read.csv
 #' @import ggplot2
-#' @import asreml
 #' @import SpATS
 #' @importFrom ggpubr ggarrange
 #' @importFrom rlang .data
@@ -205,7 +204,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
     }
     if (n.trait==1) {
       if (solver=="ASREML") {
-        predans <- predict.asreml(ans,classify="id",vcov = TRUE)
+        predans <- asreml::predict.asreml(ans,classify="id",vcov = TRUE)
         tmp <- predans$pvals[,c("id","predicted.value")]
         colnames(tmp) <- c("id","BLUE")
         vcov[[j]] <- predans$vcov
@@ -223,7 +222,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
       blue.out <- rbind(blue.out,data.frame(env=envs[j],tmp))
       
     } else {
-      predans <- predict.asreml(ans,classify="id:trait",vcov = TRUE)
+      predans <- asreml::predict.asreml(ans,classify="id:trait",vcov = TRUE)
       tmp <- predans$pvals[,c("id","trait","predicted.value")]
       colnames(tmp) <- c("id","trait","BLUE")
       vcov[[j]] <- predans$vcov

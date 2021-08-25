@@ -32,7 +32,6 @@
 #' @import Matrix
 #' @import ggplot2
 #' @import ggrepel
-#' @import asreml
 #' 
 #' @export
 
@@ -193,7 +192,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     meanOmega <- as.numeric(NA)
   }
   
-  asreml.options(workspace=workspace,maxit=30,trace=!silent)
+  asreml::asreml.options(workspace=workspace,maxit=30,trace=!silent)
   model <- sub(pattern="RANDOM",replacement=random.effects,model,fixed=T)
   if (!is.null(vcov)) {
     start.table <- eval(parse(text=paste0(model,",start.values = TRUE)")))$vparameters.table
@@ -208,7 +207,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     cat("ASReml-R failed to converge. Do you wish to continue running? y/n \n")
     input <- readLines(n=1)
     if (input=="y") {
-      ans <- update.asreml(ans)
+      ans <- asreml::update.asreml(ans)
     } else {
       return()
     }
