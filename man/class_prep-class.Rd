@@ -27,7 +27,7 @@ S4 class to prepare for blup
 
 \item{\code{random}}{random effect estimates}
 
-\item{\code{add}}{logical whether additive effects predicted}
+\item{\code{add}}{matrix of additive variances from \code{\link{class_var}}}
 
 \item{\code{loc.env}}{data frame with loc, env}
 

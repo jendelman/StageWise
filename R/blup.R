@@ -2,7 +2,7 @@
 #' 
 #' BLUP
 #' 
-#' Argument \code{what="id"} leads to prediction of breeding values (BV) and genotypic values (GV), including the average fixed effect of the environments and any fixed effect markers.  For argument \code{what="marker"}, fixed effects are not included in the BLUP. Argument \code{index.coeff} should be a named vector, matching the names of the locations or traits. Index coefficients are assumed to imply relative weights for the different locations or traits; as such, they are divided by the square root of the genetic variance estimate for that location/trait and then rescaled to have unit sum.
+#' Argument \code{what="id"} leads to prediction of breeding values (BV) and genotypic values (GV), including the average fixed effect of the environments and any fixed effect markers.  For \code{what="marker"}, environment fixed effects are not included in the BLUP. Argument \code{index.coeff} should be a named vector, matching the names of the locations or traits. Index coefficients are assumed to imply relative weights for the different locations or traits; as such, they are divided by the square root of the genetic variance estimate for that location/trait and then rescaled to have unit sum.
 #' 
 #' @param data object of \code{\link{class_prep}} from \code{\link{blup_prep}}
 #' @param geno object of \code{\link{class_geno}} from \code{\link{read_geno}}
@@ -51,10 +51,10 @@ blup <- function(data,geno=NULL,what,index.coeff=NULL,gwas.ncore=0L) {
     fix.value <- fix.value + as.numeric(as.matrix(geno@coeff[,data@fixed.marker]) %*% a)
   }
   
-  if (data@add & is.null(geno)) {
+  if (nrow(data@add) > 0 & is.null(geno)) {
     stop("Missing geno argument")
   }
-  if (!data@add & !is.null(geno)) {
+  if (nrow(data@add)==0 & !is.null(geno)) {
     stop("Marker data was not used in blup_prep")
   }  
   
@@ -94,7 +94,8 @@ blup <- function(data,geno=NULL,what,index.coeff=NULL,gwas.ncore=0L) {
   } else {
      Ct <- data@Z %*% geno@coeff
   }
-  add.effect <- as.numeric(crossprod(Ct,data@Pmat %*% Matrix(data@y,ncol=1)))
+  V.alpha <- sum(index.coeff*diag(data@add))/geno@scale
+  add.effect <- V.alpha * as.numeric(crossprod(Ct,data@Pmat %*% Matrix(data@y,ncol=1)))
   
   if (nrow(geno@map)==0) {
       out <- data.frame(marker=colnames(geno@coeff),add.effect=add.effect)
@@ -116,6 +117,11 @@ blup <- function(data,geno=NULL,what,index.coeff=NULL,gwas.ncore=0L) {
       std.effect <- out$add.effect/sapply(se,as.numeric)
     } 
     out$gwas.score <- -log10(pnorm(q=abs(std.effect),lower.tail=FALSE)*2)
+  }
+  
+  if (n.mark > 0) {
+    k <- match(data@fixed.marker,out$marker)
+    out$add.effect[k] <- out$add.effect[k] + as.numeric(a)
   }
   
   return(out)

@@ -23,6 +23,9 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
   stopifnot(inherits(vars,"class_var"))
   data$id <- as.character(data$id)
   data$env <- as.character(data$env)
+  if (!is.na(vars@meanG)) {
+    stopifnot(!is.null(geno))
+  }
   
   if (!is.null(mask)) {
     stopifnot(is.element("id",colnames(mask)))
@@ -224,7 +227,7 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
   names(fixed) <- colnames(X)
   random <- as.numeric(GZ%*%Pmat%*%data$BLUE)
   new(Class="class_prep",y=data$BLUE,id=id,Z=Z,var.u=Gmat,Pmat=Pmat,Vinv=Vinv,
-      fixed=fixed,random=random,add=!is.null(geno),loc.env=loc.env,
+      fixed=fixed,random=random,add=vars@add,loc.env=loc.env,
       fixed.marker=as.character(rownames(vars@fixed.marker.var)),
       index.scale=index.scale)
 }    

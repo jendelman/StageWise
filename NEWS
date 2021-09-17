@@ -1,3 +1,7 @@
+Changes in 0.08
+* blup returns marker effects with proper scale 
+* blup returns sum of random and fixed effects for marker effects
+
 Changes in 0.07
 * Modified NAMESPACE for asreml
 
