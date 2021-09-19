@@ -201,12 +201,12 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
     Q <- tcrossprod(GZR) + Gmat
     Qinv <- try(solve(Q),silent=TRUE)
     if (class(Qinv)!="try-error") {
-      Vinv <- Rinv - crossprod(chol(Qinv)%*%GZR%*%cholR)
+      Vinv <- coerce_dpo(Rinv - crossprod(chol(Qinv)%*%GZR%*%cholR))
     } else {
       success <- FALSE
       warning("switching to direct inversion of V")
     }
-  } 
+  }
      
   if ((m >= n) | !success | (n.loc > 1)) {
     if (is.null(geno)) {
@@ -214,15 +214,16 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
     } else {
       V <- tcrossprod(Z%*%Gmat1$half) + tcrossprod(Z%*%Gmat2$half) + Rmat
     }
+    V <- coerce_dpo(V)
     Vinv <- try(solve(V),silent=TRUE)
     if (class(Vinv)=="try-error") {
       stop("V not invertible")
     }  
   }
 
-  W <- forceSymmetric(solve(crossprod(X,Vinv%*%X)))
+  W <- solve(crossprod(chol(Vinv)%*%X))
   XV <- crossprod(X,Vinv)
-  Pmat <- Vinv - crossprod(chol(W)%*%XV)
+  Pmat <- coerce_dpo(Vinv - crossprod(chol(W)%*%XV))
   fixed <- as.numeric(W%*%XV%*%data$BLUE)
   names(fixed) <- colnames(X)
   random <- as.numeric(GZ%*%Pmat%*%data$BLUE)

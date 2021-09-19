@@ -38,6 +38,8 @@
 Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,workspace="500mb") {
   
   stopifnot(inherits(data,"data.frame"))
+  stopifnot(requireNamespace("asreml"))
+  library(asreml)
   stopifnot(c("id","env","BLUE") %in% colnames(data))
   data$id <- as.character(data$id)
   data$env <- as.character(data$env)

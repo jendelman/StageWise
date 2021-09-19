@@ -41,14 +41,29 @@ uniplot <- function(z) {
 }
 
 coerce_dpo <- function(x) {
+  x2 <- try(as(x,"dpoMatrix"),silent=TRUE)
+  if (class(x2)=="dpoMatrix") {
+    tmp <- try(chol(x2),silent=TRUE)
+    if (class(tmp)=="Cholesky") {
+      return(x2)
+    }
+  }
+  
   d <- Diagonal(x=1/sqrt(diag(x)))
   x2 <- crossprod(d,x%*%d)
   eg <- eigen(x2,symmetric=TRUE)
-  lambda <- ifelse(eg$values < .Machine$double.eps*2,.Machine$double.eps*2,eg$values)
-  d <- Diagonal(x=sqrt(diag(x)))
-  x3 <- tcrossprod(Matrix(d %*% eg$vectors %*% Diagonal(x=sqrt(lambda))))
-  dimnames(x3) <- dimnames(x)
-  return(x3)
+  thresh <- .Machine$double.eps*10
+  repeat {
+    lambda <- ifelse(eg$values < thresh,thresh,eg$values)
+    K <- Matrix(Diagonal(x=sqrt(diag(x))) %*% eg$vectors %*% Diagonal(x=sqrt(lambda)))
+    x3 <- tcrossprod(K)
+    dimnames(x3) <- dimnames(x)
+    tmp <- chol(x3)
+    if (class(tmp)=="Cholesky") {
+      return(x3)
+    }
+    thresh <- thresh*10
+  }
 }
 
 partition <- function(x) {

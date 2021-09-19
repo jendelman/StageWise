@@ -147,11 +147,10 @@ ans2b <- Stage2(data=stage1.blue,vcov=stage1.vcov)
 data.frame(vcov=c(FALSE,TRUE),AIC=c(ans2a$aic,ans2b$aic))
 ```
 
-The above Stage 2 analysis did not include the marker data. To partition the genotype effects into additive and residual genetic (including non-additive) effects, the output from `read_geno` is included in the function call, and the resulting model has even lower AIC:
+The above Stage 2 analysis did not include the marker data. To partition the genotype effects into additive and residual genetic (including non-additive) effects, the output from `read_geno` is included in the function call.
 
 ```{r}
 ans2c <- Stage2(data=stage1.blue,vcov=stage1.vcov,geno=geno)
-ans2c$aic
 ```
 
 Several other pieces of information are in the list output from `Stage2`. The variance components are contained in "vars" as an S4 class, which is used by the `blup_prep` function. The `summary` command can be used to see the proportion of variance for the different effects:
@@ -262,9 +261,7 @@ ggplot(plot.data,aes(x=MBS,y=MAS)) + geom_point() + theme_bw() + ggtitle("Reliab
 
 ### Marker effects and GWAS
 
-Using "marker" instead of "id" for the `what` argument leads to the prediction of additive marker effects. The marker effects can also be standardized to compute GWAS -log10(p) scores that are equivalent to the traditional fixed effect method ([Duarte et al. (2014)](http://www.biomedcentral.com/1471-2105/15/246); [Bernal Rubio et al. 2016](https://doi.org/10.1111/age.12378)). This calculation is easily parallelized, and the argument `gwas.ncore` specifies how many cores to use (the default is 0, which skips computing the GWAS scores). The `gwas_threshold` command computes the -log10(p) threshold for QTL discovery based on an effective number of markers ([Moskvina and Schmidt, 2008](https://doi.org/10.1002/gepi.20331)), and `manhattan_plot` displays the result. 
-
-Although no major QTL were detected for total yield in this dataset, there is one for vine maturity:
+Using "marker" instead of "id" for the `what` argument leads to the prediction of additive marker effects. The marker effects can also be standardized to compute GWAS -log10(p) scores that are equivalent to the traditional fixed effect method ([Duarte et al. (2014)](http://www.biomedcentral.com/1471-2105/15/246); [Bernal Rubio et al. 2016](https://doi.org/10.1111/age.12378)). This calculation is easily parallelized, and the argument `gwas.ncore` specifies how many cores to use (the default is 0, which skips computing the GWAS scores). 
 
 ```{r,fig.height=3,fig.width=4}
 prep3 <- blup_prep(data=ans1$vine.maturity$blue,
@@ -274,7 +271,20 @@ prep3 <- blup_prep(data=ans1$vine.maturity$blue,
 
 pred.marker <- blup(data=prep3,geno=geno,what="marker",gwas.ncore=2)
 head(pred.marker)
+```
 
+Marker effects offer a convenient way to save the results of the training set analysis and can be used later to make predictions for new individuals. The result is equivalent to the `what="id"` option with `blup` (i.e., RR-BLUP is equivalent to G-BLUP); the only difference in this implementation is that the BVs computed via marker effects are centered on zero, while the G-BLUP result includes the average value of the fixed effects.
+
+```{r,fig.height=4,fig.width=3}
+RR_BLUP <- predict(geno,pred.marker)
+G_BLUP <- blup(data=prep3,geno=geno,what="id")
+plot(RR_BLUP$BV,G_BLUP$BV,xlab="RR-BLUP",ylab="G-BLUP")
+summary(lm(y~x,data.frame(y=RR_BLUP$BV,x=G_BLUP$BV)))
+```
+
+The `gwas_threshold` command computes the -log10(p) threshold for QTL discovery based on an effective number of markers ([Moskvina and Schmidt, 2008](https://doi.org/10.1002/gepi.20331)), and `manhattan_plot` displays the result. Although no major QTL were detected for total yield in this dataset, there is one for vine maturity:
+
+```{r,fig.height=3,fig.width=4}
 gwas_threshold(geno,alpha=0.05,n.core=2)
 manhattan_plot(pred.marker,thresh=5.1,rotate.label=TRUE)
 ```

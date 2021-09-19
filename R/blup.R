@@ -64,7 +64,7 @@ blup <- function(data,geno=NULL,what,index.coeff=NULL,gwas.ncore=0L) {
       out <- data.frame(id=data@id,GV=as.numeric(M%*%Matrix(data@random,ncol=1)) + fix.value)
       
       GZt <- tcrossprod(data@var.u,data@Z)
-      var.uhat <- forceSymmetric(GZt %*% tcrossprod(data@Pmat,GZt))
+      var.uhat <- crossprod(tcrossprod(chol(data@Pmat),GZt))
       numer <- diag(M%*% tcrossprod(var.uhat,M))
       denom <- diag(M%*% tcrossprod(data@var.u,M))
       out$GV.r2 <- numer/denom
@@ -72,7 +72,7 @@ blup <- function(data,geno=NULL,what,index.coeff=NULL,gwas.ncore=0L) {
       out <- data.frame(id=data@id,BV=as.numeric(cbind(M,0*M) %*% Matrix(data@random,ncol=1)) + fix.value,
                            GV=as.numeric(cbind(M,M) %*% Matrix(data@random,ncol=1)) + fix.value)
       GZt <- tcrossprod(data@var.u,cbind(data@Z,data@Z))
-      var.uhat <- forceSymmetric(GZt %*% tcrossprod(data@Pmat,GZt))
+      var.uhat <- crossprod(tcrossprod(chol(data@Pmat),GZt))
       numer <- diag(cbind(M,0*M)%*% tcrossprod(var.uhat,cbind(M,0*M)))
       denom <- diag(cbind(M,0*M)%*% tcrossprod(data@var.u,cbind(M,0*M)))
       out$BV.r2 <- numer/denom
@@ -95,7 +95,8 @@ blup <- function(data,geno=NULL,what,index.coeff=NULL,gwas.ncore=0L) {
      Ct <- data@Z %*% geno@coeff
   }
   V.alpha <- sum(index.coeff*diag(data@add))/geno@scale
-  add.effect <- V.alpha * as.numeric(crossprod(Ct,data@Pmat %*% Matrix(data@y,ncol=1)))
+  Ct <- Ct * V.alpha
+  add.effect <- as.numeric(crossprod(Ct,data@Pmat %*% Matrix(data@y,ncol=1)))
   
   if (nrow(geno@map)==0) {
       out <- data.frame(marker=colnames(geno@coeff),add.effect=add.effect)

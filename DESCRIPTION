@@ -21,6 +21,7 @@ Collate:
     'class_var.R'
     'gwas_threshold.R'
     'manhattan_plot.R'
+    'predict.geno.R'
     'private_functions.R'
     'quantile.geno.R'
     'read_geno.R'
