@@ -70,11 +70,17 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   
   data$env <- as.character(data$env)
   data$id <- as.character(data$id)
-  envs <- unique(data$env)
-  n.env <- length(envs)
+  env.og <- unique(data$env)
   
   iz <- apply(as.matrix(data[,traits]),1,function(z){!all(is.na(z))})
   data <- data[iz,]
+  envs <- unique(data$env)
+  env.missing <- setdiff(env.og,envs)
+  if (length(env.missing)>1) {
+    cat("Some environments removed due to missing data:\n")
+    cat(paste0(paste(env.missing,collapse="\n"),"\n"))
+  }
+  n.env <- length(envs)
   
   effect.table <- matrix("",nrow=2,ncol=2)
   rownames(effect.table) <- c("blue","blup")
@@ -182,20 +188,16 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   for (j in 1:n.env) {
     cat(sub("X",envs[j],"Env: X\n"))
     ix <- which(data$env==envs[j])
-    if (length(ix)==0) {
-      cat("Warning: No data present\n")
-    } else {
-      data1 <- data[ix,]
-      for (q in 1:length(factor.vars)) {
-        eval(parse(text="data1[,factor.vars[q]] <- factor(as.character(data1[,factor.vars[q]]))"))
-      }
-      if (n.numeric > 0) {
-        for (q in 1:n.numeric) {
-          eval(parse(text="data1[,numeric.vars[q]] <- as.numeric(data1[,numeric.vars[q]])"))
-        }
+    data1 <- data[ix,]
+    for (q in 1:length(factor.vars)) {
+      eval(parse(text="data1[,factor.vars[q]] <- factor(as.character(data1[,factor.vars[q]]))"))
+    }
+    if (n.numeric > 0) {
+      for (q in 1:n.numeric) {
+        eval(parse(text="data1[,numeric.vars[q]] <- as.numeric(data1[,numeric.vars[q]])"))
       }
     }
-    
+  
     ans <- try(eval(parse(text=blue.model)),silent=TRUE)
     if (class(ans)=="try-error") {
       stop("BLUE model failed to converge.")
@@ -212,7 +214,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
       }
       if (solver=="SPATS") {
         predans <- predict.SpATS(object=ans,which="id",predFixed="marginal",
-                                   return.vcov.matrix = TRUE)
+                                 return.vcov.matrix = TRUE)
         tmp <- predans[,c("id","predicted.values")]
         colnames(tmp) <- c("id","BLUE")
         tmp2 <- Matrix(spam::as.dgCMatrix.spam(attr(predans,"vcov")))
@@ -221,7 +223,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
       tmp$id <- as.character(tmp$id)
       dimnames(vcov[[j]]) <- list(tmp$id,tmp$id)
       blue.out <- rbind(blue.out,data.frame(env=envs[j],tmp))
-      
+    
     } else {
       predans <- asreml::predict.asreml(ans,classify="id:trait",vcov = TRUE)
       tmp <- predans$pvals[,c("id","trait","predicted.value")]
@@ -232,7 +234,6 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
       dimnames(vcov[[j]]) <- list(id.trait,id.trait)
       blue.out <- rbind(blue.out,data.frame(env=envs[j],tmp))
     }
-    
     if (n.trait==1) {
       ans <- try(eval(parse(text=blup.model)),silent=TRUE)
       if (class(ans)=="try-error") {
@@ -241,28 +242,26 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
       if ((solver=="ASREML")&&(!ans$converge)) {
         stop("BLUP model failed to converge.")
       }
-      if (n.trait==1) {
-        residuals <- resid(ans)
-        blup.resid <- rbind(blup.resid,
-                          data.frame(id=as.character(data1$id),env=envs[j],resid=residuals))
-        if (solver=="ASREML") {
-          vc <- summary(ans)$varcomp
-          Vg <- vc[match("id",rownames(vc)),1]
-          Ve <- vc[match("units!units",rownames(vc)),1]
-          H2$H2[j] <- round(Vg/(Vg+Ve),2)
+      residuals <- resid(ans)
+      blup.resid <- rbind(blup.resid,
+                        data.frame(id=as.character(data1$id),env=envs[j],resid=residuals))
+      if (solver=="ASREML") {
+        vc <- summary(ans)$varcomp
+        Vg <- vc[match("id",rownames(vc)),1]
+        Ve <- vc[match("units!units",rownames(vc)),1]
+        H2$H2[j] <- round(Vg/(Vg+Ve),2)
+      }
+      if (solver=="SPATS") {
+        H2$H2[j] <- round(as.numeric(getHeritability(ans)),2)
+        x.coord <- ans$data[,ans$terms$spatial$terms.formula$x.coord]
+        y.coord <- ans$data[,ans$terms$spatial$terms.formula$y.coord]
+        fit.spatial.trend <- obtain.spatialtrend(ans)
+        p1.data <- data.frame(x=x.coord,y=y.coord,z=residuals)
+        p1 <- ggplot(p1.data,aes(x=.data$x,y=.data$y,fill=.data$z)) + geom_tile() + scale_fill_viridis_c(name="") + xlab(spline[1]) + ylab(spline[2]) + ggtitle("Residuals")
+        p2.data <-data.frame(expand.grid(x=fit.spatial.trend$col.p, y=fit.spatial.trend$row.p), z=as.numeric(t(fit.spatial.trend$fit)))
+        p2 <- ggplot(p2.data,aes(x=.data$x,y=.data$y,fill=.data$z)) + geom_tile() + scale_fill_viridis_c(name="") + xlab(spline[1]) + theme(axis.text.y = element_blank(),axis.ticks.y=element_blank(),axis.title.y=element_blank()) + ggtitle("Spatial Trend")
+        spatial.plot[[j]] <- ggarrange(p1,p2,common.legend = TRUE,legend = "right")
         }
-        if (solver=="SPATS") {
-          H2$H2[j] <- round(as.numeric(getHeritability(ans)),2)
-          x.coord <- ans$data[,ans$terms$spatial$terms.formula$x.coord]
-          y.coord <- ans$data[,ans$terms$spatial$terms.formula$y.coord]
-          fit.spatial.trend <- obtain.spatialtrend(ans)
-          p1.data <- data.frame(x=x.coord,y=y.coord,z=residuals)
-          p1 <- ggplot(p1.data,aes(x=.data$x,y=.data$y,fill=.data$z)) + geom_tile() + scale_fill_viridis_c(name="") + xlab(spline[1]) + ylab(spline[2]) + ggtitle("Residuals")
-          p2.data <-data.frame(expand.grid(x=fit.spatial.trend$col.p, y=fit.spatial.trend$row.p), z=as.numeric(t(fit.spatial.trend$fit)))
-          p2 <- ggplot(p2.data,aes(x=.data$x,y=.data$y,fill=.data$z)) + geom_tile() + scale_fill_viridis_c(name="") + xlab(spline[1]) + theme(axis.text.y = element_blank(),axis.ticks.y=element_blank(),axis.title.y=element_blank()) + ggtitle("Spatial Trend")
-          spatial.plot[[j]] <- ggarrange(p1,p2,common.legend = TRUE,legend = "right")
-        }
-      } 
     }
   }
   

@@ -27,7 +27,7 @@ read_geno <- function(filename,ploidy,map,eigen.tol=1e-9) {
     geno <- as.matrix(data[,-1])
   }
   m <- nrow(geno)
-  if ((min(geno[1:min(m,1000),])==-1) & (ploidy==2)) {
+  if ((min(geno[1:min(m,1000),],na.rm=T)==-1) & (ploidy==2)) {
     geno <- geno + 1
   }
   rownames(geno) <- data[,1]

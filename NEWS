@@ -1,3 +1,7 @@
+Changes in 0.09
+* Improved handling of missing environments in Stage1
+* Fixed handling NA in genotype data
+
 Changes in 0.08
 * blup returns marker effects with proper scale 
 * blup returns sum of random and fixed effects for marker effects
