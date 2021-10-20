@@ -186,9 +186,9 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   names(vcov) <- envs
   if (n.trait==1) {
     H2 <- data.frame(env=envs,H2=as.numeric(NA))
-  }
-  if ("loc" %in% colnames(data)) {
-    H2$loc <- data$loc[match(H2$env,data$env)]
+    if ("loc" %in% colnames(data)) {
+      H2$loc <- data$loc[match(H2$env,data$env)]
+    }
   }
 
   blue.out <- NULL
