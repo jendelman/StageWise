@@ -74,10 +74,23 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   
   iz <- apply(as.matrix(data[,traits]),1,function(z){!all(is.na(z))})
   data <- data[iz,]
+  
+  tmp <- split(data$id,data$env)
+  replicated <- sapply(tmp,function(x){
+    y <- table(table(x))
+    any(as.integer(names(y)) > 1)
+  })
+  envs <- names(replicated)[replicated]
+  data <- data[data$env %in% envs,]
+  
+  if (nrow(data)==0) {
+    stop("Individuals are not replicated within environment.")
+  }
   envs <- unique(data$env)
   env.missing <- setdiff(env.og,envs)
+  
   if (length(env.missing)>1) {
-    cat("Some environments removed due to missing data:\n")
+    cat("Some environments removed due to missing data or lack of replication:\n")
     cat(paste0(paste(env.missing,collapse="\n"),"\n"))
   }
   n.env <- length(envs)

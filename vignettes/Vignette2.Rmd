@@ -10,6 +10,7 @@ vignette: >
 ```{r include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,message=FALSE,warning=FALSE,comment="##",
                       fig.width=4,fig.height=4,dpi=150)
+knitr::opts_knit$set(root.dir="~/Box Sync/Endelman/Software/StageWise")
 ```
 
 This vignette builds on the information in [Vignette 1](https://jendelman.github.io/StageWise/Vignette1.html), which covered analysis at a single location. This vignette illustrates how to model the covariance between multiple locations, using a dataset of potato yield trials across 9 locations and 6 years and a population size of 336 genotypes ([Schmitz Carley et al. 2019](https://doi.org/10.2135/cropsci2018.05.0314)). 
@@ -56,7 +57,7 @@ plot(hclust(as.dist(1-summary(ans2a$vars)[[2]])),
      hang = -1,xlab="")
 ```
 
-Although the FA2 model should have enough complexity for a set of correlated locations used by a single breeding program, it may be inadequate when analyzing disparate locations, such as in this dataset. The inadequacy of the FA2 model can be assessed using a  uniplot ([Cullis et al. 2010](https://doi.org/10.1139/G10-080)), which is returned by `Stage2`:
+The FA2 model should have enough complexity for a set of correlated locations used by a single breeding program, but it may be inadequate when analyzing disparate locations, such as in this dataset. The inadequacy of the FA2 model can be assessed with a uniplot ([Cullis et al. 2010](https://doi.org/10.1139/G10-080)), which is returned by `Stage2`:
 
 ```{r, fig.width=3,fig.height=3}
 ans2a$uniplot
@@ -66,12 +67,19 @@ The distance of each location from the perimeter of the unit circle (radius = 1)
 
 For locations on the circle perimeter, the cosine of the angle between them equals the correlation (recall cos(0) = 1). Focusing on the 6 highly correlated locations-WI,MI,NC,OR,NY,MO-we will now add the marker data to `Stage2` to estimate the additive correlation and predict breeding values.
 
-```{r,fig.width=3,fig.height=3}
+```{r}
 locs <- c("WI","MI","OR","NY","NC","MO")
 data <- ans1$blue[ans1$blue$loc %in% locs,]
 tmp <- sapply(strsplit(names(ans1$vcov),split="_"),"[[",1)
 vcov <- ans1$vcov[tmp %in% locs]
-ans2b <- Stage2(data=data,vcov=vcov,geno=geno,silent=FALSE)
+```
+```{r, eval=FALSE}
+ans2b <- Stage2(data=data,vcov=vcov,geno=geno,silent=TRUE)
+```
+```{r, include=FALSE}
+load("Vignette2_ans2b.rda")
+```
+```{r,fig.width=3,fig.height=3}
 summary(ans2b$vars)
 ans2b$uniplot
 ```
@@ -107,6 +115,6 @@ tmp <- merge(pred3[,c("id","BV","BV.r2")],pred1[,c("id","BV","BV.r2")],by="id")
 cor(tmp$BV.x,tmp$BV.y)
 
 ggplot(tmp,aes(x=BV.r2.x,y=BV.r2.y)) + geom_point() + coord_fixed(ratio=1) + xlim(0.3,0.8) + ylim(0.3,0.8) + geom_line(data=data.frame(x=c(0.3,0.8),y=c(0.3,0.8)),mapping=aes(x=x,y=y),linetype=2) + theme_bw() + 
-  xlab("5 stage average") + ylab("WI") + ggtitle("BV Reliability")
+  xlab("5 state average") + ylab("WI") + ggtitle("BV Reliability")
 ```
 

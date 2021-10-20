@@ -1,3 +1,6 @@
+Changes in 0.10
+* Removed g.resid x loc from Stage 2
+
 Changes in 0.09
 * Improved handling of missing environments in Stage1
 * Fixed handling NA in genotype data

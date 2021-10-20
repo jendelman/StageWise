@@ -66,11 +66,9 @@ setMethod("summary",c(object="class_var"),
                 Va <- tmp[1]*object@meanG
                 VaL <- tmp[2]*object@meanG
                 
-                Vr <- object@g.resid[1,1]*mean(object@g.resid[,1][-1])
-                VrL <- mean(object@g.resid[,1][-1])*(1-object@g.resid[1,1])
-                
-                V1 <- matrix(c(Va,VaL,Vr,VrL),ncol=1)
-                rownames(V1) <- c("additive","add x loc","g.resid","g.resid x loc")
+                Vr <- mean(object@g.resid[,1])
+                V1 <- matrix(c(Va,VaL,Vr),ncol=1)
+                rownames(V1) <- c("additive","add x loc","g.resid")
               } else {
                 #one location
                 Va <- as.numeric(object@add)*object@meanG

@@ -196,15 +196,18 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
   
   asreml::asreml.options(workspace=workspace,maxit=30,trace=!silent)
   model <- sub(pattern="RANDOM",replacement=random.effects,model,fixed=T)
+  start.table <- eval(parse(text=paste0(model,",start.values = TRUE)")))$vparameters.table
   if (!is.null(vcov)) {
-    start.table <- eval(parse(text=paste0(model,",start.values = TRUE)")))$vparameters.table
     k <- grep("Omega",start.table$Component,fixed=T)
     start.table$Value[k] <- 1
     start.table$Constraint[k] <- "F"
-    ans <- eval(parse(text=paste0(model,",G.param=start.table)")))
-  } else {
-    ans <- eval(parse(text=paste0(model,")")))
   }
+  if (!is.null(geno) & (n.loc > 1)) {
+    k <- grep("id:loc!loc!cor",start.table$Component,fixed=T)
+    start.table$Value[k] <- 1
+    start.table$Constraint[k] <- "F"
+  }
+  ans <- eval(parse(text=paste0(model,",G.param=start.table)")))
   while (!ans$converge) {
     cat("ASReml-R failed to converge. Do you wish to continue running? y/n \n")
     input <- readLines(n=1)
@@ -323,13 +326,13 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
         add.vc <- Matrix(NA,nrow=0,ncol=0)
       } else {
         g.resid.vc <- Matrix(vc[grep("id:loc",vc.names,fixed=T),1],ncol=1)
-        rownames(g.resid.vc) <- c("cor",locations)
+        rownames(g.resid.vc) <- locations
         cov.ans <- f.cov.loc(vc[grep("source = asremlG",vc.names,fixed=T),],locations)
         add.vc <- cov.ans$cov.mat
       }
       out$uniplot <- cov.ans$plot
     } else {
-      g.resid.vc <- Matrix(vc[match("id",vc.names),1],ncol=1)
+      g.resid.vc <- Matrix(vc["id",1],ncol=1)
       if (!is.null(geno)) {
         add.vc <- Matrix(vc[grep("source = asremlG",vc.names,fixed=T),1],ncol=1)
       } else {

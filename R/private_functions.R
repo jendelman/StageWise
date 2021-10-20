@@ -135,17 +135,6 @@ cov_to_cor <- function(x) {
   return(as.matrix(x2))
 }
 
-cor2cov <- function(x) {
-  n <- nrow(x)-1
-  rho.mat <- matrix(x[1],nrow=n,ncol=n)
-  diag(rho.mat) <- 1
-  scale.mat <- diag(sqrt(x[-1]))
-  dimnames(scale.mat) <- list(rownames(x)[-1],rownames(x)[-1])
-  y <- coerce_dpo(scale.mat%*% rho.mat%*%scale.mat)
-  dimnames(y) <- list(rownames(x)[-1],rownames(x)[-1])
-  return(y)
-}
-
 direct_sum <- function(x) {
   n <- length(x) 
   m <- sapply(x,nrow)

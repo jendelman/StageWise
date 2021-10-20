@@ -129,7 +129,7 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
         index.scale <- sqrt(diag(as.matrix(vars@g.resid)))
       } else {
         Gmat1 <- kron(eigen.A=geno@eigen.G, B=vars@add)
-        Gmat2 <- kron(eigen.A=eigen.I, B=cor2cov(vars@g.resid))
+        Gmat2 <- kron(eigen.A=eigen.I, B=coerce_dpo(tcrossprod(sqrt(vars@g.resid))))
         Gmat <- as(bdiag(Gmat1$full,Gmat2$full),"symmetricMatrix")
         index.scale <- sqrt(diag(as.matrix(vars@add)))
       } 
