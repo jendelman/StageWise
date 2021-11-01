@@ -213,10 +213,12 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   
     ans <- try(eval(parse(text=blue.model)),silent=TRUE)
     if (class(ans)=="try-error") {
-      stop("BLUE model failed to converge.")
+      cat("BLUE model failed to converge.\n")
+      next
     }
     if ((solver=="ASREML")&&(!ans$converge)) {
-      stop("BLUE model failed to converge.")
+      cat("BLUE model failed to converge.\n")
+      next
     }
     if (n.trait==1) {
       if (solver=="ASREML") {
@@ -250,10 +252,12 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
     if (n.trait==1) {
       ans <- try(eval(parse(text=blup.model)),silent=TRUE)
       if (class(ans)=="try-error") {
-        stop("BLUP model failed to converge.")
+        cat("BLUP model failed to converge.\n")
+        next
       }
       if ((solver=="ASREML")&&(!ans$converge)) {
-        stop("BLUP model failed to converge.")
+        cat("BLUP model failed to converge.\n")
+        next
       }
       residuals <- resid(ans)
       blup.resid <- rbind(blup.resid,
@@ -278,10 +282,14 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
     }
   }
   
+  ik <- which(!sapply(vcov,is.null))
+  vcov <- vcov[ik]
+  
   if ("loc" %in% colnames(data)) {
     blue.out$loc <- as.character(data$loc[match(blue.out$env,data$env)])
   }
   if (n.trait==1) {
+    H2 <- H2[ik,]
     p1 <- ggplot(data=blup.resid,aes(y=.data$resid,x=.data$env)) + ylab("Residual") + xlab("") +
       stat_boxplot(outlier.color="red") + theme_bw() + theme(axis.text.x=element_text(angle=90,vjust=0.5))
     p2 <- ggplot(data=blup.resid,aes(sample=.data$resid)) + stat_qq() + stat_qq_line() + facet_wrap(~env) + theme_bw() + xlab("Expected") + ylab("Observed")
