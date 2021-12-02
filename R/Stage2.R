@@ -69,6 +69,10 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     dat2 <- data.frame(id=rownames(geno@coeff),as.matrix(geno@coeff[,fix.eff.marker]))
     colnames(dat2) <- c("id",fix.eff.marker)
     data <- merge(data,dat2,by="id")
+  } else {
+    n.mark <- 0
+    marker.var <- matrix(NA,nrow=0,ncol=0)
+    marker.cov <- matrix(NA,nrow=0,ncol=0)
   }
   
   data$env <- factor(data$env)
@@ -109,7 +113,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     } else {
       model <- "asreml(data=data,fixed=BLUE~FIX-1,random=~RANDOM,residual=~dsum(~idv(units)|loc)"
     }
-    if (!is.null(fix.eff.marker)) {
+    if (n.mark > 0) {
       if (n.loc==1) {
         model <- sub("FIX",paste(c("env",fix.eff.marker),collapse="+"),model,fixed=T)
       } else {
@@ -120,7 +124,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     }
   } else {
     model <- "asreml(data=data,fixed=BLUE~FIX-1,random=~RANDOM,residual=~id(env.id):us(Trait)"
-    if (!is.null(fix.eff.marker)) {
+    if (n.mark > 0) {
       model <- sub("FIX",paste(paste0(c("env",fix.eff.marker),":Trait"),collapse="+"),model,fixed=T)
     } else {
       model <- sub("FIX","env:Trait",model,fixed=T)
@@ -235,16 +239,19 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     ix <- match(levels(data$env),rownames(beta))
     out$fixed$env <- data.frame(env=levels(data$env),effect=as.numeric(beta[ix,1]))
   
-    beta.stat <- matrix(NA,nrow=0,ncol=0)
-    marker.cov <- matrix(NA,nrow=0,ncol=0)
-    if (!is.null(fix.eff.marker)) {
+#    beta.stat <- matrix(NA,nrow=n.mark,ncol=0)
+#    marker.cov <- matrix(NA,nrow=n.mark,ncol=0)
+    if (n.mark > 0) {
       var.x <- var(as.matrix(geno@coeff[,fix.eff.marker]))
       if (n.loc==1) {
         ix <- match(fix.eff.marker,rownames(beta))
         out$fixed$marker <- data.frame(marker=fix.eff.marker,effect=as.numeric(beta[ix,1]))
-        beta.stat <- matrix(diag(var.x) * beta[ix,1]^2,ncol=1)
-        rownames(beta.stat) <- fix.eff.marker
+        marker.var <- matrix(beta[ix,1] * var.x %*% beta[ix,1],ncol=1)
+        #beta.stat <- matrix(diag(var.x) * beta[ix,1]^2,ncol=1)
+        rownames(marker.var) <- fix.eff.marker
+        marker.cov <- crossprod(beta[ix,1],var.x %*% beta[ix,1])
       } else {
+        #need to finish
         rownames(beta) <- gsub("loc_","",rownames(beta))
         loc.marker <- expand.grid(loc=locations,marker=fix.eff.marker,stringsAsFactors = FALSE)
         ix <- match(apply(loc.marker,1,paste,collapse=":"),rownames(beta))
@@ -272,15 +279,14 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
   } else {
     #multi-trait
     beta <- sans$coef.fixed
+    ix <- grep("env_",rownames(beta),fixed=T)
     rownames(beta) <- gsub("env_","",rownames(beta))
     rownames(beta) <- gsub("Trait_","",rownames(beta))
-    tmp <- strsplit(rownames(beta),split=":",fixed=T)
+    tmp <- strsplit(rownames(beta)[ix],split=":",fixed=T)
     out$fixed$env <- data.frame(env=sapply(tmp,"[[",1),trait=sapply(tmp,"[[",2),
-                                effect=as.numeric(beta[,1]))
+                                effect=as.numeric(beta[ix,1]))
     
-    beta.stat <- matrix(NA,nrow=0,ncol=0)
-    marker.cov <- matrix(NA,nrow=0,ncol=0)
-    if (!is.null(fix.eff.marker)) {
+    if (n.mark > 0) {
       var.x <- var(as.matrix(geno@coeff[,fix.eff.marker,drop=FALSE]))
       trait.marker <- expand.grid(trait=traits,marker=fix.eff.marker,stringsAsFactors = FALSE)
       ix <- match(apply(trait.marker,1,paste,collapse=":"),rownames(beta))
@@ -298,11 +304,15 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
       }
       marker.cov <- as.matrix(sparseMatrix(i=tmp$Var1,j=tmp$Var2,x=tmp$value,dims=c(n.trait,n.trait),
                                              dimnames=list(traits,traits),symmetric=T))
-    
-      tmp <- diag(var.x)[out$fixed$marker$marker]*out$fixed$marker$effect^2
-      beta.stat <- matrix(tmp,ncol=n.trait,byrow = TRUE)
-      rownames(beta.stat) <- unique(names(tmp))
-      colnames(beta.stat) <- traits
+      marker.var <- matrix(NA,nrow=n.mark,ncol=n.trait)
+      colnames(marker.var) <- traits
+      for (i in 1:n.trait) {
+        b <- matrix(x$effect[x$trait==traits[i]],ncol=1)
+        marker.var[,i] <- b * var.x %*% b
+      }
+      #tmp <- diag(var.x)[x$marker]*x$effect^2
+      #beta.stat <- matrix(tmp,ncol=n.trait,byrow = TRUE)
+      rownames(marker.var) <- unique(x$marker)
     }
   }
     
@@ -356,7 +366,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
   
   out$vars <- new(Class="class_var",add=add.vc,g.resid=g.resid.vc,resid=resid.vc,
                   meanG=meanG,meanOmega=meanOmega,
-                  fixed.marker.var=beta.stat,fixed.marker.cov=marker.cov)
+                  fixed.marker.var=marker.var,fixed.marker.cov=marker.cov)
   
   #random effects
   if (n.trait==1) {
