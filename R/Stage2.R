@@ -208,7 +208,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
   }
   if (!is.null(geno) & (n.loc > 1)) {
     k <- grep("id:loc!loc!cor",start.table$Component,fixed=T)
-    start.table$Value[k] <- 1
+    start.table$Value[k] <- 0.9999
     start.table$Constraint[k] <- "F"
   }
   ans <- eval(parse(text=paste0(model,",G.param=start.table)")))
@@ -251,29 +251,58 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
         rownames(marker.var) <- fix.eff.marker
         marker.cov <- crossprod(beta[ix,1],var.x %*% beta[ix,1])
       } else {
-        #need to finish
-        rownames(beta) <- gsub("loc_","",rownames(beta))
+        
+        beta.names <- rownames(beta)
+        ix <- grep("loc_",beta.names)
+        tmp <- strsplit(beta.names[ix],split=":",fixed=T)
+        beta.names <- sapply(tmp,function(z){
+          tmp2 <- apply(array(z),1,grep,pattern="loc_")
+          paste(z[order(sapply(tmp2,length))],collapse=":")
+        })
+        beta.names <- gsub("loc_","",beta.names)
         loc.marker <- expand.grid(loc=locations,marker=fix.eff.marker,stringsAsFactors = FALSE)
-        ix <- match(apply(loc.marker,1,paste,collapse=":"),rownames(beta))
-        out$fixed$marker <- data.frame(marker=loc.marker$marker,
+        loc.marker <- loc.marker[,c(2,1)]
+        ix <- match(apply(loc.marker,1,paste,collapse=":"),beta.names)
+        x <- out$fixed$marker <- data.frame(marker=loc.marker$marker,
                                        loc=loc.marker$loc,
                                        effect=as.numeric(beta[ix,1]))
-
-        tmp <- expand.grid(1:n.loc,1:n.loc)
-        tmp <- tmp[tmp$Var2 >= tmp$Var1,]
-        tmp$value <- numeric(nrow(tmp))
-        x <- out$fixed$marker
-        for (i in 1:nrow(tmp)) {
-          lv <- matrix(x$effect[x$loc==locations[tmp$Var1[i]]],nrow=1)
-          rv <- matrix(x$effect[x$loc==locations[tmp$Var2[i]]],ncol=1)
-          tmp$value[i] <- lv %*% var.x %*% rv
+        tmp2 <- array(data=as.numeric(NA),dim=c(n.loc,n.loc,n.mark),dimnames=list(locations,locations,fix.eff.marker))
+        for (i in 1:n.loc) {
+          for (j in i:n.loc) {
+            lv <- matrix(x$effect[x$loc==locations[i]],ncol=1)
+            rv <- matrix(x$effect[x$loc==locations[j]],ncol=1)
+            tmp2[i,j,] <- lv * var.x %*% rv
+            if (j > i) {
+              tmp2[j,i,] <- tmp2[i,j,]
+            }
+          }
         }
-        marker.cov <- as.matrix(sparseMatrix(i=tmp$Var1,j=tmp$Var2,x=tmp$value,dims=c(n.loc,n.loc),
-                                             dimnames=list(locations,locations),symmetric=T))
-        tmp <- split(out$fixed$marker$effect,out$fixed$marker$marker)
-        tmp2 <- lapply(tmp,function(x){crossprod(matrix(x,nrow=1))})
-        beta.stat <- t(mapply(function(x,y){partition(x*y)},x=tmp2,y=as.list(diag(var.x))))
-        colnames(beta.stat) <- c("marker","marker x loc")
+        marker.cov <- matrix(0,nrow=n.loc,ncol=n.loc,dimnames=list(locations,locations))
+        for (i in 1:n.mark) {
+          marker.cov <- marker.cov + tmp2[,,i] 
+        }
+
+        # tmp <- expand.grid(1:n.loc,1:n.loc)
+        # tmp <- tmp[tmp$Var2 >= tmp$Var1,]
+        # tmp$value <- numeric(nrow(tmp))
+        # for (i in 1:nrow(tmp)) {
+        #   lv <- matrix(x$effect[x$loc==locations[tmp$Var1[i]]],nrow=1)
+        #   rv <- matrix(x$effect[x$loc==locations[tmp$Var2[i]]],ncol=1)
+        #   tmp$value[i] <- lv %*% var.x %*% rv
+        # }
+        #marker.cov <- as.matrix(sparseMatrix(i=tmp$Var1,j=tmp$Var2,x=tmp$value,dims=c(n.loc,n.loc),
+        #                                     dimnames=list(locations,locations),symmetric=T))
+        
+        marker.var <- matrix(NA,nrow=n.mark,ncol=2)
+        rownames(marker.var) <- fix.eff.marker
+        colnames(marker.var) <- c("marker","marker x loc")
+        for (i in 1:n.mark) {
+          marker.var[i,] <- partition(tmp2[,,i])
+        }
+        #tmp <- split(out$fixed$marker$effect,out$fixed$marker$marker)
+        #tmp2 <- lapply(tmp,function(x){crossprod(matrix(x,nrow=1))})
+        #beta.stat <- t(mapply(function(x,y){partition(x*y)},x=tmp2,y=as.list(diag(var.x))))
+        #colnames(beta.stat) <- c("marker","marker x loc")
       }
     }
   } else {
@@ -318,7 +347,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     
   #variances 
   vc <- sans$varcomp
-  vc <- vc[-which(vc$bound=="F" & vc$component==1),c("component","std.error")]
+  vc <- vc[-which(vc$bound=="F" & round(vc$component)==1L),c("component","std.error")]
   vc.names <- rownames(vc)
   
   if (n.trait==1) {

@@ -71,19 +71,18 @@ setMethod("summary",c(object="class_var"),
                   rownames(V1) <- c("additive","add x loc","g.resid")
                   
                   if (n.mark > 0) {
-                    stop("Not working yet.")
-                    cor.poly <- round(cov_to_cor(add.cov.mat),3)
-                    add.cov.mat <- add.cov.mat + object@fixed.marker.cov
+                    fix.eff.markers <- rownames(object@fixed.marker.var)
+                    tmp <- matrix(t(object@fixed.marker.var),ncol=1)
+                    rownames(tmp) <- as.vector(matrix(rbind(fix.eff.markers,paste(fix.eff.markers,"x loc")),ncol=1))
+                    V1 <- rbind(tmp,V1)
                     
-                      markers <- rownames(object@fixed.marker.var)
-                      x <- matrix(t(object@fixed.marker.var),ncol=1)
-                      tmp <- expand.grid(factor(markers,levels = markers,ordered=T),c(""," x loc"))
-                      rownames(x) <- apply(tmp[order(tmp$Var1),],1,paste,collapse="")
-                      V1 <- rbind(x,V1)                    
+                    cor.mat <- round(cov_to_cor(object@add+object@fixed.marker.cov),3)
+                    tmp <- object@fixed.marker.cov/(object@add+object@fixed.marker.cov)
+                    cor.mat[lower.tri(cor.mat)] <- tmp[lower.tri(tmp)]
+                    cor.mat <- round(cor.mat,3)    
                   } else {
-                    cor.mat <- round(cov_to_cor(object@add),3)
+                    cor.mat <- round(cov_to_cor(object@add),3)    
                   }
-                  
                 } else {
                   #one location
                   Va <- as.numeric(object@add)*object@meanG

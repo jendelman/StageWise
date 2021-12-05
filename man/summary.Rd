@@ -7,11 +7,11 @@
 \item{object}{object of \code{\link{class_var}}}
 }
 \value{
-For univariate analysis, a matrix with the proportion of variance. For multi-location or multi-trait analysis, a list containing the proportion of variance and the correlation matrix.
+For univariate analysis, a matrix with the proportion of variance. For multi-location or multi-trait analysis, a correlation matrix is also returned. If a G matrix was included in the analysis, the correlation is between additive values; otherwise, it is between genotypic values. If fixed effect markers are present, the additive correlation is above the diagonal, and below the diagonal is the proportion of additive covariance due to the fixed effect markers.
 }
 \description{
 Summarize variances and correlations
 }
 \details{
-When reporting the partitioning of variance, the variance component for the additive effect is multiplied by the mean diagonal of the G matrix. When a G matrix has been included, the correlation matrix shown is for the additive value (plus any markers).
+When reporting the partitioning of variance, the variance component for the additive effect is multiplied by the mean diagonal of the G matrix.
 }
