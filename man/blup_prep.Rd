@@ -15,14 +15,11 @@ blup_prep(data, vcov = NULL, geno = NULL, vars, mask = NULL)
 
 \item{vars}{object of \code{\link{class_var}} from \code{\link{Stage2}}}
 
-\item{mask}{(optional) data frame with column "id" and optional columns "env", "trait"}
+\item{mask}{(optional) data frame with possible columns "id","env","trait"}
 }
 \value{
 Object of \code{\link{class_prep}}
 }
 \description{
 Prepare data for BLUP
-}
-\details{
-The argument \code{mask} can be used to mask all observations for a particular individual, or by including a column named 'env', only the observations in particular environments can be masked. This is useful for cross-validation to test the accuracy of predicting into new environments.
 }

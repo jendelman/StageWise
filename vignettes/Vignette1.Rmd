@@ -1,5 +1,5 @@
 ---
-title: "Vignette 1: Single trait analysis at one location"
+title: "Vignette 1: Single trait analysis with compound symmetric GxE"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{StageWise Vignette1}
@@ -10,7 +10,12 @@ vignette: >
 ```{r include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,message=FALSE,warning=FALSE,comment="##",
                       fig.width=4,fig.height=4,dpi=150)
+knitr::opts_knit$set(root.dir="~/Box Sync/Endelman/Software/StageWise")
 ```
+
+### Preface
+
+This vignette illustrates basic features of the package using a potato breeding dataset of 958 genotypes (i.e., clones), with phenotype data from six years at one location. It is an updated version of the dataset published by [Endelman et al. (2018)](https://doi.org/10.1534/genetics.118.300685). This vignette covers single trait analysis, under the assumption that all enviroments have the same genetic correlation (i.e., compound symmetry). The analysis of multiple locations with different correlations are covered in [Vignette 2](https://jendelman.github.io/StageWise/Vignette2.html), and the analysis of correlated traits is covered in [Vignette 3](https://jendelman.github.io/StageWise/Vignette3.html).
 
 There are five main functions in the package:
 
@@ -30,7 +35,7 @@ The package depends on ASReml-R (version 4.1.0.148 or later), which requires a l
 
 The `read_geno` function reads bi-allelic marker data as a CSV file. If you intend to run GWAS, the option `map=TRUE` indicates the first three columns of the input file are the marker name, chromosome, and position, followed by columns for the individuals. Map information is not used for genomic prediction and can be omitted by using `map=FALSE`, in which case the first column is the marker name and subsequent columns are individuals. The marker data should represent allele dosage, with numeric values between 0 and ploidy. (For compatibility with other software, the coding {-1,0,1} is also allowed for diploids.)
 
-The example dataset contains marker data for 958 tetraploid potato clones from the US round white market class, which is used to make potato chips. It is an updated version of the dataset published by [Endelman et al. (2018)](https://doi.org/10.1534/genetics.118.300685). Our genotyping platform for tetraploid potato has been an Infinium SNP array. Most of the clones in this dataset were genotyped with Version 3 (V3) of the array, but some were genotyped with an earlier version (V2). Data from the two different versions were combined using the function `merge_impute` from R package [polyBreedR](https://github.com/jendelman/polyBreedR). The imputation procedure is based on BLUP and generates fractional values of allele dosage, which poses no difficulty for estimating breeding values. 
+The potato marker data were generated using an Infinium SNP array. Most clones were genotyped with Version 3 (V3) of the array, but some were genotyped with an earlier version (V2). Data from the two different versions were combined using the function `merge_impute` from R package [polyBreedR](https://github.com/jendelman/polyBreedR). The imputation procedure is based on BLUP and generates fractional values of allele dosage, which is compatible with estimating breeding values. 
 
 ```{r}
 geno.file <- system.file("vignette_data", "geno1.csv", package = "StageWise")
@@ -147,10 +152,10 @@ ans2b <- Stage2(data=stage1.blue,vcov=stage1.vcov)
 data.frame(vcov=c(FALSE,TRUE),AIC=c(ans2a$aic,ans2b$aic))
 ```
 
-The above Stage 2 analysis did not include the marker data. To partition the genotype effects into additive and residual genetic (including non-additive) effects, the output from `read_geno` is included in the function call.
+The above Stage 2 analysis did not include the marker data. To partition the genotype effects into additive and residual genetic (including non-additive) effects, the output from `read_geno` is included in the function call. The following example also shows the `silent=FALSE` option (default is TRUE), which shows the convergence progress from ASReml-R.
 
 ```{r}
-ans2c <- Stage2(data=stage1.blue,vcov=stage1.vcov,geno=geno)
+ans2c <- Stage2(data=stage1.blue,vcov=stage1.vcov,geno=geno,silent=FALSE)
 ```
 
 Several other pieces of information are in the list output from `Stage2`. The variance components are contained in "vars" as an S4 class, which is used by the `blup_prep` function. The `summary` command can be used to see the proportion of variance for the different effects:
@@ -191,7 +196,7 @@ Specific gravity had the highest heritability of the four traits.
 
 ### BLUP Reliability
 
-The calculation of BLUPs is split into two functions: `blup_prep` and `blup`. The primary motivation for doing this was to facilitate quicker exploration of different index coefficients, which is illustrated in Vignettes 2 and 3. 
+The calculation of BLUPs is split into two functions: `blup_prep` and `blup`. The primary motivation for doing this was to facilitate quicker exploration of different selection indices, which is illustrated in Vignettes 2 and 3. 
 
 The `blup_prep` function needs the same phenotype information supplied to `Stage2`, i.e, the Stage 1 BLUEs and their covariances, which is then combined with the variance component estimates from Stage 2 to make predictions for all individuals in the genotype file, regardless of whether they have been phenotyped. The object returned by `blup_prep` contains the inverted covariance matrix of the Stage 2 response variable, plus other information needed for BLUP, as an S4 class. This object is provided to the `blup` function, along with the genotype object, and the third argument `what` has possible values of "id" or "marker". Using "id" leads to the prediction of breeding values (BV) and genotypic values (GV) for the individuals:
 
@@ -234,7 +239,7 @@ The `blup_prep` function allows masking the phenotypes for some individuals befo
 
 ```{r, fig.height=3,fig.width=3}
 id <- stage1.blue$id
-mask <- data.frame(id=id[substr(id,1,3)=="W17"])
+mask <- data.frame(id=unique(id[substr(id,1,3)=="W17"]))
 head(mask)
 
 prep2 <- blup_prep(data=stage1.blue,
@@ -258,6 +263,8 @@ head(plot.data)
 ggplot(plot.data,aes(x=MBS,y=MAS)) + geom_point() + theme_bw() + ggtitle("Reliability") +
   xlab("MBS") + ylab("MAS") + coord_fixed(ratio=1) + ylim(0.3,0.8) + xlim(0.3,0.8) + geom_line(data=data.frame(x=c(0.3,0.8),y=c(0.3,0.8)),mapping=aes(x=x,y=y),linetype=2)
 ```
+
+Using the `mask` argument, one can also specify that individuals are masked only in some environments, which is useful for assessing the accuracy of prediction into new environments based on phenotypes in other environments. This idea is revisited in Vignette 2.
 
 ### Marker effects and GWAS
 

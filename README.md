@@ -26,9 +26,11 @@ The ASReml-R package is used for variance component estimation, which
 requires a license from [VSN
 International](https://www.vsni.co.uk/software/asreml-r).
 
-Funding for software development has come from USDA NIFA Hatch Project
-1013047 and SCRI Project 2020-51181-32156, and the datasets were
-generated with support from Potatoes USA.
+Funding for software development has come from USDA Hatch Project
+1013047 and NIFA Award 2020-51181-32156, and the vignette datasets were
+generated with support from NIFA Awards 2016-34141-25707 and
+2019-34141-30284, Potatoes USA, the Wisconsin Potato and Vegetable
+Growers Association, and the University of Wisconsin-Madison.
 
 To install and load the package:
 
@@ -41,16 +43,17 @@ library(StageWise)
 There are three vignettes in the package:
 
 -   [Vignette 1](https://jendelman.github.io/StageWise/Vignette1.html)
-    illustrates the analysis of a single trait across multiple years at
-    one location, or for multiple locations when the genotype x location
-    effect is negligible.
+    illustrates analysis of a single trait under a compound symmetry
+    model for GxE, which is appropriate when the genetic correlation
+    between environments is similar.
 
 -   [Vignette 2](https://jendelman.github.io/StageWise/Vignette2.html)
-    illustrates the analysis of a dataset with correlated locations (for
-    one trait).
+    illustrates analysis of a single trait under a heterogeneous
+    covariance structure, which is often needed with diverse locations.
 
--   Vignette 3 (in progress) illustrates the analysis of correlated
-    traits (at one location).
+-   [Vignette 3](https://jendelman.github.io/StageWise/Vignette3.html)
+    illustrates the analysis of correlated traits under a compound
+    symmetry model for GxE.
 
 For a complete specification of package functions, consult the
 [reference manual.](https://jendelman.github.io/StageWise/manual.pdf)

@@ -4,7 +4,7 @@
 \alias{blup}
 \title{BLUP}
 \usage{
-blup(data, geno = NULL, what, index.coeff = NULL, gwas.ncore = 0L)
+blup(data, geno = NULL, what, index.weights = NULL, gwas.ncore = 0L)
 }
 \arguments{
 \item{data}{object of \code{\link{class_prep}} from \code{\link{blup_prep}}}
@@ -13,7 +13,7 @@ blup(data, geno = NULL, what, index.coeff = NULL, gwas.ncore = 0L)
 
 \item{what}{"id" or "marker"}
 
-\item{index.coeff}{index coefficients for the locations or traits}
+\item{index.weights}{named vector of index weights for the locations or traits}
 
 \item{gwas.ncore}{Integer indicating number of cores to use for GWAS (default is 0 for no GWAS). Requires \code{what="markers"}.}
 }
@@ -24,5 +24,5 @@ Data frames of BLUPs
 BLUP
 }
 \details{
-Argument \code{what="id"} leads to prediction of breeding values (BV) and genotypic values (GV), including the average fixed effect of the environments and any fixed effect markers.  For \code{what="marker"}, environment fixed effects are not included in the BLUP. Argument \code{index.coeff} should be a named vector, matching the names of the locations or traits. Index coefficients are assumed to imply relative weights for the different locations or traits; as such, they are divided by the square root of the genetic variance estimate for that location/trait and then rescaled to have unit sum.
+Argument \code{what="id"} leads to prediction of breeding values (BV) and genotypic values (GV), including the average fixed effect of the environments and any fixed effect markers.  For \code{what="marker"}, environment fixed effects are not included in the BLUP. Argument \code{index.weights} is a named vector (matching the names of the locations or traits), and the values are interpreted for standardized traits. An overall scaling factor is also applied so that the sum of the squared index coefficients equals 1.
 }

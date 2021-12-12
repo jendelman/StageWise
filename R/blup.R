@@ -2,12 +2,12 @@
 #' 
 #' BLUP
 #' 
-#' Argument \code{what="id"} leads to prediction of breeding values (BV) and genotypic values (GV), including the average fixed effect of the environments and any fixed effect markers.  For \code{what="marker"}, environment fixed effects are not included in the BLUP. Argument \code{index.coeff} should be a named vector, matching the names of the locations or traits. Index coefficients are assumed to imply relative weights for the different locations or traits; as such, they are divided by the square root of the genetic variance estimate for that location/trait and then rescaled to have unit sum.
+#' Argument \code{what="id"} leads to prediction of breeding values (BV) and genotypic values (GV), including the average fixed effect of the environments and any fixed effect markers.  For \code{what="marker"}, environment fixed effects are not included in the BLUP. Argument \code{index.weights} is a named vector (matching the names of the locations or traits), and the values are interpreted for standardized traits. An overall scaling factor is also applied so that the sum of the squared index coefficients equals 1.
 #' 
 #' @param data object of \code{\link{class_prep}} from \code{\link{blup_prep}}
 #' @param geno object of \code{\link{class_geno}} from \code{\link{read_geno}}
 #' @param what "id" or "marker"
-#' @param index.coeff index coefficients for the locations or traits
+#' @param index.weights named vector of index weights for the locations or traits
 #' @param gwas.ncore Integer indicating number of cores to use for GWAS (default is 0 for no GWAS). Requires \code{what="markers"}.
 #' 
 #' @return Data frames of BLUPs
@@ -17,37 +17,59 @@
 #' @importFrom parallel makeCluster clusterExport parCapply stopCluster
 #' @export
 
-blup <- function(data,geno=NULL,what,index.coeff=NULL,gwas.ncore=0L) {
+blup <- function(data,geno=NULL,what,index.weights=NULL,gwas.ncore=0L) {
   
   stopifnot(what %in% c("id","marker"))
   n.id <- length(data@id)
   n.mark <- length(data@fixed.marker)
   
   if (nrow(data@loc.env) > 0) {
-    locations <- sort(unique(data@loc.env$loc))
-    data@index.scale <- data@index.scale[locations]
-    data@loc.env$loc <- factor(data@loc.env$loc,levels=locations)
+    locations <- names(data@index.scale)
     n.loc <- length(locations)
-    if (is.null(index.coeff)) {
+    if (is.null(index.weights)) {
       index.coeff <- 1/data@index.scale
     } else {
-      ix <- match(locations,names(index.coeff))
-      if (any(is.na(ix))) {stop("Check names of locations in index.coeff")}
-      index.coeff <- index.coeff[ix]/data@index.scale
+      ix <- match(locations,names(index.weights))
+      if (any(is.na(ix))) {stop("Check names of locations in index.weights")}
+      index.coeff <- index.weights[ix]/data@index.scale
     }
-    index.coeff <- index.coeff/sum(index.coeff)
+    index.coeff <- index.coeff/sqrt(sum(index.coeff^2))
     n.env <- length(data@fixed) - n.loc*n.mark
-    fix.value <- sum(index.coeff*tapply(data@fixed[data@loc.env$env],data@loc.env$loc,mean))
+    fix.value <- sum(index.coeff*tapply(data@fixed[data@loc.env$env],data@loc.env$loc,mean)[locations])
   } else {
-    n.loc <- 1
-    index.coeff <- 1
-    n.env <- length(data@fixed) - n.loc*n.mark
-    fix.value <- mean(data@fixed[1:n.env])
+    n.loc <- 1 
+    if (nrow(data@trait.env)==0) {
+      #single trait
+      index.coeff <- 1
+      n.env <- length(data@fixed) - n.mark
+      fix.value <- mean(data@fixed[1:n.env])
+    } else {
+      # multi-trait
+      traits <- names(data@index.scale)
+      n.trait <- length(traits)
+      if (is.null(index.weights)) {
+        index.coeff <- 1/data@index.scale
+      } else {
+        ix <- match(traits,names(index.weights))
+        if (any(is.na(ix))) {stop("Check names of traits in index.coeff")}
+        index.coeff <- index.weights[ix]/data@index.scale
+      }
+      index.coeff <- index.coeff/sqrt(sum(index.coeff^2))
+      n.env <- length(data@fixed)/n.trait - n.mark
+      tmp <- apply(data@trait.env[,c(2,1)],1,paste,collapse=":")
+      fix.value <- sum(index.coeff*tapply(data@fixed[tmp],data@trait.env$trait,mean)[traits])
+    }
   }
   
   if (n.mark > 0) {
-    a <- kronecker(Diagonal(n=n.mark),Matrix(index.coeff,nrow=1)) %*% 
-      Matrix(data@fixed[n.env+1:(n.loc*n.mark)],ncol=1)
+    #trait/loc nested within marker
+    if (n.trait==1) {
+      a <- kronecker(Diagonal(n=n.mark),Matrix(index.coeff,nrow=1)) %*% 
+        Matrix(data@fixed[n.env+1:(n.loc*n.mark)],ncol=1)
+    } else {
+      a <- kronecker(Diagonal(n=n.mark),Matrix(index.coeff,nrow=1)) %*% 
+        Matrix(data@fixed[n.env*n.trait+1:(n.trait*n.mark)],ncol=1)
+    }
     fix.value <- fix.value + as.numeric(as.matrix(geno@coeff[,data@fixed.marker]) %*% a)
   }
   
@@ -60,9 +82,9 @@ blup <- function(data,geno=NULL,what,index.coeff=NULL,gwas.ncore=0L) {
   
   M <- kronecker(Diagonal(n=n.id),Matrix(index.coeff,nrow=1))
   if (what=="id") {
+    #trait/loc within id
     if (is.null(geno)) {
       out <- data.frame(id=data@id,GV=as.numeric(M%*%Matrix(data@random,ncol=1)) + fix.value)
-      
       GZt <- tcrossprod(data@var.u,data@Z)
       var.uhat <- crossprod(tcrossprod(chol(data@Pmat),GZt))
       numer <- diag(M%*% tcrossprod(var.uhat,M))

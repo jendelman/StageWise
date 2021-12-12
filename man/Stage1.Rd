@@ -36,6 +36,7 @@ List containing
 \item{vcov}{list of variance-covariance matrices for the BLUEs, one per env}
 \item{H2}{broad-sense H2 on a plot basis}
 \item{resid}{list containing diagnostic plots and data frame of residuals}
+\item{aic}{AIC for the BLUE model (only with asreml)}
 }
 }
 \description{

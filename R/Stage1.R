@@ -30,6 +30,7 @@
 #' \item{vcov}{list of variance-covariance matrices for the BLUEs, one per env}
 #' \item{H2}{broad-sense H2 on a plot basis}
 #' \item{resid}{list containing diagnostic plots and data frame of residuals}
+#' \item{aic}{AIC for the BLUE model (only with asreml)}
 #' }
 #' 
 #' @importFrom utils combn read.csv
@@ -226,6 +227,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
         tmp <- predans$pvals[,c("id","predicted.value")]
         colnames(tmp) <- c("id","BLUE")
         vcov[[j]] <- predans$vcov
+        aic <- as.numeric(summary(ans)$aic)
       }
       if (solver=="SPATS") {
         predans <- predict.SpATS(object=ans,which="id",predFixed="marginal",
@@ -240,6 +242,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
       blue.out <- rbind(blue.out,data.frame(env=envs[j],tmp))
     
     } else {
+      aic <- as.numeric(summary(ans)$aic)
       predans <- asreml::predict.asreml(ans,classify="id:trait",vcov = TRUE)
       tmp <- predans$pvals[,c("id","trait","predicted.value")]
       colnames(tmp) <- c("id","trait","BLUE")
@@ -249,6 +252,8 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
       dimnames(vcov[[j]]) <- list(id.trait,id.trait)
       blue.out <- rbind(blue.out,data.frame(env=envs[j],tmp))
     }
+    
+    #BLUP model
     if (n.trait==1) {
       ans <- try(eval(parse(text=blup.model)),silent=TRUE)
       if (class(ans)=="try-error") {
@@ -295,11 +300,12 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
     p2 <- ggplot(data=blup.resid,aes(sample=.data$resid)) + stat_qq() + stat_qq_line() + facet_wrap(~env) + theme_bw() + xlab("Expected") + ylab("Observed")
     if (solver=="ASREML")
       return(list(blue=blue.out,vcov=vcov,H2=H2,
-                  resid=list(boxplot=p1,qqplot=p2,table=blup.resid)))
+                  resid=list(boxplot=p1,qqplot=p2,table=blup.resid),aic=aic))
     if (solver=="SPATS")
       return(list(blue=blue.out,vcov=vcov,H2=H2,
                   resid=list(boxplot=p1,qqplot=p2,spatial=spatial.plot,table=blup.resid)))
   } else {
-    return(list(blue=blue.out,vcov=vcov))
+    #Multi-trait
+    return(list(blue=blue.out,vcov=vcov,aic=aic))
   }
 }

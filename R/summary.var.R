@@ -6,7 +6,7 @@
 #' 
 #' @param object object of \code{\link{class_var}}
 #'
-#' @return For univariate analysis, a matrix with the proportion of variance. For multi-location or multi-trait analysis, a correlation matrix is also returned. If a G matrix was included in the analysis, the correlation is between additive values; otherwise, it is between genotypic values. If fixed effect markers are present, the additive correlation is above the diagonal, and below the diagonal is the proportion of additive covariance due to the fixed effect markers.
+#' @return For univariate analysis, a matrix with the proportion of variance (R2). For multi-location or multi-trait analysis, a correlation matrix is also returned. If a G matrix was included in the analysis, the correlation is between additive values; otherwise, it is between genotypic values. If fixed effect markers are present, the additive correlation is above the diagonal, and below the diagonal is the proportion of additive covariance due to the fixed effect markers.
 #'
 #' @include class_var.R
 #' @name summary
@@ -122,12 +122,12 @@ setMethod("summary",c(object="class_var"),
               }
               vtab <- rbind(V1,V2)
               pvar <- round(vtab / sum(vtab),3)
-              colnames(pvar) <- "Var. Proportion"
+              colnames(pvar) <- "R2"
               
             } #single trait
             
             if (!is.null(cor.mat)) {
-              return(list(prop.var=pvar,cor=cor.mat))
+              return(list(R2=pvar,cor=cor.mat))
             } else {
               return(pvar) 
             }

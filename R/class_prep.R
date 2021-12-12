@@ -10,6 +10,7 @@
 #' @slot random random effect estimates
 #' @slot add matrix of additive variances from \code{\link{class_var}}
 #' @slot loc.env data frame with loc, env
+#' @slot trait.env data frame with trait, env
 #' @slot index.scale sqrt of genetic variances for the locations/traits
 #' @slot fixed.marker names of fixed effect markers
 #' 
@@ -17,5 +18,6 @@
 #' @import Matrix
 #' @export
 class_prep <- setClass("class_prep",slots=c(y="numeric",Z="Matrix",id="character",var.u="Matrix",Vinv="Matrix",Pmat="Matrix",
-                                            fixed="numeric",random="numeric",add="Matrix",loc.env="data.frame",
+                                            fixed="numeric",random="numeric",add="Matrix",
+                                            loc.env="data.frame",trait.env="data.frame",
                                             index.scale="numeric",fixed.marker="character"))
