@@ -43,7 +43,7 @@ geno <- read.csv(geno.file,check.names=F)
 geno[1:4,1:6]
 
 library(StageWise)
-geno <- read_geno(filename=geno.file,ploidy=4,map=TRUE)
+geno <- read_geno(filename=geno.file, ploidy=4, map=TRUE, min.minor.allele=5)
 ``` 
 
 The function `read_geno` computes the additive relationship (G) matrix and its inverse, which can take some time for large datasets. These matrices and other information needed for the `Stage2` function are stored in the returned object as an S4 class. 

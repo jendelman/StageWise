@@ -1,3 +1,6 @@
+Changes in 0.14
+* Added min.minor.allele argument to read_geno
+
 Changes in 0.13
 * multi-trait functionality completed and Vignette 3 added
 * changed argument for blup from index.coeff to index.weights

@@ -2,19 +2,22 @@
 #' 
 #' Read marker genotype data
 #' 
-#' When \code{map=TRUE}, first three columns of the file are marker, chrom, position. When \code{map=FALSE}, the first column is marker. Subsequent columns contain the allele dosage for individuals/clones, coded 0,1,2,...ploidy (fractional values are allowed). The input file for diploids can also be coded using {-1,0,1} (fractional values allowed). Additive coefficients are computed by subtracting the population mean from each marker, and the additive (genomic) relationship matrix is computed as G = tcrossprod(coeff)/scale. The scale parameter ensures the mean of the diagonal elements of G equals 1 under panmictic equilibrium. Missing genotype data is replaced with the population mean. For numerical conditioning, eigenvalues of G smaller than \code{eigen.tol} are replaced by \code{eigen.tol}. Monomorphic markers are removed.
+#' When \code{map=TRUE}, first three columns of the file are marker, chrom, position. When \code{map=FALSE}, the first column is marker. Subsequent columns contain the allele dosage for individuals/clones, coded 0,1,2,...ploidy (fractional values are allowed). The input file for diploids can also be coded using {-1,0,1} (fractional values allowed). Additive coefficients are computed by subtracting the population mean from each marker, and the additive (genomic) relationship matrix is computed as G = tcrossprod(coeff)/scale. The scale parameter ensures the mean of the diagonal elements of G equals 1 under panmictic equilibrium. Missing genotype data is replaced with the population mean. For numerical conditioning, eigenvalues of G smaller than \code{eigen.tol} are replaced by \code{eigen.tol}. 
+#' 
+#' The argument \code{min.minor.allele} specifies the minimum number of individuals that must contain the minor allele. Markers that do not meet this threshold are discarded.
 #'  
 #' @param filename Name of CSV file
 #' @param ploidy 2,4,6,etc. (even numbers)
 #' @param map TRUE/FALSE
-#' @param eigen.tol 1e-9
+#' @param eigen.tol See Details. Default is 1e-9.
+#' @param min.minor.allele See Details. Default is 5.
 #' 
 #' @return Variable of class \code{\link{class_geno}}.
 #' 
 #' @export
 #' @importFrom utils read.csv
 
-read_geno <- function(filename,ploidy,map,eigen.tol=1e-9) {
+read_geno <- function(filename,ploidy,map,eigen.tol=1e-9,min.minor.allele=5) {
   data <- read.csv(file = filename,check.names=F)
   if (map) {
     map <- data[,1:3]
@@ -33,8 +36,19 @@ read_geno <- function(filename,ploidy,map,eigen.tol=1e-9) {
   rownames(geno) <- data[,1]
   id <- colnames(geno)
   p <- apply(geno,1,mean,na.rm=T)/ploidy
-  ix <- which(p > 0 & p < 1)
+  n.minor <- apply(geno,1,function(z){
+    p <- mean(z,na.rm=T)/ploidy
+    tab <- table(factor(round(z),levels=0:ploidy))
+    if (p > 0.5) {
+      sum(tab) - tab[ploidy+1]
+    } else {
+      sum(tab) - tab[1]
+    }
+  })
+  ix <- which(n.minor >= min.minor.allele)
   stopifnot(length(ix) > 0)
+  cat(sub("X",min.minor.allele,"Minor allele threshold = X genotypes\n"))
+  cat(sub("X",length(ix),"Number of markers = X\n"))
   geno <- geno[ix,]
   p <- p[ix]
   if (nrow(map)>0)
