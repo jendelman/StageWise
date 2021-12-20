@@ -43,10 +43,8 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
   stopifnot(c("id","env","BLUE") %in% colnames(data))
   data$id <- as.character(data$id)
   data$env <- as.character(data$env)
-  envs <- unique(data$env)
-  n.env <- length(envs)
-  
   data$env.id <- apply(data[,c("env","id")],1,paste,collapse=":")
+  
   missing <- which(is.na(data$BLUE))
   if (length(missing) > 0) {
     data <- data[!(data$env.id %in% data$env.id[missing]),]
@@ -60,6 +58,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     data <- data[data$id %in% id,]
   } else {
     meanG <- as.numeric(NA)
+    id <- sort(unique(data$id))
   }
   
   if (!is.null(fix.eff.marker)) {
@@ -75,15 +74,17 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     marker.cov <- matrix(NA,nrow=0,ncol=0)
   }
   
-  data$env <- factor(data$env)
-  stopifnot(table(data$env)>0)
-  id <- sort(unique(data$id))
+  envs <- unique(data$env)
+  n.env <- length(envs)
+  if (n.env==1) {
+    stop("Need more than one environment")
+  }
+  data$env <- factor(data$env,levels=envs)
   data$id <- factor(data$id,levels=id)
   env.id <- sort(unique(data$env.id))
   data$env.id <- factor(data$env.id,levels=env.id)
   
   if ("trait" %in% colnames(data)) {
-    #stop("Multiple traits not supported yet. Check back soon.")
     n.loc <- 1
     data$trait <- as.character(data$trait)
     data$env.id.trait <- apply(data[,c("env.id","trait")],1,paste,collapse=":")
@@ -163,8 +164,8 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
   
   if (!is.null(vcov)) {
     stopifnot(is.list(vcov))
-    stopifnot(length(vcov)==n.env)
-    stopifnot(sort(levels(data$env))==sort(names(vcov)))
+    stopifnot(envs %in% names(vcov))
+    vcov <- vcov[envs]
     vcov <- mapply(FUN=function(x,y){
       tmp <- paste(y,rownames(x),sep=":")
       dimnames(x) <- list(tmp,tmp)

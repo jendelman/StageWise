@@ -1,3 +1,8 @@
+Changes in 0.15
+* Environmental covariance returned as resid in Stage1 for multi-trait analysis
+* Dropping of environments in Stage2 now works
+* blup_prep now works even with one environment
+
 Changes in 0.14
 * Added min.minor.allele argument to read_geno
 

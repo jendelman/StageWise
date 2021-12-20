@@ -23,22 +23,18 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
   data$env <- as.character(data$env)
   
   n.loc <- 1
-  loc.env <- data.frame(loc=character(0),env=character(0))
   n.trait <- 1
-  trait.env <- data.frame(trait=character(0),env=character(0))
   if ("loc" %in% colnames(data)) {
     locations <- rownames(vars@resid)
     n.loc <- length(locations)
     data$loc <- as.character(data$loc)
     stopifnot(n.loc > 1)
-    loc.env <- unique(data[,c("loc","env")])
   } 
   if ("trait" %in% colnames(data)) {
     traits <- rownames(vars@resid)
     n.trait <- length(traits)
     data$trait <- as.character(data$trait)
     stopifnot(n.trait > 1)
-    trait.env <- unique(data[,c("trait","env")])
   } 
   
   if (!is.na(vars@meanG)) {
@@ -91,23 +87,33 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
                                 return(Q)})
   }
   names(omega.list) <- names(vcov)
+  
+  #redo envs because some may have been dropped
+  data$env <- as.character(data$env)
+  loc.env <- data.frame(loc=character(0),env=character(0))
+  trait.env <- data.frame(trait=character(0),env=character(0))
+  if (n.loc > 1) 
+    loc.env <- unique(data[,c("loc","env")])
+  if (n.trait > 1)
+    trait.env <- unique(data[,c("trait","env")])
+  
   envs <- unique(data$env)
   n.env <- length(envs)
   omega.list <- omega.list[envs]
-  data$env <- as.character(data$env)
+  data$env <- factor(data$env,levels=envs)
   n.obs <- sapply(omega.list,nrow)
   
   #Rlist
   if (n.trait==1) {
     if (n.loc > 1) {
-      tmp <- vars@resid[data$loc[match(envs,data$env)],1]
+      tmp <- vars@resid[as.character(data$loc)[match(envs,as.character(data$env))],1]
     } else {
       tmp <- rep(vars@resid[1,1],n.env)
     }
     Rlist <- mapply(FUN=function(n,v){Diagonal(n=n)*v},n=as.list(n.obs),v=as.list(tmp))
   } else {
     #multi-trait
-    tmp <- split(data$id,factor(data$env,levels=envs))
+    tmp <- split(data$id,data$env)
     tmp2 <- lapply(tmp,function(id) {
       n.id <- length(id)
       eigen.I <- list(values=rep(1,n.id),vectors=as(Diagonal(n.id,1),"dgeMatrix"))
@@ -141,8 +147,13 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
   }
   
   if (n.trait==1) {
-    X <- sparse.model.matrix(~env-1,data,sep = "__")
-    colnames(X) <- sub("env__","",colnames(X),fixed=T)
+    if (n.env > 1) {
+      X <- sparse.model.matrix(~env-1,data,sep = "__")
+      colnames(X) <- sub("env__","",colnames(X),fixed=T)
+    } else {
+      X <- sparse.model.matrix(~1,data)
+      colnames(X) <- envs
+    }
     
     if (n.loc > 1) {
       Z <- sparse.model.matrix(~id:loc-1,data,sep="__")
@@ -193,9 +204,15 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
     colnames(Z) <- sub("trait__","",colnames(Z),fixed=T)
     colnames(Z) <- sub("id__","",colnames(Z),fixed=T)
     
-    X <- sparse.model.matrix(~env:trait-1,data,sep="__")
-    colnames(X) <- sub("trait__","",colnames(X),fixed=T)
-    colnames(X) <- sub("env__","",colnames(X),fixed=T)
+    if (n.env > 1) {
+      X <- sparse.model.matrix(~env:trait-1,data,sep="__")
+      colnames(X) <- sub("trait__","",colnames(X),fixed=T)
+      colnames(X) <- sub("env__","",colnames(X),fixed=T)
+    } else {
+      X <- sparse.model.matrix(~trait-1,data,sep="__")
+      colnames(X) <- sub("trait__","",colnames(X),fixed=T)
+      colnames(X) <- paste(envs,colnames(X),sep=":")
+    }
     
     trait.id <- data.frame(as.matrix(expand.grid(traits,id))[,c(2,1)])
     colnames(trait.id) <- c("id","trait")
