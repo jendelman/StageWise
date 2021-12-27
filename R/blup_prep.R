@@ -37,7 +37,7 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
     stopifnot(n.trait > 1)
   } 
   
-  if (!is.na(vars@meanG)) {
+  if (length(vars@meanG)>0) {
     stopifnot(!is.null(geno))
   }
   
@@ -60,7 +60,7 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
   
   if (!is.null(geno)) {
     stopifnot(inherits(geno,"class_geno"))
-    stopifnot(!is.na(vars@meanG))
+    stopifnot(length(vars@meanG)>0)
     id <- intersect(data$id,rownames(geno@G))
     data <- data[data$id %in% id,]
     id <- rownames(geno@G)
@@ -138,9 +138,9 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
   if (n.loc > 1)
     data$loc <- factor(data$loc,levels=locations)
   
-  n.mark <- nrow(vars@fixed.marker.var)
+  n.mark <- dim(vars@fixed.marker.cov)[3]
+  fix.eff.markers <- dimnames(vars@fixed.marker.cov)[[3]]
   if (n.mark > 0) {
-    fix.eff.markers <- rownames(vars@fixed.marker.var)
     dat2 <- data.frame(id=rownames(geno@coeff),as.matrix(geno@coeff[,fix.eff.markers]))
     colnames(dat2) <- c("id",fix.eff.markers)
     data <- merge(data,dat2,by="id")
@@ -312,6 +312,5 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
   random <- as.numeric(GZ%*%Pmat%*%data$BLUE)
   new(Class="class_prep",y=data$BLUE,id=id,Z=Z,var.u=Gmat,Pmat=Pmat,Vinv=Vinv,
       fixed=fixed,random=random,add=vars@add,loc.env=loc.env,trait.env=trait.env,
-      fixed.marker=as.character(rownames(vars@fixed.marker.var)),
-      index.scale=index.scale)
+      fixed.marker=as.character(fix.eff.markers),index.scale=index.scale)
 }    

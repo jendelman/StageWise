@@ -55,5 +55,5 @@ Missing response values are omitted for single-trait analysis but retained for m
 
 Argument \code{workspace} is a vector of length two containing the workspace and pworkspace limits for ASReml-R, with default values of 500mb. If you get an error about insufficient memory, try increasing the appropriate value (workspace for variance estimation and pworkspace for BLUE computation).
 
-For multiple traits, only "asreml" is supported, and only the BLUE model is run, so the returned object does not contain H2. The resid object is the estimated variance-covariance matrix for the residual, which can be used to compute the environmental correlation.
+For multiple traits, only "asreml" is supported, and only the BLUE model is run, so the returned object does not contain H2.
 }

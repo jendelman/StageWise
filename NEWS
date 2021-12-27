@@ -1,5 +1,8 @@
+Changes in 0.16
+* Partitioning of covariance
+* summary correlation matrix interpreted differently
+
 Changes in 0.15
-* Environmental covariance returned as resid in Stage1 for multi-trait analysis
 * Dropping of environments in Stage2 now works
 * blup_prep now works even with one environment
 

@@ -16,7 +16,7 @@ load("~/Box Sync/Endelman/Software/StageWise/Vignette3.rda")
 
 This vignette builds on the information in [Vignette 1](https://jendelman.github.io/StageWise/Vignette1.html), which covered analysis of a single trait under a compound symmetry model for GxE.  Using the same potato dataset, this vignette illustrates the analysis of multiple traits but retains the assumption of compound symmetry for GxE. Our focus is yield and maturity, which are correlated in potato (as in many crops). As a result, naive selection for yield can lead to later maturity.
 
-Multi-trait analysis with `Stage1` follows the same syntax as the single-trait analysis, except now the argument `traits` is a vector of trait names. (The only `solver` option for multiple traits is "asreml", not "SpATS".) As shown in Vignette 1, a large-effect QTL influences maturity, so the most significant marker is included as a fixed effect. 
+Multi-trait analysis with `Stage1` follows the same syntax as the single-trait analysis, except now the argument `traits` is a vector of trait names. (The only `solver` option for multiple traits is "asreml", not "SpATS".) 
 
 ```{r}
 library(StageWise)
@@ -40,18 +40,25 @@ stage1.blue <- rbind(ans1a$blue,ans1b$blue)
 stage1.vcov <- c(ans1a$vcov,ans1b$vcov)
 ```
 ```{r eval=FALSE}
-ans2 <- Stage2(stage1.blue,stage1.vcov,geno,fix.eff.marker="solcap_snp_c2_22964")
+ans2a <- Stage2(stage1.blue,stage1.vcov,geno)
+ans2b <- Stage2(stage1.blue,stage1.vcov,geno,fix.eff.marker="solcap_snp_c2_22964")
 ``` 
 ```{r}
-summary(ans2$vars)
+ans2b$aic - ans2a$aic
 ```
 
-The `summary` command shows the decomposition of variance for both traits under "R2", and the values above the diagonal of the matrix under "cor" are the additive genetic correlation. When fixed effect markers are present, the values below the diagonal of "cor" represent the proportion of additive covariance due to the fixed effects. In this example, the breeding values for yield and maturity are correlated at 0.56, and the marker linked to the QTL accounts for 20% of the covariance.
+Two different Stage2 models were fit: ans2b includes the most significant marker for the CDF1 gene (see Vignette 1) as a fixed effect, while ans2a does not. Based on AIC, the model with the fixed effect is superior, and the `summary` command shows the partitioning of variance and trait covariance under "R2":
+
+```{r}
+summary(ans2b$vars)
+```
+
+CDF1 accounted for 12% of the phenotypic covariance, compared with 38% for the polygenic additive effect and 27% for the residual genetic effect. The "cor" matrix in the output shows the additive correlation (due to fixed and random effects) above the diagonal, and the total genotypic correlation is below the diagonal. 
 
 A selection index that combines both traits can be specified using the argument `index.weights` in the `blup` function. The user-specified weights are interpreted as applying to the traits after standardizing to unit variance. The following code compares an index based only on yield (index1) with an index that combines both traits (index2). Because our maturity scale runs from 1 = early to 9 = late, the weight for maturity is negative to select for earliness.
 
 ```{r, fig.width=3,fig.height=4}
-prep <- blup_prep(stage1.blue,stage1.vcov,geno=geno,vars=ans2$vars)
+prep <- blup_prep(stage1.blue, stage1.vcov, geno, vars=ans2b$vars)
 
 index1 <- blup(prep, geno, what="id",
                index.weights=c(total.yield=1,vine.maturity=0))
@@ -79,35 +86,61 @@ The above figure compares the rank of genotypes under the two different indices.
 
 ### Predicting yield based on secondary traits
 
-A recent trend in plant breeding research is the use of secondary traits collected by UAVs to try to improve genomic prediction of yield. Although the maturity phenotypes in this dataset were based on visual ratings, they can be used to illustrate this type of analysis. Research has shown that including a secondary trait in the prediction model becomes more beneficial with increases in its heritability and correlation to the primary trait. From the single trait analysis, vine maturity had the highest heritability in 2016, so we will try masking the breeding cohort from that year, which begin with the prefix "W13".
+A recent trend in plant breeding research is the use of secondary traits collected by UAVs to try to improve genomic prediction of yield. Although the maturity phenotypes in this dataset were based on visual ratings, they can be used to illustrate this type of analysis. Research has shown that including a secondary trait in the prediction model is more beneficial with higher heritability and correlation to the primary trait, and when genomic prediction accuracy for the primary trait is lower. 
+
+The following code compares the reliability of genomic prediction for yield with vs. without maturity data for the prediction set, for two different training population (TP) sizes (both traits are measured in the TP). A single cohort from the breeding program (id prefix W13) was chosen as the prediction set. Because fixed effects do not contribute to reliability, the Stage2 model (ans2a) without CDF1 as a fixed effect was used (it is still captured as a random effect). The code illustrates the flexibility of masking only some traits for particular individuals in the call to `blup_prep`. If no trait is specified, all of them are masked.
 
 ```{r}
-id <- stage1.blue$id
-mask1 <- data.frame(id=unique(id[substr(id,1,3)=="W13"]))
-head(mask1)
-mask2 <- data.frame(mask1,trait="total.yield")
-head(mask2)
-```
+id <- unique(stage1.blue$id)
+W13 <- id[substr(id,1,3)=="W13"]
 
-The above code creates two different masks: the first masks both yield and maturity (because no trait is specified), while the second only masks yield.
+TP1 <- sample(setdiff(id,W13), size = 250) #N = 250
+TP2 <- c(TP1,sample(setdiff(id,c(W13,TP1)), size = 250)) #N = 500
 
-```{r,eval=FALSE}
-prep1 <- blup_prep(stage1.blue,stage1.vcov,geno,ans2$vars,
-                  mask=mask1)
-prep2 <- blup_prep(stage1.blue,stage1.vcov,geno,ans2$vars,
-                  mask=mask2)
+yield.index <- c(total.yield=1, vine.maturity=0)
 
-pred1 <- blup(prep1, geno, what="id", index.weights=c(total.yield=1,vine.maturity=0))
-pred2 <- blup(prep2, geno, what="id", index.weights=c(total.yield=1,vine.maturity=0))
-```
-```{r,fig.width=4,fig.height=4}
-plot.data <- merge(pred1[pred1$id %in% mask1$id,c("id","BV.r2")],
-                   pred2[pred2$id %in% mask2$id,c("id","BV.r2")],by="id")
+#Masks for TP1
+pred.with.maturity <- rbind(data.frame(id=W13,trait="total.yield"),
+                            data.frame(id=setdiff(id,c(TP1,W13)),trait="total.yield"),
+                            data.frame(id=setdiff(id,c(TP1,W13)),trait="vine.maturity"))
+pred.without.maturity <- rbind(pred.with.maturity,
+                               data.frame(id=W13,trait="vine.maturity"))
 
-ggplot(plot.data,aes(x=BV.r2.x,y=BV.r2.y)) + geom_point() +
-  geom_line(data=data.frame(x=c(0.3,0.9),y=c(0.3,0.9)),mapping=aes(x=x,y=y),linetype=2) + 
+#Predictions for TP1
+prep.without <- blup_prep(stage1.blue, stage1.vcov, geno, ans2a$vars,
+                  mask=pred.without.maturity)
+prep.with <- blup_prep(stage1.blue, stage1.vcov, geno, ans2a$vars,
+                  mask=pred.with.maturity)
+pred.TP1 <- merge(blup(prep.without, geno, what="id", index.weights = yield.index),
+                  blup(prep.with, geno, what="id", index.weights = yield.index),by="id")
+pred.TP1 <- pred.TP1[pred.TP1$id %in% W13,]
+
+#Masks for TP2
+pred.with.maturity <- rbind(data.frame(id=W13,trait="total.yield"),
+                            data.frame(id=setdiff(id,c(W13,TP2)),trait="total.yield"),
+                            data.frame(id=setdiff(id,c(W13,TP2)),trait="vine.maturity"))
+pred.without.maturity <- rbind(pred.with.maturity,
+                               data.frame(id=W13,trait="vine.maturity"))
+
+#Predictions for TP2
+prep.without <- blup_prep(stage1.blue, stage1.vcov, geno, ans2a$vars,
+                  mask=pred.without.maturity)
+prep.with <- blup_prep(stage1.blue, stage1.vcov, geno, ans2a$vars,
+                  mask=pred.with.maturity)
+pred.TP2 <- merge(blup(prep.without, geno, what="id", index.weights = yield.index),
+                  blup(prep.with, geno, what="id", index.weights = yield.index),by="id")
+pred.TP2 <- pred.TP2[pred.TP2$id %in% W13,]
+
+#Plot results
+plot.data <- rbind(data.frame(pred.TP1[,c("BV.r2.x","BV.r2.y")],nTP=250),
+                   data.frame(pred.TP2[,c("BV.r2.x","BV.r2.y")],nTP=500))
+plot.data$nTP <- factor(plot.data$nTP)
+
+ggplot() + geom_point(data=plot.data,mapping=aes(x=BV.r2.x,y=BV.r2.y,colour=nTP,shape=nTP)) +
+  scale_shape_manual(values=c(15,1),name="TP Size") + scale_color_brewer(palette="Set1",name="TP Size") + 
+  geom_line(data=data.frame(x=c(0.1,0.8),y=c(0.1,0.8)),mapping=aes(x=x,y=y),linetype=2) + 
   theme_bw() + xlab("without maturity") + ylab("with maturity") + ggtitle("Yield Reliability") +
   theme(axis.text=element_text(size=13),axis.title=element_text(size=13))
 ```
 
-The figure shows that using vine maturity as a correlated trait increased the reliability of the GEBVs for yield.
+The figure shows that reliability increased with TP size, and the benefit of using maturity as a correlated trait was greater at low reliability.

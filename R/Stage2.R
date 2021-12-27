@@ -57,10 +57,11 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     meanG <- mean(diag(.GlobalEnv$asremlG))
     data <- data[data$id %in% id,]
   } else {
-    meanG <- as.numeric(NA)
+    meanG <- numeric(0)
     id <- sort(unique(data$id))
   }
   
+  #marker.var <- matrix(NA,nrow=0,ncol=0)
   if (!is.null(fix.eff.marker)) {
     stopifnot(!is.null(geno))
     n.mark <- length(fix.eff.marker)
@@ -70,8 +71,8 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     data <- merge(data,dat2,by="id")
   } else {
     n.mark <- 0
-    marker.var <- matrix(NA,nrow=0,ncol=0)
-    marker.cov <- matrix(NA,nrow=0,ncol=0)
+    #marker.var <- matrix(NA,nrow=0,ncol=0)
+    marker.cov <- array(0,dim=rep(0,3))
   }
   
   envs <- unique(data$env)
@@ -87,16 +88,23 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
   if ("trait" %in% colnames(data)) {
     n.loc <- 1
     data$trait <- as.character(data$trait)
+    traits <- sort(unique(data$trait))
+    n.trait <- length(traits)
+    stopifnot(n.trait > 1)
+    
     data$env.id.trait <- apply(data[,c("env.id","trait")],1,paste,collapse=":")
     env.id.trait <- unique(data$env.id.trait)
     data$env.id.trait <- factor(data$env.id.trait,levels=env.id.trait)
-    data$Trait <- factor(data$trait)
-    traits <- levels(data$Trait)
-    n.trait <- length(traits)
-    stopifnot(n.trait > 1)
+    
+    if (!is.null(vcov)) {
+      dname <- strsplit(rownames(vcov[[1]])[1:n.trait],split=":",fixed=T)
+      traits <- sapply(dname,"[[",2)
+    } 
+    data$Trait <- factor(data$trait,levels=traits)
     data <- data[order(data$env.id,data$Trait),]
   } else {
     n.trait <- 1
+    traits <- NULL
     if ("loc" %in% colnames(data)) {
       data$loc <- factor(as.character(data$loc))
       data <- data[order(data$loc),]
@@ -177,26 +185,45 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
       ix <- lapply(vcov,function(y){which(rownames(y) %in% env.id.trait)})
       random.effects <- paste0(random.effects,"+vm(env.id.trait,source=asremlOmega)")
     }
+    
     omega.list <- vector("list",n.env)
     for (j in 1:n.env) {
       omega.list[[j]] <- as(vcov[[j]][ix[[j]],ix[[j]]],"dpoMatrix")
     }
     .GlobalEnv$asremlOmega <- direct_sum(lapply(omega.list,solve))
-    dname <- unlist(lapply(omega.list,rownames))
-    dimnames(.GlobalEnv$asremlOmega) <- list(dname,dname)
+    dname <- lapply(omega.list,rownames)
+    dimnames(.GlobalEnv$asremlOmega) <- list(unlist(dname),unlist(dname))
     attr(.GlobalEnv$asremlOmega,"INVERSE") <- TRUE
     
-    diagOmega <- unlist(lapply(omega.list,diag))
-    tmp <- strsplit(dname,split=":",fixed=T)
-    if (n.trait==1) {
-      tmp2 <- tapply(diagOmega,sapply(tmp,"[[",2),mean)
-      meanOmega <- mean(tmp2)
-    } else {
-      tmp2 <- tapply(diagOmega,list(sapply(tmp,"[[",2),sapply(tmp,"[[",3)),mean)
-      meanOmega <- apply(tmp2,2,mean)
+    #Calculate meanOmega
+    tmp <- expand.grid(1:n.trait,1:n.trait)
+    tmp <- tmp[tmp$Var1 <= tmp$Var2,]
+    tmp$band <- tmp$Var2-tmp$Var1
+    tmp <- tmp[order(tmp$band,tmp$Var1),]
+    
+    eid.names <- lapply(dname,function(x){
+      tmp <- sapply(strsplit(x,split=":",fixed=T),function(u){paste(u[1:2],collapse=":")})
+      return(unique(tmp))
+    })
+    n.eid <- sapply(eid.names,length)
+    meanOmega <- array(0,dim=c(n.trait,n.trait,sum(n.eid)),dimnames=list(traits,traits,unlist(eid.names)))
+    
+    for (j in 1:n.env) {
+      for (k in 1:nrow(tmp)) {
+        z <- rep(FALSE,n.trait)
+        z[tmp$Var1[k]] <- TRUE
+        z <- rep(z,n.eid[j])[1:(n.eid[j]*n.trait-tmp$band[k])]
+        y <- 1:length(z)
+        meanOmega[tmp$Var1[k],tmp$Var2[k],eid.names[[j]]] <- (omega.list[[j]][cbind(y,y+tmp$band[k])])[z]
+      }
     }
+    id.names <- sapply(strsplit(unlist(eid.names),split=":",fixed=T),"[[",2)
+    meanOmega <- apply(meanOmega,c(1,2),function(x){mean(tapply(x,id.names,mean))})
+    tmp <- diag(meanOmega)
+    meanOmega <- meanOmega + t(meanOmega)
+    diag(meanOmega) <- tmp
   } else {
-    meanOmega <- as.numeric(NA)
+    meanOmega <- matrix(NA,nrow=0,ncol=0)
   }
   
   asreml::asreml.options(workspace=workspace,maxit=30,trace=!silent)
@@ -240,17 +267,13 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     ix <- match(levels(data$env),rownames(beta))
     out$fixed$env <- data.frame(env=levels(data$env),effect=as.numeric(beta[ix,1]))
   
-#    beta.stat <- matrix(NA,nrow=n.mark,ncol=0)
-#    marker.cov <- matrix(NA,nrow=n.mark,ncol=0)
     if (n.mark > 0) {
       var.x <- var(as.matrix(geno@coeff[,fix.eff.marker]))
       if (n.loc==1) {
         ix <- match(fix.eff.marker,rownames(beta))
         out$fixed$marker <- data.frame(marker=fix.eff.marker,effect=as.numeric(beta[ix,1]))
-        marker.var <- matrix(beta[ix,1] * var.x %*% beta[ix,1],ncol=1)
-        #beta.stat <- matrix(diag(var.x) * beta[ix,1]^2,ncol=1)
-        rownames(marker.var) <- fix.eff.marker
-        marker.cov <- crossprod(beta[ix,1],var.x %*% beta[ix,1])
+        marker.cov <- array(beta[ix,1] * var.x %*% beta[ix,1],dim=c(1,1,n.mark),
+                            dimnames=list(traits,traits,fix.eff.marker))
       } else {
         
         beta.names <- rownames(beta)
@@ -267,43 +290,16 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
         x <- out$fixed$marker <- data.frame(marker=loc.marker$marker,
                                        loc=loc.marker$loc,
                                        effect=as.numeric(beta[ix,1]))
-        tmp2 <- array(data=as.numeric(NA),dim=c(n.loc,n.loc,n.mark),dimnames=list(locations,locations,fix.eff.marker))
+        
+        
+        marker.cov <- array(0,dim=c(n.loc,n.loc,n.mark),dimnames=list(traits,traits,fix.eff.marker))
         for (i in 1:n.loc) {
-          for (j in i:n.loc) {
+          for (j in 1:n.loc) {
             lv <- matrix(x$effect[x$loc==locations[i]],ncol=1)
             rv <- matrix(x$effect[x$loc==locations[j]],ncol=1)
-            tmp2[i,j,] <- lv * var.x %*% rv
-            if (j > i) {
-              tmp2[j,i,] <- tmp2[i,j,]
-            }
+            marker.cov[i,j,] <- as.numeric(lv * var.x %*% rv)
           }
         }
-        marker.cov <- matrix(0,nrow=n.loc,ncol=n.loc,dimnames=list(locations,locations))
-        for (i in 1:n.mark) {
-          marker.cov <- marker.cov + tmp2[,,i] 
-        }
-
-        # tmp <- expand.grid(1:n.loc,1:n.loc)
-        # tmp <- tmp[tmp$Var2 >= tmp$Var1,]
-        # tmp$value <- numeric(nrow(tmp))
-        # for (i in 1:nrow(tmp)) {
-        #   lv <- matrix(x$effect[x$loc==locations[tmp$Var1[i]]],nrow=1)
-        #   rv <- matrix(x$effect[x$loc==locations[tmp$Var2[i]]],ncol=1)
-        #   tmp$value[i] <- lv %*% var.x %*% rv
-        # }
-        #marker.cov <- as.matrix(sparseMatrix(i=tmp$Var1,j=tmp$Var2,x=tmp$value,dims=c(n.loc,n.loc),
-        #                                     dimnames=list(locations,locations),symmetric=T))
-        
-        marker.var <- matrix(NA,nrow=n.mark,ncol=2)
-        rownames(marker.var) <- fix.eff.marker
-        colnames(marker.var) <- c("marker","marker x loc")
-        for (i in 1:n.mark) {
-          marker.var[i,] <- partition(tmp2[,,i])
-        }
-        #tmp <- split(out$fixed$marker$effect,out$fixed$marker$marker)
-        #tmp2 <- lapply(tmp,function(x){crossprod(matrix(x,nrow=1))})
-        #beta.stat <- t(mapply(function(x,y){partition(x*y)},x=tmp2,y=as.list(diag(var.x))))
-        #colnames(beta.stat) <- c("marker","marker x loc")
       }
     }
   } else {
@@ -320,29 +316,18 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
       var.x <- var(as.matrix(geno@coeff[,fix.eff.marker,drop=FALSE]))
       trait.marker <- expand.grid(trait=traits,marker=fix.eff.marker,stringsAsFactors = FALSE)
       ix <- match(apply(trait.marker,1,paste,collapse=":"),rownames(beta))
-      out$fixed$marker <- data.frame(marker=trait.marker$marker,
+      x <- out$fixed$marker <- data.frame(marker=trait.marker$marker,
                                        trait=trait.marker$trait,
                                        effect=as.numeric(beta[ix,1]))
-      tmp <- expand.grid(1:n.trait,1:n.trait)
-      tmp <- tmp[tmp$Var2 >= tmp$Var1,]
-      tmp$value <- numeric(nrow(tmp))
-      x <- out$fixed$marker
-      for (i in 1:nrow(tmp)) {
-        lv <- matrix(x$effect[x$trait==traits[tmp$Var1[i]]],nrow=1)
-        rv <- matrix(x$effect[x$trait==traits[tmp$Var2[i]]],ncol=1)
-        tmp$value[i] <- lv %*% var.x %*% rv
-      }
-      marker.cov <- as.matrix(sparseMatrix(i=tmp$Var1,j=tmp$Var2,x=tmp$value,dims=c(n.trait,n.trait),
-                                             dimnames=list(traits,traits),symmetric=T))
-      marker.var <- matrix(NA,nrow=n.mark,ncol=n.trait)
-      colnames(marker.var) <- traits
+      
+      marker.cov <- array(0,dim=c(n.trait,n.trait,n.mark),dimnames=list(traits,traits,fix.eff.marker))
       for (i in 1:n.trait) {
-        b <- matrix(x$effect[x$trait==traits[i]],ncol=1)
-        marker.var[,i] <- b * var.x %*% b
+        for (j in 1:n.trait) {
+          lv <- matrix(x$effect[x$trait==traits[i]],ncol=1)
+          rv <- matrix(x$effect[x$trait==traits[j]],ncol=1)
+          marker.cov[i,j,] <- as.numeric(lv * var.x %*% rv)
+        }
       }
-      #tmp <- diag(var.x)[x$marker]*x$effect^2
-      #beta.stat <- matrix(tmp,ncol=n.trait,byrow = TRUE)
-      rownames(marker.var) <- unique(x$marker)
     }
   }
     
@@ -396,7 +381,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
   
   out$vars <- new(Class="class_var",add=add.vc,g.resid=g.resid.vc,resid=resid.vc,
                   meanG=meanG,meanOmega=meanOmega,
-                  fixed.marker.var=marker.var,fixed.marker.cov=marker.cov)
+                  fixed.marker.cov=marker.cov)
   
   #random effects
   if (n.trait==1) {

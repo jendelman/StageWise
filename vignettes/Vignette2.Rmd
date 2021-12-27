@@ -40,7 +40,7 @@ ggplot(data=ans1$H2,aes(x=loc,y=H2)) + stat_boxplot(outlier.color="red") + xlab(
 
 The above figure shows the variation in broad-sense heritability across locations and years. 
 
-When the data frame of BLUEs passed to `Stage2` has a column labeled 'loc', genotype x location effects are included using a separable covariance structure. If marker data are included, the genetic covariance between locations for the additive effects follows a 2nd order factor-analytic (FA2) model, and the location covariance for the residual genetic effects is compound symmetric. If marker data are not included, an FA2 model is used for the genetic covariance between locations. For large datasets with many locations (such as this one), I recommend first analyzing it without marker data, as the computation proceeds more quickly. 
+When the data frame of BLUEs passed to `Stage2` has a column labeled 'loc', genotype x location effects are included using a separable covariance structure. When marker data are included, the genetic covariance between locations for the additive effects follows a 2nd order factor-analytic (FA2) model. Based on experience with a few datasets, attempts to also model covariance between residual genetic effect were unsuccessful, so the correlation is constrained at 1 in the current implementation. If marker data are not included, the genetic covariance between locations follows the FA2 model. For large datasets with many locations (such as this one), I recommend first analyzing it without marker data, as the computation proceeds more quickly. 
 
 Here is a joint analysis of all 9 locations without using the marker data.
 ```{r eval=FALSE}

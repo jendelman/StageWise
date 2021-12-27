@@ -21,8 +21,6 @@ S4 class for variances
 
 \item{\code{meanOmega}}{mean of diagonal of Omega}
 
-\item{\code{fixed.marker.var}}{variance of marker fixed effects}
-
 \item{\code{fixed.marker.cov}}{contribution of marker fixed effects to additive covariance between locations}
 }}
 
