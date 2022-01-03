@@ -68,25 +68,25 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
     id <- unique(data$id)
   }
   
-  data$env <- factor(data$env,levels=names(vcov))
-  
   if (n.trait > 1) {
     tmp <- paste(data$id,data$trait,sep=":")
   } else {
     tmp <- data$id
   }
   if (!is.null(vcov)) {
+    data$env <- factor(data$env,levels=names(vcov))
     omega.list <- mapply(FUN=function(Q,ix){
                           ix2 <- match(ix,rownames(Q))
                           as(Q[ix2,ix2,drop=FALSE],"dpoMatrix")
                         },Q=vcov,ix=split(tmp,data$env))
+    #names(omega.list) <- names(vcov)
   } else {
+    data$env <- factor(data$env)
     omega.list <- lapply(split(tmp,data$env),function(rnames){
                                 n <- length(rnames)
                                 Q <- Matrix(0,nrow=n,ncol=n,dimnames=list(rnames,rnames))
                                 return(Q)})
   }
-  names(omega.list) <- names(vcov)
   
   #redo envs because some may have been dropped
   data$env <- as.character(data$env)
