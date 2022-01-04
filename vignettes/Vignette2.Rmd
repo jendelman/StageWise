@@ -44,8 +44,7 @@ When the data frame of BLUEs passed to `Stage2` has a column labeled 'loc', geno
 
 Here is a joint analysis of all 9 locations without using the marker data.
 ```{r eval=FALSE}
-ans2a <- Stage2(data=ans1$blue,
-                vcov=ans1$vcov,silent=FALSE)
+ans2a <- Stage2(data=ans1$blue, vcov=ans1$vcov)
 ```
 ```{r}
 summary(ans2a$vars)
