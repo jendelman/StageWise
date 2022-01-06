@@ -84,6 +84,8 @@ ggplot(plot.data,aes(x=x,y=y,xend=xend,yend=yend)) + geom_segment() + theme_bw()
 
 The above figure compares the rank of genotypes under the two different indices. The highest-yielding genotype dropped to sixth place under index2, while the second-highest moved to first place. The sensitivity of the ranking to different penalties for late maturity could be explored. 
 
+The number of traits that ASReml-R, and thus `Stage2`, can handle is limited. Fortunately,for uncorrelated traits, the optimal index can be constructed by weighting the BLUPs from single trait analyses. Thus, a practical solution to handling many traits is to split them into groups that have correlations within but little correlation between. Calculate the BLUPs for each group and then combine the results in a final index (scaling the results appropriately).
+
 ### Predicting yield based on secondary traits
 
 A recent trend in plant breeding research is the use of secondary traits collected by UAVs to try to improve genomic prediction of yield. Although the maturity phenotypes in this dataset were based on visual ratings, they can be used to illustrate this type of analysis. Research has shown that including a secondary trait in the prediction model is more beneficial with higher heritability and correlation to the primary trait, and when genomic prediction accuracy for the primary trait is lower. 

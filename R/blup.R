@@ -24,6 +24,7 @@ blup <- function(data,geno=NULL,what,index.weights=NULL,gwas.ncore=0L) {
   n.mark <- length(data@fixed.marker)
   
   if (nrow(data@loc.env) > 0) {
+    n.trait <- 1
     locations <- names(data@index.scale)
     n.loc <- length(locations)
     if (is.null(index.weights)) {
@@ -43,6 +44,7 @@ blup <- function(data,geno=NULL,what,index.weights=NULL,gwas.ncore=0L) {
       index.coeff <- 1
       n.env <- length(data@fixed) - n.mark
       fix.value <- mean(data@fixed[1:n.env])
+      n.trait <- 1
     } else {
       # multi-trait
       traits <- names(data@index.scale)

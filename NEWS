@@ -1,5 +1,5 @@
 Changes in 0.17
-* Fixed bug for vcov=NULL in blup_prep
+* Fixed error for vcov=NULL in blup_prep
 
 Changes in 0.16
 * Partitioning of covariance
