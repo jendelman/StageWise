@@ -12,7 +12,7 @@
 
 
 
-<title>Vignette 1: Single trait analysis with compound symmetric GxE</title>
+<title>Vignette 1: Single trait analysis with homogeneous GxE</title>
 
 <script src="data:application/javascript;base64,Ly8gUGFuZG9jIDIuOSBhZGRzIGF0dHJpYnV0ZXMgb24gYm90aCBoZWFkZXIgYW5kIGRpdi4gV2UgcmVtb3ZlIHRoZSBmb3JtZXIgKHRvCi8vIGJlIGNvbXBhdGlibGUgd2l0aCB0aGUgYmVoYXZpb3Igb2YgUGFuZG9jIDwgMi44KS4KZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcignRE9NQ29udGVudExvYWRlZCcsIGZ1bmN0aW9uKGUpIHsKICB2YXIgaHMgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCJkaXYuc2VjdGlvbltjbGFzcyo9J2xldmVsJ10gPiA6Zmlyc3QtY2hpbGQiKTsKICB2YXIgaSwgaCwgYTsKICBmb3IgKGkgPSAwOyBpIDwgaHMubGVuZ3RoOyBpKyspIHsKICAgIGggPSBoc1tpXTsKICAgIGlmICghL15oWzEtNl0kL2kudGVzdChoLnRhZ05hbWUpKSBjb250aW51ZTsgIC8vIGl0IHNob3VsZCBiZSBhIGhlYWRlciBoMS1oNgogICAgYSA9IGguYXR0cmlidXRlczsKICAgIHdoaWxlIChhLmxlbmd0aCA+IDApIGgucmVtb3ZlQXR0cmlidXRlKGFbMF0ubmFtZSk7CiAgfQp9KTsK"></script>
 
@@ -137,13 +137,13 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 
 
 
-<h1 class="title toc-ignore">Vignette 1: Single trait analysis with compound symmetric GxE</h1>
+<h1 class="title toc-ignore">Vignette 1: Single trait analysis with homogeneous GxE</h1>
 
 
 
 <div id="preface" class="section level3">
 <h3>Preface</h3>
-<p>This vignette illustrates basic features of the package using a potato breeding dataset of 958 genotypes (i.e., clones), with phenotype data from six years at one location. It is an updated version of the dataset published by <a href="https://doi.org/10.1534/genetics.118.300685">Endelman et al. (2018)</a>. This vignette covers single trait analysis, under the assumption that all enviroments have the same genetic correlation (i.e., compound symmetry). The analysis of multiple locations with different correlations are covered in <a href="https://jendelman.github.io/StageWise/Vignette2.html">Vignette 2</a>, and the analysis of correlated traits is covered in <a href="https://jendelman.github.io/StageWise/Vignette3.html">Vignette 3</a>.</p>
+<p>This vignette illustrates basic features of the package using a potato breeding dataset of 958 genotypes (i.e., clones), with phenotype data from six years at one location. It is an updated version of the dataset published by <a href="https://doi.org/10.1534/genetics.118.300685">Endelman et al. (2018)</a>. This vignette covers single trait analysis, under the assumption that all environments have the same genetic correlation (i.e., compound symmetry). The analysis of multiple locations with different correlations are covered in <a href="https://jendelman.github.io/StageWise/Vignette2.html">Vignette 2</a>, and the analysis of correlated traits is covered in <a href="https://jendelman.github.io/StageWise/Vignette3.html">Vignette 3</a>.</p>
 <p>There are five main functions in the package:</p>
 <ul>
 <li><p><code>read_geno</code></p></li>

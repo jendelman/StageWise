@@ -1,5 +1,5 @@
 ---
-title: "Vignette 1: Single trait analysis with compound symmetric GxE"
+title: "Vignette 1: Single trait analysis with homogeneous GxE"
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{StageWise Vignette1}
@@ -15,7 +15,7 @@ knitr::opts_knit$set(root.dir="~/Box Sync/Endelman/Software/StageWise")
 
 ### Preface
 
-This vignette illustrates basic features of the package using a potato breeding dataset of 958 genotypes (i.e., clones), with phenotype data from six years at one location. It is an updated version of the dataset published by [Endelman et al. (2018)](https://doi.org/10.1534/genetics.118.300685). This vignette covers single trait analysis, under the assumption that all enviroments have the same genetic correlation (i.e., compound symmetry). The analysis of multiple locations with different correlations are covered in [Vignette 2](https://jendelman.github.io/StageWise/Vignette2.html), and the analysis of correlated traits is covered in [Vignette 3](https://jendelman.github.io/StageWise/Vignette3.html).
+This vignette illustrates basic features of the package using a potato breeding dataset of 958 genotypes (i.e., clones), with phenotype data from six years at one location. It is an updated version of the dataset published by [Endelman et al. (2018)](https://doi.org/10.1534/genetics.118.300685). This vignette covers single trait analysis, under the assumption that all environments have the same genetic correlation (i.e., compound symmetry). The analysis of multiple locations with different correlations are covered in [Vignette 2](https://jendelman.github.io/StageWise/Vignette2.html), and the analysis of correlated traits is covered in [Vignette 3](https://jendelman.github.io/StageWise/Vignette3.html).
 
 There are five main functions in the package:
 
