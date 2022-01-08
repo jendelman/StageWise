@@ -74,6 +74,7 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
     tmp <- data$id
   }
   if (!is.null(vcov)) {
+    stopifnot(nrow(vars@meanOmega) > 0)
     data$env <- factor(data$env,levels=names(vcov))
     omega.list <- mapply(FUN=function(Q,ix){
                           ix2 <- match(ix,rownames(Q))
