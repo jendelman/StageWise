@@ -17,7 +17,7 @@ S4 class for marker genotype data
 
 \item{\code{scale}}{Scaling factor between markers and indiv}
 
-\item{\code{G}}{Additive (genomic) relationship matrix}
+\item{\code{G}}{Additive relationship matrix (from markers and potentially also pedigree)}
 
 \item{\code{eigen.G}}{list of eigenvalues and eigenvectors}
 }}

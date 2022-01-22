@@ -1,3 +1,9 @@
+Changes in 0.20
+* blup_prep now inverts MME instead of V if #id < #obs. This led to changes in class_prep.
+* Modified numerical conditioning of G in read_geno. Function arguments changed.
+* Option to use A matrix from pedigree file in read_geno
+* Removed/renamed duplicate genotypes in vignette dataset
+
 Changes in 0.17
 * Fixed error for vcov=NULL in blup_prep
 

@@ -4,7 +4,7 @@
 \alias{blup_prep}
 \title{Prepare data for BLUP}
 \usage{
-blup_prep(data, vcov = NULL, geno = NULL, vars, mask = NULL)
+blup_prep(data, vcov = NULL, geno = NULL, vars, mask = NULL, method = NULL)
 }
 \arguments{
 \item{data}{data frame of BLUEs from Stage 1}
@@ -16,10 +16,15 @@ blup_prep(data, vcov = NULL, geno = NULL, vars, mask = NULL)
 \item{vars}{object of \code{\link{class_var}} from \code{\link{Stage2}}}
 
 \item{mask}{(optional) data frame with possible columns "id","env","trait"}
+
+\item{method}{(optional) "MME", "Vinv", NULL (defaut). see Details}
 }
 \value{
 Object of \code{\link{class_prep}}
 }
 \description{
 Prepare data for BLUP
+}
+\details{
+The \code{method} argument can be used to control how the linear system is solved. "MME" leads to inversion of the MME coefficient matrix, while "Vinv" leads to inversion of the overall var-cov matrix for the response vector. If NULL, the software uses whichever method involves inverting the smaller matrix. If the number of random effects (m) is less than the number of BLUEs (n), "MME" is used.
 }

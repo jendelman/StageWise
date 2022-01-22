@@ -2,22 +2,39 @@
 #' 
 #' Read marker genotype data
 #' 
-#' When \code{map=TRUE}, first three columns of the file are marker, chrom, position. When \code{map=FALSE}, the first column is marker. Subsequent columns contain the allele dosage for individuals/clones, coded 0,1,2,...ploidy (fractional values are allowed). The input file for diploids can also be coded using {-1,0,1} (fractional values allowed). Additive coefficients are computed by subtracting the population mean from each marker, and the additive (genomic) relationship matrix is computed as G = tcrossprod(coeff)/scale. The scale parameter ensures the mean of the diagonal elements of G equals 1 under panmictic equilibrium. Missing genotype data is replaced with the population mean. For numerical conditioning, eigenvalues of G smaller than \code{eigen.tol} are replaced by \code{eigen.tol}. 
+#' When \code{map=TRUE}, first three columns of the file are marker, chrom, position. When \code{map=FALSE}, the first column is marker. Subsequent columns contain the allele dosage for individuals/clones, coded 0,1,2,...ploidy (fractional values are allowed). The input file for diploids can also be coded using {-1,0,1} (fractional values allowed). Additive coefficients are computed by subtracting the population mean from each marker, and the additive (genomic) relationship matrix is computed as G = tcrossprod(coeff)/scale. The scale parameter ensures the mean of the diagonal elements of G equals 1 under panmictic equilibrium. Missing genotype data is replaced with the population mean. 
+#' 
+#' G can be blended with the pedigree relationship matrix (A) by providing a pedigree data frame in \code{ped} and blending parameter \code{w}. The blended relationship matrix is H = (1-w)G + wA. The first three columns of \code{ped} are id, parent1, parent2. Missing parents must be coded NA. An optional fourth column in binary (0/1) format can be used to indicate which ungenotyped individuals should be included in the H matrix. If there is no fourth column, only genotyped individuals are included. If a vector of w values is provided, the function returns a list of \code{\link{class_geno}} objects.
+#' 
+#' If the A matrix is not used, then G is blended with the identity matrix (times the mean diagonal of G) to improve numerical conditioning for matrix inversion. The default for w is 1e-5, which is somewhat arbitrary and based on tests with the vignette dataset. 
+#' 
+#' When \code{dominance=FALSE}, non-additive effects are captured using a residual genetic effect, with zero covariance. If \code{dominance=TRUE}, a (digenic) dominance covariance matrix D is used instead. 
 #' 
 #' The argument \code{min.minor.allele} specifies the minimum number of individuals that must contain the minor allele. Markers that do not meet this threshold are discarded.
 #'  
-#' @param filename Name of CSV file
+#' @param filename Name of CSV file with marker allele dosage
 #' @param ploidy 2,4,6,etc. (even numbers)
 #' @param map TRUE/FALSE
-#' @param eigen.tol See Details. Default is 1e-9.
-#' @param min.minor.allele See Details. Default is 5.
+#' @param min.minor.allele threshold for marker filtering (see Details)
+#' @param w blending parameter (see Details)
+#' @param ped optional, pedigree data frame with 3 or 4 columns (see Details)
+#' @param dominance TRUE/FALSE whether to include dominance covariance (see Details)
 #' 
 #' @return Variable of class \code{\link{class_geno}}.
 #' 
 #' @export
-#' @importFrom utils read.csv
+#' @importFrom utils read.csv capture.output
+#' @import Matrix
+#' @importFrom AGHmatrix Amatrix
 
-read_geno <- function(filename,ploidy,map,eigen.tol=1e-9,min.minor.allele=5) {
+read_geno <- function(filename, ploidy, map, min.minor.allele=5, 
+                      w=1e-5, ped=NULL, dominance=FALSE) {
+  if (dominance) 
+    stop("Dominance option is under construction.")
+  
+  if (any(w < 1e-5))
+    stop("Blending parameter should not be smaller than 1e-5")
+  
   data <- read.csv(file = filename,check.names=F)
   if (map) {
     map <- data[,1:3]
@@ -60,13 +77,80 @@ read_geno <- function(filename,ploidy,map,eigen.tol=1e-9,min.minor.allele=5) {
   
   scale <- sum(ploidy*p*(1-p))
   G <- tcrossprod(coeff)/scale
-  eigen.G <- eigen(G,symmetric=TRUE)
-  class(eigen.G) <- "list"
-  eigen.G$values <- ifelse(eigen.G$values < eigen.tol,
-                         eigen.tol,eigen.G$values)
-  eigen.G$vectors <- Matrix(eigen.G$vectors,dimnames=list(id,id))
-  G <- tcrossprod(eigen.G$vectors%*%Diagonal(x=sqrt(eigen.G$values)))
-
-  return(new(Class="class_geno",map=map,coeff=coeff,scale=scale,
-             G=G,eigen.G=eigen.G))
+  
+  nw <- length(w)
+  H <- vector("list",nw)
+  Hinv <- vector("list",nw)
+  
+  if (is.null(ped)) {
+    for (i in 1:nw) {
+      H[[i]] <- (1-w[i])*G + w[i]*mean(diag(G))*Diagonal(n=nrow(G))
+    }
+  } else {
+    
+    if (ncol(ped)==4) {
+      colnames(ped) <- c("id","parent1","parent2","H")
+    } else {
+      colnames(ped) <- c("id","parent1","parent2")
+    }
+    for (i in 1:3) {
+      ped[,i] <- as.character(ped[,i])
+    }
+    if (!all(id %in% ped$id)) {
+      stop("Some genotyped individuals are not in the pedigree file.")
+    }
+    
+    ped2 <- data.frame(id=1:nrow(ped),
+                       parent1=match(ped$parent1,ped$id,nomatch=0),
+                       parent2=match(ped$parent2,ped$id,nomatch=0))
+    invisible(capture.output(A <- as(Amatrix(ped2,ploidy=ploidy),"symmetricMatrix")))
+    rownames(A) <- ped$id
+    colnames(A) <- ped$id
+    
+    if (ncol(ped)==4) {
+      id2 <- setdiff(ped$id[ped$H==1],id)
+    } else {
+      id2 <- character(0)
+    }
+    n2 <- length(id2)
+    A <- A[c(id,id2),c(id,id2)]
+    A11 <- A[id,id]
+    
+    if (n2 > 0) {
+      A.inv <- solve(A)
+      A11.inv <- solve(A11)
+    }
+    
+    for (i in 1:nw) {
+      Gw <- (1-w[i])*G + w[i]*A11
+      
+      if (n2==0) {
+        H[[i]] <- Gw
+      } else {
+        Hinv[[i]] <- as(bdiag(solve(Gw)-A11.inv,Matrix(0,nrow=n2,ncol=n2)) + A.inv,"symmetricMatrix")
+      }
+    }
+  }
+  
+  output <- vector("list",nw)
+  for (i in 1:nw) {
+    if (!is.null(H[[i]])) {
+      eigen.G <- eigen(H[[i]],symmetric=TRUE)
+      eigen.G$vectors <- Matrix(eigen.G$vectors,dimnames=list(id,id))
+    } else {
+      eigen.G <- eigen(Hinv[[i]],symmetric=TRUE)
+      eigen.G$values <- 1/eigen.G$values
+      eigen.G$vectors <- Matrix(eigen.G$vectors,dimnames=list(id,id))
+      H[[i]] <- tcrossprod(eigen.G$vectors%*%Diagonal(n=nrow(Hinv[[i]]),x=sqrt(eigen.G$values)))
+    }
+    class(eigen.G) <- "list"
+    output[[i]] <- new(Class="class_geno",map=map,coeff=coeff,scale=scale,
+                        G=H[[i]], eigen.G=eigen.G)
+  }
+  
+  if (nw==1) {
+    return(output[[1]])
+  } else {
+    return(output)
+  }
 }

@@ -20,9 +20,11 @@ Multi-trait analysis with `Stage1` follows the same syntax as the single-trait a
 
 ```{r}
 library(StageWise)
+ped.file <- system.file("vignette_data", "ped.csv", package = "StageWise")
+ped <- read.csv(ped.file)
 
 geno.file <- system.file("vignette_data", "geno1.csv", package = "StageWise")
-geno <- read_geno(filename=geno.file,ploidy=4,map=TRUE)
+geno <- read_geno(filename=geno.file, ploidy=4, map=TRUE, w=0.4, ped=ped)
 
 pheno1a.file <- system.file("vignette_data", "pheno1a.csv", package = "StageWise")
 pheno1b.file <- system.file("vignette_data", "pheno1b.csv", package = "StageWise")
@@ -53,7 +55,7 @@ Two different Stage2 models were fit: ans2b includes the most significant marker
 summary(ans2b$vars)
 ```
 
-CDF1 accounted for 12% of the phenotypic covariance, compared with 38% for the polygenic additive effect and 27% for the residual genetic effect. The "cor" matrix in the output shows the additive correlation (due to fixed and random effects) above the diagonal, and the total genotypic correlation is below the diagonal. 
+CDF1 accounted for 12% of the phenotypic covariance, compared with 55% for the polygenic additive effect and 13% for the residual genetic effect. The "cor" matrix in the output shows the additive correlation (due to fixed and random effects) above the diagonal, and the total genotypic correlation is below the diagonal. 
 
 A selection index that combines both traits can be specified using the argument `index.weights` in the `blup` function. The user-specified weights are interpreted as applying to the traits after standardizing to unit variance. The following code compares an index based only on yield (index1) with an index that combines both traits (index2). Because our maturity scale runs from 1 = early to 9 = late, the weight for maturity is negative to select for earliness.
 
@@ -64,7 +66,7 @@ index1 <- blup(prep, geno, what="id",
                index.weights=c(total.yield=1,vine.maturity=0))
 
 index2 <- blup(prep, geno, what="id",
-               index.weights=c(total.yield=1,vine.maturity=-0.3))
+               index.weights=c(total.yield=1,vine.maturity=-0.5))
 
 # Rank genotypes from high to low 
 index1$rank <- rank(-index1$BV)
@@ -82,7 +84,7 @@ ggplot(plot.data,aes(x=x,y=y,xend=xend,yend=yend)) + geom_segment() + theme_bw()
   theme(axis.text=element_text(size=13),axis.title=element_text(size=13))
 ```
 
-The above figure compares the rank of genotypes under the two different indices. The highest-yielding genotype dropped to sixth place under index2, while the second-highest moved to first place. The sensitivity of the ranking to different penalties for late maturity could be explored. 
+The above figure compares the rank of genotypes under the two different indices. The top 3 genotypes were the same under both indices, while the genotype ranked 15th for yield jumped to fourth place under the penalized index.  
 
 The number of traits that ASReml-R, and thus `Stage2`, can handle is limited. Fortunately,for uncorrelated traits, the optimal index can be constructed by weighting the BLUPs from single trait analyses. Thus, a practical solution to handling many traits is to split them into groups that have correlations within but little correlation between. Calculate the BLUPs for each group and then combine the results in a final index (scaling the results appropriately).
 

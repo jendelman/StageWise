@@ -1,9 +1,11 @@
-kron <- function(eigen.A,B) {
+kron <- function(eigen.A, B) {
+  #returns Q such that QtQ is solution
   eigen.B <- eigen(B)
-  V <- as(Matrix(eigen.B$vectors,dimnames=list(rownames(B),rownames(B))),"dgeMatrix")
-  half <- kronecker(eigen.A$vectors,V,make.dimnames=T) %*%
-    kronecker(Diagonal(x=sqrt(eigen.A$values)),Diagonal(x=sqrt(eigen.B$values)))
-  return(list(half=half,full=tcrossprod(half)))
+  V1 <- kronecker(Diagonal(x=sqrt(eigen.A$values)),Diagonal(x=sqrt(eigen.B$values)))
+  V1.inv <- kronecker(Diagonal(x=1/sqrt(eigen.A$values)),Diagonal(x=1/sqrt(eigen.B$values)))
+  V2 <- as(Matrix(eigen.B$vectors,dimnames=list(rownames(B),rownames(B))),"dgeMatrix")
+  V3 <- kronecker(eigen.A$vectors,V2,make.dimnames=T)
+  return(list(mat=tcrossprod(V1,V3), inv=tcrossprod(V1.inv,V3)))
 }
 
 Keff <- function(r2,alpha) {

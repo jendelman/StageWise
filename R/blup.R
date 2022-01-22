@@ -83,44 +83,45 @@ blup <- function(data,geno=NULL,what,index.weights=NULL,gwas.ncore=0L) {
   }  
   
   M <- kronecker(Diagonal(n=n.id),Matrix(index.coeff,nrow=1))
+  n.fix <- length(data@fixed)
   if (what=="id") {
     #trait/loc within id
     if (is.null(geno)) {
       out <- data.frame(id=data@id,GV=as.numeric(M%*%Matrix(data@random,ncol=1)) + fix.value)
-      GZt <- tcrossprod(data@var.u,data@Z)
-      var.uhat <- crossprod(tcrossprod(chol(data@Pmat),GZt))
-      numer <- diag(M%*% tcrossprod(var.uhat,M))
+      numer <- diag(M%*% tcrossprod(data@var.uhat,M))
       denom <- diag(M%*% tcrossprod(data@var.u,M))
       out$GV.r2 <- numer/denom
     } else {
       out <- data.frame(id=data@id,BV=as.numeric(cbind(M,0*M) %*% Matrix(data@random,ncol=1)) + fix.value,
                            GV=as.numeric(cbind(M,M) %*% Matrix(data@random,ncol=1)) + fix.value)
-      GZt <- tcrossprod(data@var.u,cbind(data@Z,data@Z))
-      var.uhat <- crossprod(tcrossprod(chol(data@Pmat),GZt))
-      numer <- diag(cbind(M,0*M)%*% tcrossprod(var.uhat,cbind(M,0*M)))
+      numer <- diag(cbind(M,0*M)%*% tcrossprod(data@var.uhat,cbind(M,0*M)))
       denom <- diag(cbind(M,0*M)%*% tcrossprod(data@var.u,cbind(M,0*M)))
       out$BV.r2 <- numer/denom
-      numer <- diag(cbind(M,M)%*% tcrossprod(var.uhat,cbind(M,M)))
+      numer <- diag(cbind(M,M)%*% tcrossprod(data@var.uhat,cbind(M,M)))
       denom <- diag(cbind(M,M)%*% tcrossprod(data@var.u,cbind(M,M)))
       out$GV.r2 <- numer/denom
     }
     return(out)
   } 
   
-  #markers
+  #marker effects
   if (is.null(geno)) {
     stop("Cannot predict marker effects without genotype data")
   }
   
-  m <- ncol(geno@coeff)
-  if (n.loc > 1) {
-     Ct <- data@Z %*% kronecker(geno@coeff,Matrix(index.coeff,ncol=1))
-  } else {
-     Ct <- data@Z %*% geno@coeff
-  }
   V.alpha <- sum(index.coeff*diag(data@add))/geno@scale
-  Ct <- Ct * V.alpha
-  add.effect <- as.numeric(crossprod(Ct,data@Pmat %*% Matrix(data@y,ncol=1)))
+  if (n.loc > 1 | n.trait > 1) {
+     W <- kronecker(geno@coeff,Matrix(index.coeff,ncol=1)) * V.alpha
+  } else {
+     W <- geno@coeff * V.alpha
+  }
+  
+  n.random <- length(data@random)
+  if (!is.null(geno)) 
+    n.random <- n.random/2
+  
+  ZtPy <- data@var.u.inv[1:n.random,] %*% Matrix(data@random,ncol=1)
+  add.effect <- as.numeric(crossprod(W, ZtPy))
   
   if (nrow(geno@map)==0) {
       out <- data.frame(marker=colnames(geno@coeff),add.effect=add.effect)
@@ -128,16 +129,18 @@ blup <- function(data,geno=NULL,what,index.weights=NULL,gwas.ncore=0L) {
       out <- data.frame(geno@map,add.effect=add.effect)
   }
   
-  f.se <- function(x,P) {sqrt(crossprod(x,P%*%x))}
+  f.se <- function(x,Q) {sqrt(as.numeric(crossprod(x,Q%*%x)))}
 
   if (gwas.ncore > 0) {
+    ZtPZ <- data@var.u.inv[1:n.random,1:n.random] %*% data@var.uhat[1:n.random,1:n.random] %*% data@var.u.inv[1:n.random,1:n.random]
+    
     if (gwas.ncore == 1) {
-      se <- apply(Ct,2,f.se,P=data@Pmat)
+      se <- apply(W,2,f.se,Q=ZtPZ)
       std.effect <- out$add.effect/se
     } else {
       cl <- makeCluster(gwas.ncore)
       clusterExport(cl=cl,varlist=NULL)
-      se <- parCapply(cl=cl,x=Ct,f.se,P=data@Pmat)
+      se <- parCapply(cl=cl,x=W,f.se,Q=ZtPZ)
       stopCluster(cl)
       std.effect <- out$add.effect/sapply(se,as.numeric)
     } 

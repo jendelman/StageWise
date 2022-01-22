@@ -15,7 +15,7 @@ knitr::opts_knit$set(root.dir="~/Box Sync/Endelman/Software/StageWise")
 
 ### Preface
 
-This vignette illustrates basic features of the package using a potato breeding dataset of 958 genotypes (i.e., clones), with phenotype data from six years at one location. It is an updated version of the dataset published by [Endelman et al. (2018)](https://doi.org/10.1534/genetics.118.300685). This vignette covers single trait analysis, under the assumption that all environments have the same genetic correlation (i.e., compound symmetry). The analysis of multiple locations with different correlations are covered in [Vignette 2](https://jendelman.github.io/StageWise/Vignette2.html), and the analysis of correlated traits is covered in [Vignette 3](https://jendelman.github.io/StageWise/Vignette3.html).
+This vignette illustrates basic features of the package using a potato breeding dataset of nearly 950 genotypes (i.e., clones), with phenotype data from six years at one location. It is an updated version of the dataset published by [Endelman et al. (2018)](https://doi.org/10.1534/genetics.118.300685). This vignette covers single trait analysis, under the assumption that all environments have the same genetic correlation (i.e., compound symmetry). The analysis of multiple locations with different correlations are covered in [Vignette 2](https://jendelman.github.io/StageWise/Vignette2.html), and the analysis of correlated traits is covered in [Vignette 3](https://jendelman.github.io/StageWise/Vignette3.html).
 
 There are five main functions in the package:
 
@@ -30,23 +30,6 @@ There are five main functions in the package:
 * `blup`
 
 The package depends on ASReml-R (version 4.1.0.148 or later), which requires a license from [VSN International](https://www.vsni.co.uk/software/asreml-r). 
-
-### Marker data
-
-The `read_geno` function reads bi-allelic marker data as a CSV file. If you intend to run GWAS, the option `map=TRUE` indicates the first three columns of the input file are the marker name, chromosome, and position, followed by columns for the individuals. Map information is not used for genomic prediction and can be omitted by using `map=FALSE`, in which case the first column is the marker name and subsequent columns are individuals. The marker data should represent allele dosage, with numeric values between 0 and ploidy. (For compatibility with other software, the coding {-1,0,1} is also allowed for diploids.)
-
-The potato marker data were generated using an Infinium SNP array. Most clones were genotyped with Version 3 (V3) of the array, but some were genotyped with an earlier version (V2). Data from the two different versions were combined using the function `merge_impute` from R package [polyBreedR](https://github.com/jendelman/polyBreedR). The imputation procedure is based on BLUP and generates fractional values of allele dosage, which is compatible with estimating breeding values. 
-
-```{r}
-geno.file <- system.file("vignette_data", "geno1.csv", package = "StageWise")
-geno <- read.csv(geno.file,check.names=F)
-geno[1:4,1:6]
-
-library(StageWise)
-geno <- read_geno(filename=geno.file, ploidy=4, map=TRUE, min.minor.allele=5)
-``` 
-
-The function `read_geno` computes the additive relationship (G) matrix and its inverse, which can take some time for large datasets. These matrices and other information needed for the `Stage2` function are stored in the returned object as an S4 class. 
 
 ### Stage 1
 
@@ -90,7 +73,7 @@ effects <- data.frame(name=c("block","stand.count"),
                       fixed=c(FALSE,TRUE),
                       factor=c(TRUE,FALSE))
 effects
-
+library(StageWise)
 ans1a <- Stage1(filename=pheno1a.file,traits="total.yield",
                 effects=effects,solver="asreml")
 ```
@@ -140,6 +123,21 @@ stage1.blue <- rbind(ans1a$blue,model1$blue)
 stage1.vcov <- c(ans1a$vcov,model1$vcov)
 ```
 
+### Marker data
+
+The `read_geno` function reads bi-allelic marker data as a CSV file. If you intend to run GWAS, the option `map=TRUE` indicates the first three columns of the input file are the marker name, chromosome, and position, followed by columns for the individuals. Map information is not used for genomic prediction and can be omitted by using `map=FALSE`, in which case the first column is the marker name and subsequent columns are individuals. The marker data should represent allele dosage, with numeric values between 0 and ploidy. (For compatibility with other software, the coding {-1,0,1} is also allowed for diploids.)
+
+The potato marker data were generated using an Infinium SNP array. Most clones were genotyped with Version 3 (V3) of the array, but some were genotyped with an earlier version (V2). Data from the two different versions were combined using the function `merge_impute` from R package [polyBreedR](https://github.com/jendelman/polyBreedR). The imputation procedure is based on BLUP and generates fractional values of allele dosage, which is compatible with estimating breeding values. 
+
+```{r}
+geno.file <- system.file("vignette_data", "geno1.csv", package = "StageWise")
+geno <- read.csv(geno.file,check.names=F)
+geno[1:4,1:6]
+
+geno <- read_geno(filename=geno.file, ploidy=4, map=TRUE, min.minor.allele=5)
+``` 
+
+The function `read_geno` computes the additive relationship (G) matrix and its inverse, which can take some time for large datasets. These matrices and other information needed for the `Stage2` function are stored in the returned object as an S4 class.
 
 ### Stage 2
 
@@ -156,6 +154,7 @@ The above Stage 2 analysis did not include the marker data. To partition the gen
 
 ```{r}
 ans2c <- Stage2(data=stage1.blue,vcov=stage1.vcov,geno=geno,silent=FALSE)
+ans2c$aic
 ```
 
 Several other pieces of information are in the list output from `Stage2`. The variance components are contained in "vars" as an S4 class, which is used by the `blup_prep` function. The `summary` command can be used to see the proportion of variance for the different effects:
@@ -168,61 +167,82 @@ summary(ans2c$vars)
 
 The above results show the progression of variance partitioning as more effects are included in the model. Including the covariance of the BLUEs enables splitting of the multi-environment residual into GxE and within-environment residual, and in this example we also observe some reapportionment of the main effect for genotype vs. GxE. When the marker data are included, the genotype effect is separated into additive and residual genetic (g.resid) components; the latter is a random effect with zero covariance, which includes non-additive effects but also potentially additive effects because the G matrix computed from markers is only an estimate of the true covariance matrix. The residual variance changed when the marker data were included because some entries in the phenotype dataset are not present in the genotype file and were therefore automatically excluded by `Stage2`. 
 
-Let's see how this compares with the other 3 traits (using only the 2015-19 data for simplicity):
+### Pedigree data
+
+Estimating additive relationships using both marker and pedigree data is often beneficial because they have complementary properties. Unlike the G matrix, the A matrix is "sparse", meaning it has zero covariance between unrelated individuals. However, the A matrix does not account for segregation within biparental families or capture LD between founders. The G and A matrices can be combined into an "H" matrix, which also allows ungenotyped individuals to be included in the relationship matrix ([Legarra et al. 2009](https://doi.org/10.3168/jds.2009-2061); [Christensen and Lund 2010](https://doi.org/10.1186/1297-9686-42-2)). 
+
+To illustrate this feature, a three-column pedigree file for the potato population is included with the package. When combining the G and A matrices, their relative weights must be specified using the argument `w` in `read_geno`, such that H = (1-w)G + wA. 
+```{r}
+ped.file <- system.file("vignette_data", "ped.csv", package = "StageWise")
+ped <- read.csv(ped.file)
+geno2 <- read_geno(geno.file,ploidy=4,map=TRUE,ped=ped,w=0.1)
+ans2d <- Stage2(data=stage1.blue,vcov=stage1.vcov,geno=geno2)
+
+ans2d$aic
+summary(ans2d$vars)
+```
+
+The above result shows that blending G and A at w=0.1 reduced the AIC and shifted variance from residual genetic into the additive component. This shift occurred because the blended relationship matrix more closely resembles the identity covariance matrix for the residual genetic values. One way to select the blending parameter is based on AIC. When a vector of w values is provided to `read_geno`, the function returns a list output corresponding to those values. For numerical conditioning, a minimum threshold of 1e-5 is used for w.
 
 ```{r}
-h2 <- matrix(nrow=4,ncol=4)
-traits <- c("total.yield","spec.grav","fry.color","vine.maturity")
-colnames(h2) <- traits
-rownames(h2) <- rownames(summary(ans2c$vars))
+w.vec <- c(1e-5, seq(0.1,0.8,by=0.1))
+geno <- read_geno(geno.file,ploidy=4,map=TRUE,ped=ped,w=w.vec)
 
-#initialize lists 
-ans1 <- ans2 <- vector("list",length = 4)
-names(ans1) <- names(ans2) <- traits
-for (i in 1:4) {
-  ans1[[i]] <- Stage1(pheno1a.file,traits=traits[i],
+result <- data.frame(w=w.vec, aic=numeric(9), h2=numeric(9))
+for (i in 1:9) {
+  ans2 <- Stage2(data=stage1.blue,vcov=stage1.vcov,geno=geno[[i]])
+  result$aic[i] <- ans2$aic
+  result$h2[i] <- summary(ans2$vars)[1,1]
+}
+axis.scaling <- diff(range(result$h2))/diff(range(result$aic))
+result$y2 <- (result$aic-min(result$aic))*axis.scaling + min(result$h2)
+y2lab <- round(seq(min(result$aic),max(result$aic),length.out=5))
+y2axis <- y2lab-min(result$aic) + min(result$h2)/axis.scaling
+
+ggplot(result) + geom_line(mapping=aes(x=w,y=h2)) + geom_line(mapping=aes(x=w,y=y2),colour="red") + scale_y_continuous(name="Genomic h2",sec.axis=sec_axis(trans~./axis.scaling,name="AIC",breaks=y2axis,labels=y2lab)) + theme_bw() +  
+  theme(axis.text.y.right=element_text(colour="red"),axis.title.y.right=element_text(colour="red")) + ggtitle("Blending G and A for Yield")
+```
+
+Based on the above figure, the blending parameter w=0.5 is chosen for further analysis below. The optimal value for w will not be the same for all traits. The code below explores the result for vine maturity.
+
+```{r}
+ans1 <- Stage1(pheno1a.file,traits="vine.maturity",
                       effects=data.frame(name=c("block","stand.count"),
                                 fixed=c(FALSE,TRUE),
                                 factor=c(TRUE,FALSE)))
-  ans2[[i]] <- Stage2(data=ans1[[i]]$blue,vcov=ans1[[i]]$vcov,geno=geno)
-  h2[,i] <- summary(ans2[[i]]$vars)
+for (i in 1:9) {
+  ans2 <- Stage2(data=ans1$blue,vcov=ans1$vcov,geno=geno[[i]])
+  result$aic[i] <- ans2$aic
+  result$h2[i] <- summary(ans2$vars)[1,1]
 }
-h2
+axis.scaling <- diff(range(result$h2))/diff(range(result$aic))
+result$y2 <- (result$aic-min(result$aic))*axis.scaling + min(result$h2)
+y2lab <- round(seq(min(result$aic),max(result$aic),length.out=5))
+y2axis <- y2lab-min(result$aic) + min(result$h2)/axis.scaling
+
+ggplot(result) + geom_line(mapping=aes(x=w,y=h2)) + geom_line(mapping=aes(x=w,y=y2),colour="red") + scale_y_continuous(name="Genomic h2",sec.axis=sec_axis(trans~./axis.scaling,name="AIC",breaks=y2axis,labels=y2lab)) + theme_bw() + theme(axis.text.y.right=element_text(colour="red"),axis.title.y.right=element_text(colour="red")) + ggtitle("Blending G and A for Vine Maturity")
 ```
 
-Specific gravity had the highest heritability of the four traits.
-
-`Stage2` returns the fixed effect estimates for each environment under "fixed", and the predicted random effects for the individuals in the training set are returned under "random". This can be useful with very large datasets to avoid further computation, but this information (and a lot more) is also available from the `blup` function, which is described next.
+One last point about `Stage2`: the function returns the fixed effect estimates for each environment under "fixed", and the predicted random effects for the individuals in the training set are returned under "random". This can be useful with very large datasets to avoid further computation, but this information (and a lot more) is also available from the `blup` function, which is described next.
 
 ### BLUP Reliability
 
 The calculation of BLUPs is split into two functions: `blup_prep` and `blup`. The primary motivation for doing this was to facilitate quicker exploration of different selection indices, which is illustrated in Vignettes 2 and 3. 
 
-The `blup_prep` function needs the same phenotype information supplied to `Stage2`, i.e, the Stage 1 BLUEs and their covariances, which is then combined with the variance component estimates from Stage 2 to make predictions for all individuals in the genotype file, regardless of whether they have been phenotyped. The object returned by `blup_prep` contains the inverted covariance matrix of the Stage 2 response variable, plus other information needed for BLUP, as an S4 class. This object is provided to the `blup` function, along with the genotype object, and the third argument `what` has possible values of "id" or "marker". Using "id" leads to the prediction of breeding values (BV) and genotypic values (GV) for the individuals:
+The `blup_prep` function needs the same phenotype information supplied to `Stage2`, i.e, the Stage 1 BLUEs and their covariances, which is then combined with the variance component estimates from Stage 2 to make predictions for all individuals in the genotype file, regardless of whether they have been phenotyped. The object returned by `blup_prep` contains the inverted covariance matrix of the Stage 2 response variable, plus other information needed for BLUP, as an S4 class. This object is provided to the `blup` function, along with the genotype object, and the third argument `what` has possible values of "id" or "marker". Using "id" leads to the prediction of breeding values (BV) and genotypic values (GV) for the individuals. This is illustrated below for yield, using the optimized H matrix from above (w = 0.5).
 
 ```{r}
+geno1 <- geno[[6]] #geno[[5]] corresponds to w=0.5
+ans2 <- Stage2(data=stage1.blue,vcov=stage1.vcov,geno=geno1)
 prep <- blup_prep(data=stage1.blue,
               vcov=stage1.vcov,
-              geno=geno,
-              vars=ans2c$vars)
-
+              geno=geno1,
+              vars=ans2$vars)
 pred.id <- blup(prep,geno=geno,what="id")
 knitr::kable(head(pred.id),digits=2)
 ```
 
-The columns with `r2` contain the reliability of the BLUPs, which is the squared correlation between the true and predicted values (assuming the model is correct). Previous studies have shown that the reliability of genomic prediction depends largely on the number of close relationships for each individual, which can be quantified by the 95th (or other suitably high) percentile of its G matrix coefficients. An S4 method has been written to use the function `quantile` on the object returned by `read_geno`:
-
-```{r, fig.height=3,fig.width=4}
-G95 <- quantile(geno,p=0.95)
-head(G95)
-
-plot.data <- merge(pred.id,G95)
-ggplot(plot.data,aes(x=G,y=BV.r2)) + geom_point() +
-  ylab("BV Reliability") + xlab("95% G") + theme_bw()
-```
-
-
-Breeding values should be used for parent selection, while genotypic values should be used for clone selection. The figure below illustrates an important phenomenon, which is that the reliability of genotypic values is typically higher when using marker data because it improves estimation of the additive component. 
+The columns with `r2` contain the reliability of the BLUPs, which is the squared correlation between the true and predicted values (assuming the model is correct). Breeding values should be used for parent selection, while genotypic values should be used for clone selection. The figure below illustrates an important phenomenon, which is that the reliability of genotypic values is typically higher when using marker data because it improves estimation of the additive component. 
 
 ```{r,fig.height=3,fig.width=3}
 prep <- blup_prep(data=stage1.blue,
@@ -244,10 +264,10 @@ head(mask)
 
 prep2 <- blup_prep(data=stage1.blue,
               vcov=stage1.vcov,
-              geno=geno,
-              vars=ans2c$vars,
+              geno=geno1,
+              vars=ans2$vars,
               mask=mask)
-pred2.id <- blup(prep2,geno=geno,what="id")
+pred2.id <- blup(prep2,geno=geno1,what="id")
 
 #marker-assisted selection (MAS)
 tmp1 <- pred.id[pred.id$id %in% mask$id,c("id","BV.r2")]
@@ -270,55 +290,59 @@ Using the `mask` argument, one can also specify that individuals are masked only
 
 Using "marker" instead of "id" for the `what` argument leads to the prediction of additive marker effects. The marker effects can also be standardized to compute GWAS -log10(p) scores that are equivalent to the traditional fixed effect method ([Duarte et al. (2014)](http://www.biomedcentral.com/1471-2105/15/246); [Bernal Rubio et al. 2016](https://doi.org/10.1111/age.12378)). This calculation is easily parallelized, and the argument `gwas.ncore` specifies how many cores to use (the default is 0, which skips computing the GWAS scores). 
 
-```{r,fig.height=3,fig.width=4}
-prep3 <- blup_prep(data=ans1$vine.maturity$blue,
-              vcov=ans1$vine.maturity$vcov,
-              geno=geno,
-              vars=ans2$vine.maturity$vars)
+Marker effects offer a convenient way to save the results of the training set analysis and can be used later to make predictions for new individuals. The result is equivalent to the `what="id"` option with `blup` (i.e., RR-BLUP is equivalent to G-BLUP), except in this implementation the BVs computed via marker effects are centered on zero, while the G-BLUP result includes the average value of the fixed effects. The code below relies on the generic method `predict` to compute breeding values via the RR-BLUP method for vine maturity.
 
-pred.marker <- blup(data=prep3,geno=geno,what="marker",gwas.ncore=2)
+```{r,fig.height=4,fig.width=4}
+geno1 <- geno[[1]]  #w = 0
+ans2 <- Stage2(data=ans1$blue,vcov=ans1$vcov,geno=geno1)
+prep <- blup_prep(data=ans1$blue,vcov=ans1$vcov,geno=geno1,vars=ans2$vars)
+pred.marker <- blup(data=prep,geno=geno1,what="marker",gwas.ncore=2)
 head(pred.marker)
+
+#compare with G-BLUP
+RR_BLUP <- predict(geno1,pred.marker)
+G_BLUP <- blup(data=prep,geno=geno,what="id")
+plot.data <- merge(RR_BLUP,G_BLUP,by="id")
+ggplot(plot.data,aes(x=BV.x,y=BV.y)) + geom_point() + xlab("RR-BLUP") + ylab("G-BLUP") + theme_bw()
 ```
 
-Marker effects offer a convenient way to save the results of the training set analysis and can be used later to make predictions for new individuals. The result is equivalent to the `what="id"` option with `blup` (i.e., RR-BLUP is equivalent to G-BLUP); the only difference in this implementation is that the BVs computed via marker effects are centered on zero, while the G-BLUP result includes the average value of the fixed effects.
+If G is blended with A to perform H-BLUP, then BV predictions via RR-BLUP are similar but no longer equivalent.
 
-```{r,fig.height=4,fig.width=3}
-RR_BLUP <- predict(geno,pred.marker)
-G_BLUP <- blup(data=prep3,geno=geno,what="id")
-plot(RR_BLUP$BV,G_BLUP$BV,xlab="RR-BLUP",ylab="G-BLUP")
-summary(lm(y~x,data.frame(y=RR_BLUP$BV,x=G_BLUP$BV)))
+```{r,fig.height=4,fig.width=4}
+geno1 <- geno[[3]] #w = 0.2
+ans2 <- Stage2(data=ans1$blue,vcov=ans1$vcov,geno=geno1)
+prep <- blup_prep(data=ans1$blue,vcov=ans1$vcov,geno=geno1,vars=ans2$vars)
+pred.marker <- blup(data=prep,geno=geno1,what="marker",gwas.ncore=2)
+
+RR_BLUP <- predict(geno1,pred.marker)
+H_BLUP <- blup(data=prep,geno=geno,what="id")
+plot.data <- merge(RR_BLUP,H_BLUP,by="id")
+ggplot(plot.data,aes(x=BV.x,y=BV.y)) + geom_point() + xlab("RR-BLUP") + ylab("H-BLUP") + theme_bw()
 ```
 
-The `gwas_threshold` command computes the -log10(p) threshold for QTL discovery based on an effective number of markers ([Moskvina and Schmidt, 2008](https://doi.org/10.1002/gepi.20331)), and `manhattan_plot` displays the result. Although no major QTL were detected for total yield in this dataset, there is one for vine maturity:
+The `gwas_threshold` command computes the -log10(p) threshold for QTL discovery based on an effective number of markers ([Moskvina and Schmidt, 2008](https://doi.org/10.1002/gepi.20331)), and `manhattan_plot` displays the result. 
 
 ```{r,fig.height=3,fig.width=4}
-gwas_threshold(geno,alpha=0.05,n.core=2)
+gwas_threshold(geno1,alpha=0.05,n.core=2)
 manhattan_plot(pred.marker,thresh=5.1,rotate.label=TRUE)
 ```
 
+The GWAS peak on chr05 is near the gene *CDF1*, which is known to have a large effect on potato maturity [(Kloosterman et al. 2013)](https://doi.org/10.1038/nature11912). The following code extracts the most significant marker for the large QTL on chr05 and passes it to `Stage2` as a fixed effect.
 
-The GWAS peak on chr05 is near the gene *CDF1*, which is known to have a large effect on potato maturity [(Kloosterman et al. 2013)](https://doi.org/10.1038/nature11912). Our original Stage 2 analysis using the G matrix is equivalent to modeling marker effects as random effects, which works well for small QTL. For major QTL, however, it can be advantageous to include a linked marker as a fixed effect. 
-
-The following code extracts the most significant marker for the large QTL on chr05 and passes it to `Stage2` as a fixed effect.
 ```{r}
 k <- which.max(pred.marker$gwas.score)
 pred.marker[k,]
 
-ans2d <- Stage2(data=ans1$vine.maturity$blue,
-               vcov=ans1$vine.maturity$vcov,
-               geno=geno,
+ans2f <- Stage2(data=ans1$blue,
+               vcov=ans1$vcov,
+               geno=geno1,
                fix.eff.marker="solcap_snp_c2_22964")
 
 # Fixed effect for the marker
-ans2d$fixed$marker
+ans2f$fixed$marker
 
 # Proportion of variance
-summary(ans2d$vars)
+summary(ans2f$vars)
 ```
 
-The fixed effect estimate of -0.78 for solcap_snp_c2_22964 means that, on average, each additional copy of the alternate allele reduced vine maturity by 0.78 (on a 1-9 visual scale). According to the proportion of variance table, the solcap_snp_c2_22964 marker accounted for 0.128/(0.128 + 0.227) = 36% of the breeding value.
-
-
-
-
-
+The fixed effect estimate of -0.77 for solcap_snp_c2_22964 implies that, on average, each additional copy of the alternate allele reduced vine maturity by 0.77 (on a 1-9 visual scale). According to the proportion of variance table, the solcap_snp_c2_22964 marker accounted for 0.124/(0.124 + 0.264) = 32% of the breeding value.

@@ -3,7 +3,7 @@
 #' @slot map Marker map positions
 #' @slot coeff Coefficients of the marker effects (dim: indiv x marker)
 #' @slot scale Scaling factor between markers and indiv
-#' @slot G Additive (genomic) relationship matrix
+#' @slot G Additive relationship matrix (from markers and potentially also pedigree)
 #' @slot eigen.G list of eigenvalues and eigenvectors
 #' 
 #' @import methods

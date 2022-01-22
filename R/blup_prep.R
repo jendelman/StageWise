@@ -2,11 +2,14 @@
 #' 
 #' Prepare data for BLUP
 #' 
+#' The \code{method} argument can be used to control how the linear system is solved. "MME" leads to inversion of the MME coefficient matrix, while "Vinv" leads to inversion of the overall var-cov matrix for the response vector. If NULL, the software uses whichever method involves inverting the smaller matrix. If the number of random effects (m) is less than the number of BLUEs (n), "MME" is used.
+#' 
 #' @param data data frame of BLUEs from Stage 1 
 #' @param vcov list of variance-covariance matrices for the BLUEs
 #' @param geno object of \code{\link{class_geno}} from \code{\link{read_geno}}
 #' @param vars object of \code{\link{class_var}} from \code{\link{Stage2}}
 #' @param mask (optional) data frame with possible columns "id","env","trait" 
+#' @param method (optional) "MME", "Vinv", NULL (defaut). see Details
 #' 
 #' @return Object of \code{\link{class_prep}}
 #' 
@@ -15,12 +18,16 @@
 #' @importFrom stats model.matrix
 #' @export
 
-blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
+blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
   
   stopifnot(inherits(data,"data.frame"))
   stopifnot(inherits(vars,"class_var"))
   data$id <- as.character(data$id)
   data$env <- as.character(data$env)
+  if (!is.null(method)) {
+    method <- toupper(method)
+    stopifnot(method %in% c("MME","VINV"))
+  }
   
   n.loc <- 1
   n.trait <- 1
@@ -119,17 +126,12 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
       n.id <- length(id)
       eigen.I <- list(values=rep(1,n.id),vectors=as(Diagonal(n.id,1),"dgeMatrix"))
       dimnames(eigen.I$vectors) <- list(id,id)
-      kron(eigen.I,vars@resid)$full
+      crossprod(kron(eigen.I,vars@resid)$mat)
     })
     Rlist <- mapply(function(Q,rnames){
-                    as(Q[rnames,rnames],"dpoMatrix")},
+                    Q[rnames,rnames]},
                     Q=tmp2,rnames=lapply(omega.list,rownames))
   }
-
-  tmp <- mapply(function(a,b){solve(as(a+b,"dpoMatrix"))},omega.list,Rlist)
-  Rinv <- bdiag(tmp)
-  tmp <- mapply(function(a,b){as(a+b,"dpoMatrix")},omega.list,Rlist)
-  Rmat <- bdiag(tmp)
 
   n.id <- length(id)
   data$id <- factor(data$id,levels=id)
@@ -168,35 +170,31 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
       dimnames(eigen.I$vectors) <- list(id,id)
       
       if (is.null(geno)) {
-        tmp <- kron(eigen.A=eigen.I, B=vars@g.resid)
-        Gmat.half <- tmp$half
-        Gmat <- tmp$full
+        Gmat <- kron(eigen.A=eigen.I, B=vars@g.resid)
         index.scale <- sqrt(diag(as.matrix(vars@g.resid)))
       } else {
         Gmat1 <- kron(eigen.A=geno@eigen.G, B=vars@add)
         Gmat2 <- kron(eigen.A=eigen.I, B=coerce_dpo(tcrossprod(sqrt(vars@g.resid))))
-        Gmat <- as(bdiag(Gmat1$full,Gmat2$full),"symmetricMatrix")
+        Gmat <- list(mat=bdiag(Gmat1$mat,Gmat2$mat),inv=bdiag(Gmat1$inv,Gmat2$inv))
         index.scale <- sqrt(diag(as.matrix(vars@add)))
       } 
     } else {
       index.scale <- numeric(0)
       Z <- sparse.model.matrix(~id-1,data,sep="__")
       colnames(Z) <- sub("id__","",colnames(Z),fixed=T)
-      #Z <- Z[,id]
-      
-      tmp <- list(half=Diagonal(n=n.id,x=sqrt(as.numeric(vars@g.resid))))
-      dimnames(tmp$half) <- list(id,id)
-      tmp$full <- tcrossprod(tmp$half)
+
+      tmp <- list(mat=Diagonal(n=n.id,x=sqrt(as.numeric(vars@g.resid))),
+                  inv=Diagonal(n=n.id,x=1/sqrt(as.numeric(vars@g.resid))))
+      dimnames(tmp$inv) <- dimnames(tmp$mat) <- list(id,id)
     
       if (is.null(geno)) {
-        Gmat.half <- tmp$half
-        Gmat <- tmp$full
+        Gmat <- tmp
       } else {
-        Gmat2 <- tmp
-        Gmat1 <- list(half=geno@eigen.G$vectors %*% 
-                        Diagonal(x=sqrt( geno@eigen.G$values * as.numeric(vars@add) )),
-                      full=geno@G * as.numeric(vars@add))
-        Gmat <- as(bdiag(Gmat1$full,Gmat2$full),"symmetricMatrix")
+        Gmat1 <- list(mat=tcrossprod(Diagonal(x=sqrt(geno@eigen.G$values * as.numeric(vars@add))),
+                                     geno@eigen.G$vectors),
+                      inv=tcrossprod(Diagonal(x=1/sqrt(geno@eigen.G$values * as.numeric(vars@add))),
+                                     geno@eigen.G$vectors))
+        Gmat <- list(mat=bdiag(Gmat1$mat,tmp$mat),inv=bdiag(Gmat1$inv,tmp$inv))
       }
     }
   } else {
@@ -223,16 +221,18 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
     dimnames(eigen.I$vectors) <- list(id,id)
     
     if (is.null(geno)) {
-      tmp <- kron(eigen.A=eigen.I, B=vars@g.resid)
-      Gmat.half <- tmp$half
-      Gmat <- tmp$full
+      Gmat <- kron(eigen.A=eigen.I, B=vars@g.resid)
       index.scale <- sqrt(diag(as.matrix(vars@g.resid)))
     } else {
       Gmat1 <- kron(eigen.A=geno@eigen.G, B=vars@add)
       Gmat2 <- kron(eigen.A=eigen.I, B=vars@g.resid)
-      Gmat <- as(bdiag(Gmat1$full,Gmat2$full),"symmetricMatrix")
+      Gmat <- list(mat=bdiag(Gmat1$mat,Gmat2$mat),inv=bdiag(Gmat1$inv,Gmat2$inv))
       index.scale <- sqrt(diag(as.matrix(vars@add)))
     } 
+  }
+  
+  if (!is.null(geno)) {
+    Z <- cbind(Z,Z)
   }
 
   if (n.mark > 0) {
@@ -268,50 +268,60 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL) {
     X <- cbind(X,tmp)
   }
   
-  n <- nrow(Z)
   m <- ncol(Z)
-  if (is.null(geno)) {
-    GZ <- tcrossprod(Gmat,Z)
-  } else {
-    m <- 2*m
-    GZ <- rbind(tcrossprod(Gmat1$full,Z),tcrossprod(Gmat2$full,Z))
-  } 
+  n <- nrow(Z)
+  var.u <- crossprod(Gmat$mat)
   
-  #which way to invert V
-  success <- TRUE
-  if ((m < n) & (n.loc==1) & (n.trait==1)) {
-    cholR <- chol(Rinv)
-    GZR <- tcrossprod(GZ,cholR)
-    Q <- tcrossprod(GZR) + Gmat
-    Qinv <- try(solve(Q),silent=TRUE)
-    if (class(Qinv)!="try-error") {
-      Vinv <- coerce_dpo(Rinv - crossprod(chol(Qinv)%*%GZR%*%cholR))
+  if (is.null(method)) {
+    if (m < n) {
+      method <- "MME"
     } else {
-      success <- FALSE
-      warning("switching to direct inversion of V")
+      method <- "VINV"
     }
   }
-     
-  if ((m >= n) | !success | (n.loc > 1) | (n.trait > 1)) {
-    if (is.null(geno)) {
-      V <- tcrossprod(Z%*%Gmat.half) + Rmat
-    } else {
-      V <- tcrossprod(Z%*%Gmat1$half) + tcrossprod(Z%*%Gmat2$half) + Rmat
+  if (method=="MME") {
+    #Construct MME coefficient matrix
+    tmp <- mapply(function(a,b){chol(solve(as(a+b,"dpoMatrix")))},omega.list,Rlist)
+    Rinv <- bdiag(tmp)
+  
+    n.fix <- ncol(X)
+    RZ <- Rinv %*% Z
+    RX <- Rinv %*% X
+    Q <- cbind(RX, RZ)
+  
+    MME <- as(crossprod(Q) + crossprod(cbind(Matrix(0,ncol=n.fix,nrow=m),Gmat$inv)),"symmetricMatrix")
+    MME.inv <- as(solve(MME),"symmetricMatrix")
+    soln <- MME.inv %*% crossprod(Q,Rinv%*%data$BLUE)
+    fixed <- as.numeric(soln[1:n.fix])
+    names(fixed) <- colnames(X)
+    random.ix <- (n.fix+1):length(soln)
+    random <- as.numeric(soln[random.ix])
+    var.uhat=var.u - MME.inv[random.ix,random.ix]
+    
+  } else {
+    #invert V
+    tmp <- mapply(function(a,b){as(a+b,"dpoMatrix")},omega.list,Rlist)
+    Rmat <- bdiag(tmp)
+    
+    Vinv <- as(solve(as(tcrossprod(Z %*% t(Gmat$mat)) + Rmat,"symmetricMatrix")),"symmetricMatrix")
+    chol.Vinv <- chol(Vinv)
+    
+    W <- as(solve(crossprod(chol.Vinv%*%X)),"symmetricMatrix")
+    fixed <- as.numeric(tcrossprod(W,X) %*% Vinv %*% data$BLUE)
+    names(fixed) <- colnames(X)
+        
+    WW <- as(Diagonal(n=n) - chol.Vinv %*% X %*% tcrossprod(W, chol.Vinv %*% X),"symmetricMatrix")
+    cholWW <- suppressWarnings(try(chol(WW),silent=TRUE))
+    if (class(cholWW)=="try-error") {
+      cholWW <- chol(WW + Diagonal(n=n,x=1e-6))
     }
-    V <- coerce_dpo(V)
-    Vinv <- try(solve(V),silent=TRUE)
-    if (class(Vinv)=="try-error") {
-      stop("V not invertible")
-    }  
+    GZtP <- tcrossprod(var.u,Z) %*% crossprod(cholWW %*% chol.Vinv)
+    random <- as.numeric(GZtP %*% data$BLUE)
+    var.uhat <- GZtP %*% tcrossprod(Z,var.u)
   }
-
-  W <- solve(crossprod(chol(Vinv)%*%X))
-  XV <- crossprod(X,Vinv)
-  Pmat <- coerce_dpo(Vinv - crossprod(chol(W)%*%XV))
-  fixed <- as.numeric(W%*%XV%*%data$BLUE)
-  names(fixed) <- colnames(X)
-  random <- as.numeric(GZ%*%Pmat%*%data$BLUE)
-  new(Class="class_prep",y=data$BLUE,id=id,Z=Z,var.u=Gmat,Pmat=Pmat,Vinv=Vinv,
+  
+  new(Class="class_prep",id=id,var.u=var.u,var.u.inv=crossprod(Gmat$inv),var.uhat=var.uhat,
       fixed=fixed,random=random,add=vars@add,loc.env=loc.env,trait.env=trait.env,
       fixed.marker=as.character(fix.eff.markers),index.scale=index.scale)
+  
 }    

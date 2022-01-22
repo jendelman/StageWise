@@ -11,17 +11,13 @@ S4 class to prepare for blup
 \section{Slots}{
 
 \describe{
-\item{\code{y}}{Stage 1 BLUEs}
-
-\item{\code{Z}}{Incidence matrix for random effects}
-
 \item{\code{id}}{genotype identifiers}
 
 \item{\code{var.u}}{variance of random effects}
 
-\item{\code{Vinv}}{inverted covariance matrix of the Stage 1 BLUEs}
+\item{\code{var.u.inv}}{inverse of var.u}
 
-\item{\code{Pmat}}{P matrix from Searle}
+\item{\code{var.uhat}}{variance of BLUPs}
 
 \item{\code{fixed}}{fixed effect estimates}
 
