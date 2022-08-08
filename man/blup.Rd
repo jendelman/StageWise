@@ -11,18 +11,18 @@ blup(data, geno = NULL, what, index.weights = NULL, gwas.ncore = 0L)
 
 \item{geno}{object of \code{\link{class_geno}} from \code{\link{read_geno}}}
 
-\item{what}{"id" or "marker"}
+\item{what}{One of the following: AV, BV, GV, AM, DM. See Details.}
 
 \item{index.weights}{named vector of index weights for the locations or traits}
 
-\item{gwas.ncore}{Integer indicating number of cores to use for GWAS (default is 0 for no GWAS). Requires \code{what="markers"}.}
+\item{gwas.ncore}{Integer indicating number of cores to use for GWAS (default is 0 for no GWAS).}
 }
 \value{
-Data frames of BLUPs
+Data frame of BLUPs
 }
 \description{
 BLUP
 }
 \details{
-Argument \code{what="id"} leads to prediction of breeding values (BV) and genotypic values (GV), including the average fixed effect of the environments and any fixed effect markers.  For \code{what="marker"}, environment fixed effects are not included in the BLUP. Argument \code{index.weights} is a named vector (matching the names of the locations or traits), and the values are interpreted for standardized traits. An overall scaling factor is also applied so that the sum of the squared index coefficients equals 1.
+The argument \code{what} takes 5 possible values: "AV" (additive value), "BV" (breeding value), "GV" (genotypic value), "AM" (additive marker effect), and "DM" (dominance marker effect). "Values" refer to predictions for individuals, as opposed to markers. Predicted values include the average fixed effect of the environments, whereas predicted marker effects do not. Argument \code{index.weights} is a named vector (matching the names of the locations or traits), and the values are interpreted for standardized traits.
 }

@@ -13,24 +13,26 @@ S4 class to prepare for blup
 \describe{
 \item{\code{id}}{genotype identifiers}
 
-\item{\code{var.u}}{variance of random effects}
+\item{\code{ploidy}}{ploidy}
 
-\item{\code{var.u.inv}}{inverse of var.u}
+\item{\code{var.u}}{variance of random effects}
 
 \item{\code{var.uhat}}{variance of BLUPs}
 
-\item{\code{fixed}}{fixed effect estimates}
+\item{\code{avg.env}}{average fixed effect of the environments}
+
+\item{\code{heterosis}}{regression coefficients for inbreeding}
+
+\item{\code{fixed.marker}}{fixed marker effects}
+
+\item{\code{B}}{var-cov matrix for fixed effects}
 
 \item{\code{random}}{random effect estimates}
 
 \item{\code{add}}{matrix of additive variances from \code{\link{class_var}}}
 
-\item{\code{loc.env}}{data frame with loc, env}
+\item{\code{g.iid}}{matrix of g.iid variances from \code{\link{class_var}}}
 
-\item{\code{trait.env}}{data frame with trait, env}
-
-\item{\code{index.scale}}{sqrt of genetic variances for the locations/traits}
-
-\item{\code{fixed.marker}}{names of fixed effect markers}
+\item{\code{dom}}{matrix of dominance variances from \code{\link{class_var}}}
 }}
 

@@ -2,18 +2,18 @@
 % Please edit documentation in R/predict.geno.R
 \name{predict}
 \alias{predict}
-\title{Predict additive (breeding) values from marker effects}
+\title{Predict individual values from marker effects}
 \arguments{
 \item{object}{object of \code{\link{class_geno}}}
 
-\item{marker.effects}{data frame with columns "marker","add.effect"}
+\item{marker.effects}{data frame with columns "marker" and "effect"}
 }
 \value{
-data frame with columns "id", "BV"
+data frame with columns "id" and "value"
 }
 \description{
-Predict additive (breeding) values from marker effects
+Predict individual values from marker effects
 }
 \details{
-Use the \code{\link{blup}} function with \code{what="marker"} to generate the data frame for \code{marker.effects}.
+Use the \code{\link{blup}} function with what="AM" or "DM" to generate the data frame for \code{marker.effects}.
 }

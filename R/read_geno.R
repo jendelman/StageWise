@@ -8,7 +8,7 @@
 #' 
 #' If the A matrix is not used, then G is blended with the identity matrix (times the mean diagonal of G) to improve numerical conditioning for matrix inversion. The default for w is 1e-5, which is somewhat arbitrary and based on tests with the vignette dataset. 
 #' 
-#' When \code{dominance=FALSE}, non-additive effects are captured using a residual genetic effect, with zero covariance. If \code{dominance=TRUE}, a (digenic) dominance covariance matrix D is used instead. 
+#' When \code{dominance=FALSE}, non-additive effects are captured using a residual genetic effect, with zero covariance. If \code{dominance=TRUE}, a (digenic) dominance covariance matrix is used instead. 
 #' 
 #' The argument \code{min.minor.allele} specifies the minimum number of individuals that must contain the minor allele. Markers that do not meet this threshold are discarded.
 #'  
@@ -29,9 +29,6 @@
 
 read_geno <- function(filename, ploidy, map, min.minor.allele=5, 
                       w=1e-5, ped=NULL, dominance=FALSE) {
-  if (dominance) 
-    stop("Dominance option is under construction.")
-  
   if (any(w < 1e-5))
     stop("Blending parameter should not be smaller than 1e-5")
   
@@ -63,10 +60,13 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
     }
   })
   ix <- which(n.minor >= min.minor.allele)
-  stopifnot(length(ix) > 0)
+  m <- length(ix)
+  stopifnot(m > 0)
   cat(sub("X",min.minor.allele,"Minor allele threshold = X genotypes\n"))
-  cat(sub("X",length(ix),"Number of markers = X\n"))
+  cat(sub("X",m,"Number of markers = X\n"))
   geno <- geno[ix,]
+  n <- ncol(geno)
+  cat(sub("X",n,"Number of genotypes = X\n"))
   p <- p[ix]
   if (nrow(map)>0)
     map <- map[ix,]
@@ -75,7 +75,7 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
                   dimnames=list(id,rownames(geno)))
   coeff[which(is.na(coeff))] <- 0
   
-  scale <- sum(ploidy*p*(1-p))
+  scale <- ploidy*sum(p*(1-p))
   G <- tcrossprod(coeff)/scale
   
   nw <- length(w)
@@ -132,7 +132,7 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
     }
   }
   
-  output <- vector("list",nw)
+  G.list <- vector("list",nw)
   for (i in 1:nw) {
     if (!is.null(H[[i]])) {
       eigen.G <- eigen(H[[i]],symmetric=TRUE)
@@ -144,8 +144,26 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
       H[[i]] <- tcrossprod(eigen.G$vectors%*%Diagonal(n=nrow(Hinv[[i]]),x=sqrt(eigen.G$values)))
     }
     class(eigen.G) <- "list"
-    output[[i]] <- new(Class="class_geno",map=map,coeff=coeff,scale=scale,
+    G.list[[i]] <- new(Class="class_geno",ploidy=as.integer(ploidy),map=map,coeff=coeff,scale=scale,
                         G=H[[i]], eigen.G=eigen.G)
+  }
+  
+  if (dominance) {
+    Pmat <- kronecker(matrix(p,nrow=1,ncol=m),matrix(1,ncol=1,nrow=n))
+    coeff.D <- Matrix(-2*choose(ploidy,2)*Pmat^2 + 2*(ploidy-1)*Pmat*t(geno) - t(geno)*(t(geno)-1))
+    coeff.D[is.na(coeff.D)] <- 0
+    scale.D <- 4*choose(ploidy,2)*sum(p^2*(1-p)^2)
+    D <- tcrossprod(coeff.D)/scale.D
+    eigen.D <- eigen(D,symmetric=TRUE)
+    eigen.D$vectors <- Matrix(eigen.D$vectors,dimnames=list(id,id))
+    class(eigen.D) <- "list"
+    Fg <- apply(coeff.D,1,sum)/(-scale*(ploidy-1))
+    names(Fg) <- id
+    output <- lapply(G.list,function(x){new(Class="class_genoD",ploidy=x@ploidy,map=x@map,
+                                            coeff=x@coeff,scale=x@scale,G=x@G,eigen.G=x@eigen.G,
+                                            coeff.D=coeff.D,scale.D=scale.D,D=D,eigen.D=eigen.D,Fg=Fg)})
+  } else {
+    output <- G.list
   }
   
   if (nw==1) {

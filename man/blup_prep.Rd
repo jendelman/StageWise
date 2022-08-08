@@ -27,4 +27,6 @@ Prepare data for BLUP
 }
 \details{
 The \code{method} argument can be used to control how the linear system is solved. "MME" leads to inversion of the MME coefficient matrix, while "Vinv" leads to inversion of the overall var-cov matrix for the response vector. If NULL, the software uses whichever method involves inverting the smaller matrix. If the number of random effects (m) is less than the number of BLUEs (n), "MME" is used.
+
+For the multi-location model, if all of the environments for a location are masked, the avg fixed effect and average heterosis coefficient cannot be estimated. Instead, the average of the other locations is used.
 }

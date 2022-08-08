@@ -2,155 +2,153 @@
 #' 
 #' BLUP
 #' 
-#' Argument \code{what="id"} leads to prediction of breeding values (BV) and genotypic values (GV), including the average fixed effect of the environments and any fixed effect markers.  For \code{what="marker"}, environment fixed effects are not included in the BLUP. Argument \code{index.weights} is a named vector (matching the names of the locations or traits), and the values are interpreted for standardized traits. An overall scaling factor is also applied so that the sum of the squared index coefficients equals 1.
+#' The argument \code{what} takes 5 possible values: "AV" (additive value), "BV" (breeding value), "GV" (genotypic value), "AM" (additive marker effect), and "DM" (dominance marker effect). "Values" refer to predictions for individuals, as opposed to markers. Predicted values include the average fixed effect of the environments, whereas predicted marker effects do not. Argument \code{index.weights} is a named vector (matching the names of the locations or traits), and the values are interpreted for standardized traits. 
 #' 
 #' @param data object of \code{\link{class_prep}} from \code{\link{blup_prep}}
 #' @param geno object of \code{\link{class_geno}} from \code{\link{read_geno}}
-#' @param what "id" or "marker"
+#' @param what One of the following: AV, BV, GV, AM, DM. See Details.
 #' @param index.weights named vector of index weights for the locations or traits
-#' @param gwas.ncore Integer indicating number of cores to use for GWAS (default is 0 for no GWAS). Requires \code{what="markers"}.
+#' @param gwas.ncore Integer indicating number of cores to use for GWAS (default is 0 for no GWAS). 
 #' 
-#' @return Data frames of BLUPs
+#' @return Data frame of BLUPs
 #' 
 #' @import Matrix
 #' @importFrom stats formula pnorm
-#' @importFrom parallel makeCluster clusterExport parCapply stopCluster
+#' @importFrom parallel makeCluster clusterExport parRapply stopCluster
 #' @export
 
 blup <- function(data,geno=NULL,what,index.weights=NULL,gwas.ncore=0L) {
   
-  stopifnot(what %in% c("id","marker"))
-  n.id <- length(data@id)
-  n.mark <- length(data@fixed.marker)
-  
-  if (nrow(data@loc.env) > 0) {
-    n.trait <- 1
-    locations <- names(data@index.scale)
-    n.loc <- length(locations)
-    if (is.null(index.weights)) {
-      index.coeff <- 1/data@index.scale
-    } else {
-      ix <- match(locations,names(index.weights))
-      if (any(is.na(ix))) {stop("Check names of locations in index.weights")}
-      index.coeff <- index.weights[ix]/data@index.scale
-    }
-    index.coeff <- index.coeff/sqrt(sum(index.coeff^2))
-    n.env <- length(data@fixed) - n.loc*n.mark
-    fix.value <- sum(index.coeff*tapply(data@fixed[data@loc.env$env],data@loc.env$loc,mean)[locations])
-  } else {
-    n.loc <- 1 
-    if (nrow(data@trait.env)==0) {
-      #single trait
-      index.coeff <- 1
-      n.env <- length(data@fixed) - n.mark
-      fix.value <- mean(data@fixed[1:n.env])
-      n.trait <- 1
-    } else {
-      # multi-trait
-      traits <- names(data@index.scale)
-      n.trait <- length(traits)
-      if (is.null(index.weights)) {
-        index.coeff <- 1/data@index.scale
-      } else {
-        ix <- match(traits,names(index.weights))
-        if (any(is.na(ix))) {stop("Check names of traits in index.coeff")}
-        index.coeff <- index.weights[ix]/data@index.scale
-      }
-      index.coeff <- index.coeff/sqrt(sum(index.coeff^2))
-      n.env <- length(data@fixed)/n.trait - n.mark
-      tmp <- apply(data@trait.env[,c(2,1)],1,paste,collapse=":")
-      fix.value <- sum(index.coeff*tapply(data@fixed[tmp],data@trait.env$trait,mean)[traits])
-    }
+  if (what %in% c("id","marker")) {
+    stop("The options for 'what' have changed. See Details.")
   }
+  what <- toupper(what)
+  stopifnot(what %in% c("AV","BV","GV","AM","DM"))
   
-  if (n.mark > 0) {
-    #trait/loc nested within marker
-    if (n.trait==1) {
-      a <- kronecker(Diagonal(n=n.mark),Matrix(index.coeff,nrow=1)) %*% 
-        Matrix(data@fixed[n.env+1:(n.loc*n.mark)],ncol=1)
-    } else {
-      a <- kronecker(Diagonal(n=n.mark),Matrix(index.coeff,nrow=1)) %*% 
-        Matrix(data@fixed[n.env*n.trait+1:(n.trait*n.mark)],ncol=1)
-    }
-    fix.value <- fix.value + as.numeric(as.matrix(geno@coeff[,data@fixed.marker]) %*% a)
-  }
-  
-  if (nrow(data@add) > 0 & is.null(geno)) {
+  if (nrow(data@add) > 0 & is.null(geno))
     stop("Missing geno argument")
-  }
-  if (nrow(data@add)==0 & !is.null(geno)) {
-    stop("Marker data was not used in blup_prep")
-  }  
   
-  M <- kronecker(Diagonal(n=n.id),Matrix(index.coeff,nrow=1))
-  n.fix <- length(data@fixed)
-  if (what=="id") {
-    #trait/loc within id
-    if (is.null(geno)) {
-      out <- data.frame(id=data@id,GV=as.numeric(M%*%Matrix(data@random,ncol=1)) + fix.value)
-      numer <- diag(M%*% tcrossprod(data@var.uhat,M))
-      denom <- diag(M%*% tcrossprod(data@var.u,M))
-      out$GV.r2 <- numer/denom
+  if (nrow(data@add)==0 & (!is.null(geno) | what %in% c("AM","DM","AV","BV")))
+    stop("Marker data was not used in blup_prep")
+  
+  if (what=="DM" & (!(class(geno)=="class_genoD") | nrow(data@dom)==0))
+    stop("Dominance model is required in geno and data")
+  
+  gamma <- 0
+  if (!is.null(geno)) {
+    if (what=="GV")  
+      gamma <- 1
+    if (what=="BV" & nrow(data@dom) > 0)
+      gamma <- (geno@ploidy/2 - 1)/(geno@ploidy - 1)
+    
+    if (nrow(data@dom) > 0) {
+      index.scale <- sqrt(diag(as.matrix(data@add) + gamma^2*diag(as.matrix(data@dom))))
     } else {
-      out <- data.frame(id=data@id,BV=as.numeric(cbind(M,0*M) %*% Matrix(data@random,ncol=1)) + fix.value,
-                           GV=as.numeric(cbind(M,M) %*% Matrix(data@random,ncol=1)) + fix.value)
-      numer <- diag(cbind(M,0*M)%*% tcrossprod(data@var.uhat,cbind(M,0*M)))
-      denom <- diag(cbind(M,0*M)%*% tcrossprod(data@var.u,cbind(M,0*M)))
-      out$BV.r2 <- numer/denom
-      numer <- diag(cbind(M,M)%*% tcrossprod(data@var.uhat,cbind(M,M)))
-      denom <- diag(cbind(M,M)%*% tcrossprod(data@var.u,cbind(M,M)))
-      out$GV.r2 <- numer/denom
+      index.scale <- sqrt(diag(as.matrix(data@add) + gamma^2*diag(as.matrix(data@g.iid))))
     }
+  } else {
+    index.scale <- sqrt(diag(as.matrix(data@g.iid)))
+  }
+  
+  n.id <- length(data@id)
+  nlt <- length(index.scale) #number of loc/traits
+  
+  if (nlt > 1) {
+    if (is.null(index.weights)) {
+      index.coeff <- 1/index.scale
+    } else {
+      ix <- match(names(index.scale),names(index.weights))
+      if (any(is.na(ix))) {stop("Check names of loc or traits in index.weights")}
+      index.weights <- index.weights[ix]
+      index.coeff <- index.weights/index.scale
+    }
+    index.coeff <- index.coeff/sqrt(sum(index.coeff^2))  
+    fix.value <- sum(index.coeff*data@avg.env[names(index.coeff)])
+  } else {
+    index.coeff <- 1
+    fix.value <- data@avg.env
+  }
+  
+  n.mark <- length(data@fixed.marker)/nlt
+  if (n.mark > 0) {
+    if (nlt > 1) {
+      fixed.markers <- unique(sapply(strsplit(names(data@fixed.marker),split=":",fixed=T),"[[",1))
+      beta <- matrix(data@fixed.marker,ncol=1)
+      tmp <- kronecker(geno@coeff[,fixed.markers,drop=FALSE],matrix(index.coeff,nrow=1)) %*% beta
+      fix.value <- fix.value + as.numeric(tmp)
+      
+    } else {
+      fixed.markers <- names(data@fixed.marker)
+      beta <- matrix(data@fixed.marker,ncol=1)
+      fix.value <- fix.value + as.numeric(geno@coeff[,fixed.markers,drop=FALSE] %*% beta)
+    } 
+  }
+  
+  if (length(data@heterosis) > 0 & what %in% c("BV","GV")) {
+    fix.value <- fix.value + gamma * geno@Fg[data@id] * sum(index.coeff*data@heterosis)
+  }
+  
+  if (what %in% c("AV","BV","GV")) {
+    if (gwas.ncore > 0)
+      stop("GWAS option requires either AM or DM for 'what' ")
+    
+    M <- kronecker(Diagonal(n=n.id),Matrix(index.coeff,nrow=1))
+    if (!is.null(geno)) {
+      M <- cbind(M,gamma*M)
+    }
+    out <- data.frame(id=data@id,value=as.numeric(M%*%Matrix(data@random,ncol=1)) + fix.value)
+    numer <- diag(M%*% tcrossprod(data@var.uhat,M))
+    denom <- diag(M%*% tcrossprod(data@var.u,M))
+    out$r2 <- numer/denom
+    attr(out,"what") <- what
+    rownames(out) <- NULL
     return(out)
-  } 
+  }
   
   #marker effects
-  if (is.null(geno)) {
-    stop("Cannot predict marker effects without genotype data")
-  }
-  
-  V.alpha <- sum(index.coeff*diag(data@add))/geno@scale
-  if (n.loc > 1 | n.trait > 1) {
-     W <- kronecker(geno@coeff,Matrix(index.coeff,ncol=1)) * V.alpha
-  } else {
-     W <- geno@coeff * V.alpha
-  }
-  
   n.random <- length(data@random)
   if (!is.null(geno)) 
     n.random <- n.random/2
   
-  ZtPy <- data@var.u.inv[1:n.random,] %*% Matrix(data@random,ncol=1)
-  add.effect <- as.numeric(crossprod(W, ZtPy))
-  
-  if (nrow(geno@map)==0) {
-      out <- data.frame(marker=colnames(geno@coeff),add.effect=add.effect)
+  if (what=="AM") {
+    G <- kron(geno@eigen.G,1)
+    M <- kronecker(crossprod(geno@coeff,crossprod(G$inv)),matrix(index.coeff,nrow=1))/geno@scale
+    effect <- as.numeric(M %*% matrix(data@random[1:n.random],ncol=1))
+    V <- data@var.uhat[1:n.random,1:n.random] #used for GWAS
   } else {
-      out <- data.frame(geno@map,add.effect=add.effect)
+    D <- kron(geno@eigen.D,1)
+    M <- kronecker(crossprod(geno@coeff.D,crossprod(D$inv)),matrix(index.coeff,nrow=1))/geno@scale.D
+    effect <- as.numeric(M %*% matrix(data@random[n.random + 1:n.random],ncol=1))
+    V <- data@var.uhat[n.random+1:n.random,n.random+1:n.random] #used for GWAS
   }
   
-  f.se <- function(x,Q) {sqrt(as.numeric(crossprod(x,Q%*%x)))}
-
+  if (nrow(geno@map)==0) {
+      out <- data.frame(marker=colnames(geno@coeff), effect=effect)
+  } else {
+      out <- data.frame(geno@map, effect=effect)
+  }
+  
+  f.se <- function(x,V) {sqrt(as.numeric(crossprod(x,V%*%x)))}
   if (gwas.ncore > 0) {
-    ZtPZ <- data@var.u.inv[1:n.random,1:n.random] %*% data@var.uhat[1:n.random,1:n.random] %*% data@var.u.inv[1:n.random,1:n.random]
-    
+
     if (gwas.ncore == 1) {
-      se <- apply(W,2,f.se,Q=ZtPZ)
-      std.effect <- out$add.effect/se
+      se <- apply(M,1,f.se,V=V)
+      std.effect <- out$effect/se
     } else {
       cl <- makeCluster(gwas.ncore)
       clusterExport(cl=cl,varlist=NULL)
-      se <- parCapply(cl=cl,x=W,f.se,Q=ZtPZ)
+      se <- parRapply(cl=cl,x=M,f.se,V=V)
       stopCluster(cl)
-      std.effect <- out$add.effect/sapply(se,as.numeric)
+      std.effect <- out$effect/sapply(se,as.numeric)
     } 
-    out$gwas.score <- -log10(pnorm(q=abs(std.effect),lower.tail=FALSE)*2)
+    out$score <- -log10(pnorm(q=abs(std.effect),lower.tail=FALSE)*2)
   }
   
   if (n.mark > 0) {
-    k <- match(data@fixed.marker,out$marker)
-    out$add.effect[k] <- out$add.effect[k] + as.numeric(a)
+    k <- match(fixed.markers,out$marker)
+    out$effect[k] <- out$effect[k] + as.numeric(beta)
   }
-  
+  attr(out,"what") <- what
+  rownames(out) <- NULL
   return(out)
 }

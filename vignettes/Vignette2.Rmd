@@ -19,7 +19,7 @@ This vignette builds on the information in [Vignette 1](https://jendelman.github
 ```{r}
 library(StageWise)
 geno.file <- system.file("vignette_data", "geno2.csv", package = "StageWise")
-geno <- read_geno(filename=geno.file,ploidy=4,map=FALSE)
+geno <- read_geno(filename=geno.file,ploidy=4,map=FALSE,dominance=TRUE)
 
 pheno.file <- system.file("vignette_data", "pheno2.csv", package = "StageWise")
 pheno <- read.csv(pheno.file)
@@ -30,12 +30,11 @@ table(pheno$loc)
 The input file contains not only a column named 'env' for environment but also one named 'loc' for location. The location information is not explicitly used by `Stage1` but is automatically detected and retained in the output for use in `Stage2`.
 
 ```{r, fig.width=4, fig.height=3}
-ans1 <- Stage1(filename=pheno.file,
-               traits='Yield.Mg.ha')
+ans1 <- Stage1(filename=pheno.file, traits='Yield.Mg.ha',silent=TRUE)
 head(ans1$blue)
 
 library(ggplot2)
-ggplot(data=ans1$H2,aes(x=loc,y=H2)) + stat_boxplot(outlier.color="red") + xlab("Location") + ylab(expression(paste("Broad-sense ",H^2," (plot basis)")))
+ggplot(data=ans1$fit,aes(x=loc,y=H2)) + stat_boxplot(outlier.color="red") + xlab("Location") + ylab(expression(paste("Broad-sense ",H^2," (plot basis)")))
 ```
 
 The above figure shows the variation in broad-sense heritability across locations and years. 
@@ -43,14 +42,14 @@ The above figure shows the variation in broad-sense heritability across location
 When the data frame of BLUEs passed to `Stage2` has a column labeled 'loc', genotype x location effects are included using a separable covariance structure. When marker data are included, the genetic covariance between locations for the additive effects follows a 2nd order factor-analytic (FA2) model. Based on experience with a few datasets, attempts to also model covariance between residual genetic effect were unsuccessful, so the correlation is constrained at 1 in the current implementation. If marker data are not included, the genetic covariance between locations follows the FA2 model. For large datasets with many locations (such as this one), I recommend first analyzing it without marker data, as the computation proceeds more quickly. 
 
 Here is a joint analysis of all 9 locations without using the marker data.
-```{r eval=FALSE}
+```{r, eval=FALSE}
 ans2a <- Stage2(data=ans1$blue, vcov=ans1$vcov)
 ```
 ```{r}
 summary(ans2a$vars)
 ```
 
-As in the single location analysis, running the `summary` command on the 'vars' output shows the partitioning of variance, but now a g x loc effect is also present. Although g x year effects could also be estimated, they are typically small and, unlike g x loc, have little practical importance; this is why they are not modeled explicitly in `Stage2`. 
+As in the single location analysis, running the `summary` command on the 'vars' output shows the partitioning of variance, but now a g x loc effect is also present. Because g x year effects are not repeatable and often small, they are not included in the `Stage2` model.
 
 The `summary` command also returns the correlation matrix between the locations. One way to visualize this information is with a dendrogram, which shows that the TX site, and to a lesser extent the FL and CA sites, are different than the other six. 
 
@@ -74,27 +73,35 @@ tmp <- sapply(strsplit(names(ans1$vcov),split="_"),"[[",1)
 vcov <- ans1$vcov[tmp %in% locs]
 ```
 ```{r, eval=FALSE}
-ans2b <- Stage2(data=blues,vcov=vcov,geno=geno)
-```
-```{r,fig.width=3,fig.height=3}
-summary(ans2b$vars)
-ans2b$uniplot
+ans2b <- Stage2(data=blues,vcov=vcov,geno=geno,dominance=FALSE)
+ans2c <- Stage2(data=blues,vcov=vcov,geno=geno,dominance=TRUE)
 ```
 
-The correlation matrix and uniplot show that breeding values for yield in NC were somewhat different compared to the other five sites. 
+```{r,fig.width=3,fig.height=3}
+data.frame(dominance=c(FALSE,TRUE), AIC=c(ans2b$aic,ans2c$aic))
+```
+
+The dominance model is selected over the genetic residual model because of its lower AIC.
+
+```{r,fig.width=3,fig.height=3}
+summary(ans2c$vars)
+ans2c$uniplot
+```
+
+The correlation matrix and uniplot, which are based on the additive values, show that yield in NC was somewhat different compared to the other five sites. 
 
 Compared to the single location analysis in Vignette 1, an additional argument is needed for the `blup` function to specify the index weights, which are interpreted as the relative weight for each location after standardization to unit variance. The following code compares the reliability for BV predictions in WI vs. NC. 
 
 ```{r,fig.width=3,fig.height=3}
-prep1 <- blup_prep(data=blues,vcov=vcov,geno=geno,vars=ans2b$vars)
+prep1 <- blup_prep(data=blues,vcov=vcov,geno=geno,vars=ans2c$vars)
 
 WI.index <- c(WI=1, NC=0, OR=0, NY=0, MO=0, MI=0)  
 NC.index <- c(WI=0, NC=1, OR=0, NY=0, MO=0, MI=0)  
 
-WI.pred <- blup(data=prep1,geno=geno,index.weights=WI.index,what="id")
-NC.pred <- blup(data=prep1,geno=geno,index.weights=NC.index,what="id")
+WI.pred <- blup(data=prep1,geno=geno,index.weights=WI.index,what="BV")
+NC.pred <- blup(data=prep1,geno=geno,index.weights=NC.index,what="BV")
 
-pred <- merge(NC.pred[,c("id","BV","BV.r2")],WI.pred[,c("id","BV","BV.r2")],by="id")
+pred <- merge(NC.pred,WI.pred,by="id")
 colnames(pred) <- c("id","BV.NC","r2.NC","BV.WI","r2.WI")
 
 ggplot(pred,aes(x=r2.NC,y=r2.WI)) + geom_point() + coord_fixed(ratio=1) + xlim(0.3,0.8) + ylim(0.3,0.8) + geom_line(data=data.frame(x=c(0.3,0.8),y=c(0.3,0.8)),mapping=aes(x=x,y=y),linetype=2) + theme_bw() + 
@@ -103,23 +110,17 @@ ggplot(pred,aes(x=r2.NC,y=r2.WI)) + geom_point() + coord_fixed(ratio=1) + xlim(0
 
 The above figure shows that breeding values were predicted with higher reliability in WI than NC, which is to be expected from the high correlation between WI and the other four sites (OR,MO,MI,NY) compared to NC. 
 
-As a pedagogical aside, one should avoid estimating genetic correlation via the sample correlation between GEBVs. This is because the correlation between BLUPs is an upwardly biased estimator of the true correlation. As shown above, the REML estimate of the genetic correlation between WI and NC was 0.67, while the correlation between the BLUPs is 0.74:
-
-```{r}
-cor(pred$BV.NC, pred$BV.WI)  
-```
-
 The `mask` argument for `blup_prep` can be used to mask individuals at one or more locations, to explore the accuracy of prediction into new environments. Whereas the previous analysis determined the reliability of GEBVs in WI when WI phenotypes are available, the next analysis excludes WI phenotypes: 
 
 ```{r, fig.width=3,fig.height=3}
-WI.env <- blues$env[blues$loc=="WI"]
+WI.env <- unique(blues$env[blues$loc=="WI"])
 
-prep2 <- blup_prep(data=blues,vcov=vcov,geno=geno,vars=ans2b$vars,
+prep2 <- blup_prep(data=blues,vcov=vcov,geno=geno,vars=ans2c$vars,
                    mask=data.frame(env=WI.env))
 
-pred2 <- blup(data=prep2,geno=geno,index.weights=WI.index,what="id")
+pred2 <- blup(data=prep2,geno=geno,index.weights=WI.index,what="BV")
 
-plot.data <- merge(pred2[,c("id","BV.r2")],WI.pred[,c("id","BV.r2")],by="id")
+plot.data <- merge(pred2[,c("id","r2")],WI.pred[,c("id","r2")],by="id")
 colnames(plot.data) <- c("id","without.WI.pheno","with.WI.pheno")
 
 ggplot(plot.data,aes(x=without.WI.pheno,y=with.WI.pheno)) + geom_point() + coord_fixed(ratio=1) + xlim(0.3,0.8) + ylim(0.3,0.8) + geom_line(data=data.frame(x=c(0.3,0.8),y=c(0.3,0.8)),mapping=aes(x=x,y=y),linetype=2) + theme_bw() + 

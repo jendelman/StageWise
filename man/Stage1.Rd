@@ -32,15 +32,14 @@ Stage1(
 \value{
 List containing
 \describe{
-\item{blue}{data frame of BLUEs for all environments}
-\item{vcov}{list of variance-covariance matrices for the BLUEs, one per env}
-\item{H2}{broad-sense H2 on a plot basis}
-\item{resid}{list containing diagnostic plots and data frame of residuals}
-\item{aic}{AIC for the BLUE model (only with asreml)}
+\item{blue}{data frame of BLUEs}
+\item{vcov}{list of variance-covariance matrices for the BLUEs, one per experiment (env)}
+\item{fit}{data frame with broad-sense H2 (plot basis) and/or AIC}
+\item{resid}{For single trait, list of diagnostic plots and data frame of residuals. For multi-trait, list of resid var-cov matrices.}
 }
 }
 \description{
-Computes genotype BLUEs within each environment
+Computes genotype BLUEs for each experiment
 }
 \details{
 The input file must have one column labeled "id" for the individuals and one labeled "env" for the environments. The data for each environment are analyzed independently with a linear mixed model. Although not used in Stage1, to include a genotype x location effect in \code{\link{Stage2}}, a column labeled "loc" should be present in the input file. 
@@ -55,5 +54,7 @@ Missing response values are omitted for single-trait analysis but retained for m
 
 Argument \code{workspace} is a vector of length two containing the workspace and pworkspace limits for ASReml-R, with default values of 500mb. If you get an error about insufficient memory, try increasing the appropriate value (workspace for variance estimation and pworkspace for BLUE computation).
 
-For multiple traits, only "asreml" is supported, and only the BLUE model is run, so the returned object does not contain H2.
+For multiple traits, only "asreml" is supported, and only the BLUE model is run, so the returned object does not contain H2. 
+
+If the input file has a column "expt", this indicates multiple experiments within environment, which may be needed when using spatial analyses. Each experiment is first analyzed separately, and then the BLUEs from all experiments in one env are jointly analyzed to compute a single BLUE per env. The estimation errors from each experiment are propagated into the multi-expt model.
 }

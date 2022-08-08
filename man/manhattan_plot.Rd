@@ -7,7 +7,7 @@
 manhattan_plot(data, chrom = NULL, thresh = NULL, rotate.label = FALSE)
 }
 \arguments{
-\item{data}{data frame with columns for marker, chrom, position, and gwas.score}
+\item{data}{data frame with columns for marker, chrom, position, and score}
 
 \item{chrom}{optional, to plot only one chromosome}
 

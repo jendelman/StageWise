@@ -1,12 +1,12 @@
-#' Predict additive (breeding) values from marker effects
+#' Predict individual values from marker effects
 #'
-#' Predict additive (breeding) values from marker effects
+#' Predict individual values from marker effects
 #' 
-#' Use the \code{\link{blup}} function with \code{what="marker"} to generate the data frame for \code{marker.effects}.  
+#' Use the \code{\link{blup}} function with what="AM" or "DM" to generate the data frame for \code{marker.effects}.  
 #' 
 #' @param object object of \code{\link{class_geno}}
-#' @param marker.effects data frame with columns "marker","add.effect"
-#' @return data frame with columns "id", "BV"
+#' @param marker.effects data frame with columns "marker" and "effect"
+#' @return data frame with columns "id" and "value"
 #'
 #' @include class_geno.R
 #' @name predict
@@ -15,10 +15,13 @@ NULL
 
 setGeneric("predict")
 setMethod("predict",c(object="class_geno"),
-          definition=function(object,marker.effects){
+          definition=function(object, marker.effects){
             stopifnot(marker.effects$marker==colnames(object@coeff))
-            GEBV <- object@coeff %*% marker.effects$add.effect
-            out <- data.frame(id=rownames(GEBV),BV=as.numeric(GEBV))
-            rownames(out) <- NULL
-            return(out)
+            if (attr(marker.effects,"what")=="AM") {
+              pred <- as.numeric(object@coeff %*% matrix(marker.effects$effect,ncol=1))
+            } else {
+              stopifnot(class(object)=="class_genoD")
+              pred <- as.numeric(object@coeff.D %*% matrix(marker.effects$effect,ncol=1))
+            }
+            data.frame(id=rownames(object@coeff), value=pred)
           })

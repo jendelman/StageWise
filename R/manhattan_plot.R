@@ -4,7 +4,7 @@
 #' 
 #' Assumes position in bp
 #' 
-#' @param data data frame with columns for marker, chrom, position, and gwas.score
+#' @param data data frame with columns for marker, chrom, position, and score
 #' @param chrom optional, to plot only one chromosome
 #' @param thresh optional, to include horizontal line at discovery threshold
 #' @param rotate.label TRUE/FALSE whether to rotate x-axis labels to be perpendicular 
@@ -17,7 +17,7 @@
 
 manhattan_plot <- function(data,chrom=NULL,thresh=NULL,rotate.label=FALSE) {
 		
-  stopifnot(c("chrom","position","gwas.score") %in% colnames(data))
+  stopifnot(c("chrom","position","score") %in% colnames(data))
   if (is.null(chrom)) {
     x <- get_x(data[,c("chrom","position")])
     ix <- 1:nrow(data)
@@ -26,7 +26,7 @@ manhattan_plot <- function(data,chrom=NULL,thresh=NULL,rotate.label=FALSE) {
     ix <- which(as.character(data$chrom)==chrom)
     x <- data$position[ix]/1e6
   }
-  plot.data <- data.frame(x=x,y=data$gwas.score[ix],
+  plot.data <- data.frame(x=x,y=data$score[ix],
                           color=factor(ifelse(as.integer(factor(data$chrom[ix]))%%2==1,1,0)))
   if (rotate.label) {
     angle <- 90

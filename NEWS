@@ -1,3 +1,11 @@
+Changes in 0.25
+* directional dominance
+* modified variance partitioning
+* corr function
+* gain function, restricted index
+* summary method for class_geno
+* multiple expt per env in Stage1
+
 Changes in 0.20
 * blup_prep now inverts MME instead of V if #id < #obs. This led to changes in class_prep.
 * Modified numerical conditioning of G in read_geno. Function arguments changed.

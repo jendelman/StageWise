@@ -11,6 +11,8 @@ S4 class for marker genotype data
 \section{Slots}{
 
 \describe{
+\item{\code{ploidy}}{ploidy}
+
 \item{\code{map}}{Marker map positions}
 
 \item{\code{coeff}}{Coefficients of the marker effects (dim: indiv x marker)}

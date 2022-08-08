@@ -2,7 +2,7 @@
 #' 
 #' Stage 2 analysis of multi-environment trials 
 #' 
-#' Stage 2 of the two-stage approach described by Damesa et al. 2017, using ASReml-R for variance component estimation. The variable \code{data} has three mandatory column: id, env, BLUE. Optionally, \code{data} can have a column labeled "loc", which changes the main effect for genotype into a separable genotype-within-location effect, using a FA2 covariance model for the locations. Optionally, \code{data} can have a column labeled "trait", which uses an unstructured covariance model. The multi-location and multi-trait analyses cannot be combined. Missing data are allowed in the multi-trait but not the single-trait analysis. The argument \code{geno} is used to partition genetic values into additive and non-additive (g.resid) components. Any individuals in \code{data} that are not present in \code{geno} are discarded. 
+#' Stage 2 of the two-stage approach described by Damesa et al. 2017, using ASReml-R for variance component estimation. The variable \code{data} has three mandatory column: id, env, BLUE. Optionally, \code{data} can have a column labeled "loc", which changes the main effect for genotype into a separable genotype-within-location effect, using a FA2 covariance model for the locations. Optionally, \code{data} can have a column labeled "trait", which uses an unstructured covariance model. The multi-location and multi-trait analyses cannot be combined. Missing data are allowed in the multi-trait but not the single-trait analysis. The argument \code{geno} is used to partition genetic values into additive and non-additive components. Any individuals in \code{data} that are not present in \code{geno} are discarded. 
 #' 
 #' The argument \code{vcov} is used to partition the macro- and micro-environmental variation, which are called GxE and residual in the output. \code{vcov} is a named list of variance-covariance matrices for the BLUEs within each environment, with id for rownames (single trait) or id:trait. The order in \code{vcov} and \code{data} should match. Both \code{data} and \code{vcov} can be created using the function \code{\link{Stage1}}. 
 #' 
@@ -16,11 +16,12 @@
 #' @param fix.eff.marker markers in \code{geno} to include as additive fixed effect covariates
 #' @param silent TRUE/FALSE, whether to suppress ASReml-R output
 #' @param workspace Memory limit for ASRreml-R variance estimation
+#' @param dominance TRUE/FALSE
 #' 
 #' @return List containing
 #' \describe{
 #' \item{aic}{AIC}
-#' \item{vars}{variances, as variable of class \code{\link{class_var}}}
+#' \item{vars}{variance components for \code{\link{blup_prep}}, as variable of class \code{\link{class_var}}}
 #' \item{fixed}{Fixed effect estimates for env and markers}
 #' \item{random}{Random effect predictions}
 #' \item{uniplot}{uniplot of the genetic correlation between locations}
@@ -35,10 +36,13 @@
 #' 
 #' @export
 
-Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,workspace="500mb") {
+Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
+                   silent=TRUE,workspace="500mb",dominance=FALSE) {
   
   stopifnot(inherits(data,"data.frame"))
   stopifnot(requireNamespace("asreml"))
+  if (dominance)
+    stopifnot(class(geno)=="class_genoD")
   library(asreml)
   stopifnot(c("id","env","BLUE") %in% colnames(data))
   data$id <- as.character(data$id)
@@ -50,18 +54,35 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     data <- data[!(data$env.id %in% data$env.id[missing]),]
   }
   
+  diagG <- diagD <- numeric(0)
+  dom <- NULL
   if (!is.null(geno)) {
     stopifnot(inherits(geno,"class_geno"))
     id <- sort(intersect(data$id,rownames(geno@G)))
-    .GlobalEnv$asremlG <- geno@G[id,id] + Diagonal(length(id))*1e-6
-    meanG <- mean(diag(.GlobalEnv$asremlG))
+    n <- length(id)
     data <- data[data$id %in% id,]
+    id.weights <- table(factor(data$id,levels=id))
+    .GlobalEnv$asremlG <- geno@G[id,id]
+    meanG <- as.numeric(pvar(V=.GlobalEnv$asremlG,weights=id.weights))
+    diagG <- mean(diag(.GlobalEnv$asremlG))
+
+    if (dominance) {
+      .GlobalEnv$asremlD <- geno@D[id,id]
+      meanD <- as.numeric(pvar(V=.GlobalEnv$asremlD,weights=id.weights))
+
+      dom.covariate <- as.numeric(geno@coeff.D[id,] %*% matrix(1,nrow=ncol(geno@coeff.D),ncol=1))
+      dom.covariate <- dom.covariate/(geno@scale*(geno@ploidy-1))
+      names(dom.covariate) <- id
+      data$dom <- dom.covariate[data$id]
+  
+      diagD <- mean(diag(.GlobalEnv$asremlD))
+      dom <- "dom"
+    } 
   } else {
-    meanG <- numeric(0)
     id <- sort(unique(data$id))
+    n <- length(id)
   }
   
-  #marker.var <- matrix(NA,nrow=0,ncol=0)
   if (!is.null(fix.eff.marker)) {
     stopifnot(!is.null(geno))
     n.mark <- length(fix.eff.marker)
@@ -71,13 +92,11 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     data <- merge(data,dat2,by="id")
   } else {
     n.mark <- 0
-    #marker.var <- matrix(NA,nrow=0,ncol=0)
-    marker.cov <- array(0,dim=rep(0,3))
   }
   
   envs <- unique(data$env)
   n.env <- length(envs)
-  if (n.env==1) {
+  if (n.env==1 & !dominance) {
     stop("Need more than one environment")
   }
   data$env <- factor(data$env,levels=envs)
@@ -85,8 +104,12 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
   env.id <- sort(unique(data$env.id))
   data$env.id <- factor(data$env.id,levels=env.id)
   
+  out <- vector("list",4)
+  names(out) <- c("aic","vars","fixed","random")
+  n.loc <- 1
+  n.trait <- 1
+  
   if ("trait" %in% colnames(data)) {
-    n.loc <- 1
     data$trait <- as.character(data$trait)
     traits <- sort(unique(data$trait))
     n.trait <- length(traits)
@@ -102,19 +125,32 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     } 
     data$Trait <- factor(data$trait,levels=traits)
     data <- data[order(data$env.id,data$Trait),]
+    
   } else {
-    n.trait <- 1
-    traits <- NULL
+    
+    traits <- ""  #NULL
     if ("loc" %in% colnames(data)) {
       data$loc <- factor(as.character(data$loc))
       data <- data[order(data$loc),]
       locations <- levels(data$loc)
       n.loc <- length(locations)
       stopifnot(n.loc > 1)
-    } else {
-      n.loc <- 1
-    }
+      loc.weights <- table(data$loc)
+      data$gL <- paste(as.character(data$id),as.character(data$loc),sep=":")
+      tmp <- expand.grid(loc=locations,id=id)
+      gL <- apply(tmp[,c("id","loc")],1,paste,collapse=":")
+      data$gL <- factor(data$gL,levels=gL)
+      gL.weights <- table(data$gL)
+      out <- c(out,uniplot=list(NULL))
+    } 
   }
+  
+  if (is.null(geno)) {
+    tmp <- c("env","fixed.marker","additive","add x loc","dominance","heterosis","genotype","g x loc","g x env","Stage1.error","residual")
+  } else {
+    tmp <- c("env","fixed.marker","additive","add x loc","dominance","heterosis","g.resid","g x loc","g x env","Stage1.error","residual")
+  }
+  vars <- array(data=numeric(0),dim=c(n.trait,n.trait,11),dimnames=list(traits,traits,tmp))
 
   if (n.trait==1) {
     if (n.loc==1) {
@@ -122,19 +158,19 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     } else {
       model <- "asreml(data=data,fixed=BLUE~FIX-1,random=~RANDOM,residual=~dsum(~idv(units)|loc)"
     }
-    if (n.mark > 0) {
+    if (n.mark > 0 | dominance) {
       if (n.loc==1) {
-        model <- sub("FIX",paste(c("env",fix.eff.marker),collapse="+"),model,fixed=T)
+        model <- sub("FIX",paste(c("env",fix.eff.marker,dom),collapse="+"),model,fixed=T)
       } else {
-        model <- sub("FIX",paste(c("env",paste0(fix.eff.marker,":loc")),collapse="+"),model,fixed=T)
+        model <- sub("FIX",paste(c("env",paste0(c(fix.eff.marker,dom),":loc")),collapse="+"),model,fixed=T)
       }
     } else {
       model <- sub("FIX","env",model,fixed=T)
     }
   } else {
     model <- "asreml(data=data,fixed=BLUE~FIX-1,random=~RANDOM,residual=~id(env.id):us(Trait)"
-    if (n.mark > 0) {
-      model <- sub("FIX",paste(paste0(c("env",fix.eff.marker),":Trait"),collapse="+"),model,fixed=T)
+    if (n.mark > 0 | dominance) {
+      model <- sub("FIX",paste(paste0(c("env",fix.eff.marker,dom),":Trait"),collapse="+"),model,fixed=T)
     } else {
       model <- sub("FIX","env:Trait",model,fixed=T)
     }
@@ -152,24 +188,45 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     }
   } else {
     if (n.trait > 1) {
-      if (n.trait==2) {
-        random.effects <- "id:corh(Trait)+vm(id,source=asremlG,singG='PSD'):corh(Trait)"
-      } else {
-        random.effects <- "id:us(Trait)+vm(id,source=asremlG,singG='PSD'):us(Trait)"
-      }
-    } else {
-      if (n.loc > 1) {
-        if (n.loc==2) {
-          random.effects <- "id:corh(loc)+vm(id,source=asremlG,singG='PSD'):corh(loc)"
+      if (!dominance) {
+        if (n.trait==2) {
+          random.effects <- "id:corh(Trait)+vm(id,source=asremlG,singG='PSD'):corh(Trait)"
         } else {
-          random.effects <- "id:corh(loc)+vm(id,source=asremlG,singG='PSD'):fa(loc,2)"
+          random.effects <- "id:us(Trait)+vm(id,source=asremlG,singG='PSD'):us(Trait)"
         }
       } else {
-        random.effects <- "id+vm(id,source=asremlG,singG='PSD')"
+        if (n.trait==2) {
+          random.effects <- "vm(id,source=asremlD):corh(Trait)+vm(id,source=asremlG,singG='PSD'):corh(Trait)"
+        } else {
+          random.effects <- "vm(id,source=asremlD):us(Trait)+vm(id,source=asremlG,singG='PSD'):us(Trait)"
+        }
+      }
+    } else {
+      if (!dominance) {
+        if (n.loc > 1) {
+          if (n.loc==2) {
+            random.effects <- "id:corh(loc)+vm(id,source=asremlG,singG='PSD'):corh(loc)"
+          } else {
+            random.effects <- "id:corh(loc)+vm(id,source=asremlG,singG='PSD'):fa(loc,2)"
+          }
+        } else {
+          random.effects <- "id+vm(id,source=asremlG,singG='PSD')"
+        }
+      } else {
+        if (n.loc > 1) {
+          if (n.loc==2) {
+            random.effects <- "vm(id,source=asremlD):corh(loc)+vm(id,source=asremlG,singG='PSD'):corh(loc)"
+          } else {
+            random.effects <- "vm(id,source=asremlD):corh(loc)+vm(id,source=asremlG,singG='PSD'):fa(loc,2)"
+          }
+        } else {
+          random.effects <- "vm(id,source=asremlD)+vm(id,source=asremlG,singG='PSD')"
+        }
       }
     }
   }
   
+  n.gE <- nrow(data)/n.trait
   if (!is.null(vcov)) {
     stopifnot(is.list(vcov))
     stopifnot(envs %in% names(vcov))
@@ -195,39 +252,18 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     dimnames(.GlobalEnv$asremlOmega) <- list(unlist(dname),unlist(dname))
     attr(.GlobalEnv$asremlOmega,"INVERSE") <- TRUE
     
-    #Calculate meanOmega
-    tmp <- expand.grid(1:n.trait,1:n.trait)
-    tmp <- tmp[tmp$Var1 <= tmp$Var2,]
-    tmp$band <- tmp$Var2-tmp$Var1
-    tmp <- tmp[order(tmp$band,tmp$Var1),]
-    
-    eid.names <- lapply(dname,function(x){
-      tmp <- sapply(strsplit(x,split=":",fixed=T),function(u){paste(u[1:2],collapse=":")})
-      return(unique(tmp))
-    })
-    n.eid <- sapply(eid.names,length)
-    meanOmega <- array(0,dim=c(n.trait,n.trait,sum(n.eid)),dimnames=list(traits,traits,unlist(eid.names)))
-    
-    for (j in 1:n.env) {
-      for (k in 1:nrow(tmp)) {
-        z <- rep(FALSE,n.trait)
-        z[tmp$Var1[k]] <- TRUE
-        z <- rep(z,n.eid[j])[1:(n.eid[j]*n.trait-tmp$band[k])]
-        y <- 1:length(z)
-        meanOmega[tmp$Var1[k],tmp$Var2[k],eid.names[[j]]] <- (omega.list[[j]][cbind(y,y+tmp$band[k])])[z]
+    Omega <- bdiag(omega.list)
+    ix <- split(1:(n.gE*n.trait),rep(1:n.trait,times=n.gE))
+    for (i in 1:n.trait) 
+      for (j in i:n.trait) {
+        Omega_ij <- Omega[ix[[i]],ix[[j]]]
+        vars[i,j,"Stage1.error"] <- mean(diag(Omega_ij)) - mean(Omega_ij)
       }
-    }
-    id.names <- sapply(strsplit(unlist(eid.names),split=":",fixed=T),"[[",2)
-    meanOmega <- apply(meanOmega,c(1,2),function(x){mean(tapply(x,id.names,mean))})
-    tmp <- diag(meanOmega)
-    meanOmega <- meanOmega + t(meanOmega)
-    diag(meanOmega) <- tmp
-  } else {
-    meanOmega <- matrix(NA,nrow=0,ncol=0)
   }
-  
+
   asreml::asreml.options(workspace=workspace,maxit=30,trace=!silent)
   model <- sub(pattern="RANDOM",replacement=random.effects,model,fixed=T)
+
   start.table <- eval(parse(text=paste0(model,",start.values = TRUE)")))$vparameters.table
   if (!is.null(vcov)) {
     k <- grep("Omega",start.table$Component,fixed=T)
@@ -235,7 +271,9 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     start.table$Constraint[k] <- "F"
   }
   if (!is.null(geno) & (n.loc > 1)) {
-    k <- grep("id:loc!loc!cor",start.table$Component,fixed=T)
+    k <- grep(":loc!loc!cor",start.table$Component,fixed=T)
+    k2 <- grep("asremlG",start.table$Component,fixed=T)
+    k <- setdiff(k,k2)
     start.table$Value[k] <- 0.9999
     start.table$Constraint[k] <- "F"
   }
@@ -251,59 +289,63 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
   }
   
   sans <- summary(ans,coef=TRUE)
-  if (n.loc > 1) {
-    out <- vector("list",5)
-    names(out) <- c("aic","vars","fixed","random","uniplot")
-  } else {
-    out <- vector("list",4)
-    names(out) <- c("aic","vars","fixed","random")
-  }
   out$aic <- as.numeric(sans$aic)
+  
+  B <- matrix(0,nrow=n.trait,ncol=n.trait)
+  dimnames(B) <- list(traits,traits)
   
   #fixed effects
   if (n.trait==1) {
     beta <- sans$coef.fixed
-    rownames(beta) <- gsub("env_","",rownames(beta))
-    ix <- match(levels(data$env),rownames(beta))
+    beta.names <- rownames(beta)
+    beta.names <- gsub("env_","",beta.names)
+    ix <- match(levels(data$env),beta.names)
     out$fixed$env <- data.frame(env=levels(data$env),effect=as.numeric(beta[ix,1]))
+    vars[1,1,"env"] <- pvar(mu=out$fixed$env$effect,weights=as.numeric(table(data$env)))
   
-    if (n.mark > 0) {
-      var.x <- var(as.matrix(geno@coeff[,fix.eff.marker]))
+    if (dominance) {
+      ix <- grep("dom",beta.names,fixed=T)
       if (n.loc==1) {
-        ix <- match(fix.eff.marker,rownames(beta))
-        out$fixed$marker <- data.frame(marker=fix.eff.marker,effect=as.numeric(beta[ix,1]))
-        marker.cov <- array(beta[ix,1] * var.x %*% beta[ix,1],dim=c(1,1,n.mark),
-                            dimnames=list(traits,traits,fix.eff.marker))
+        vars[1,1,"heterosis"] <- pvar(mu=dom.covariate*beta[ix,1],weights=id.weights)
+        out$fixed$heterosis <- as.numeric(beta[ix,1])
       } else {
-        
-        beta.names <- rownames(beta)
+        beta.names[ix] <- gsub("loc_","",beta.names[ix])
+        beta.names[ix] <- gsub("dom","",beta.names[ix])
+        beta.names[ix] <- gsub(":","",beta.names[ix])
+        ix <- ix[match(locations,beta.names[ix])]
+        mu <- as.numeric(kronecker(matrix(dom.covariate,ncol=1),beta[ix,1]))
+        vars[1,1,"heterosis"] <- pvar(mu=mu,weights=gL.weights)
+        out$fixed$heterosis <- data.frame(loc=locations,effect=as.numeric(beta[ix,1]))
+      }
+    }
+    if (n.mark > 0) {
+      if (n.loc==1) {
+        ix <- match(fix.eff.marker,beta.names)
+        out$fixed$marker <- data.frame(marker=fix.eff.marker,effect=as.numeric(beta[ix,1]))
+        mu <- as.numeric(as.matrix(geno@coeff[id,fix.eff.marker])%*%beta[ix,1])
+        vars[1,1,"fixed.marker"] <- pvar(mu=mu,weights=id.weights)
+      } else {
         ix <- grep("loc_",beta.names)
         tmp <- strsplit(beta.names[ix],split=":",fixed=T)
-        beta.names <- sapply(tmp,function(z){
+        beta.names[ix] <- sapply(tmp,function(z){
           tmp2 <- apply(array(z),1,grep,pattern="loc_")
           paste(z[order(sapply(tmp2,length))],collapse=":")
         })
-        beta.names <- gsub("loc_","",beta.names)
-        loc.marker <- expand.grid(loc=locations,marker=fix.eff.marker,stringsAsFactors = FALSE)
+        beta.names[ix] <- gsub("loc_","",beta.names[ix])
+        loc.marker <- expand.grid(loc=locations,marker=fix.eff.marker,
+                                  stringsAsFactors = FALSE)
         loc.marker <- loc.marker[,c(2,1)]
         ix <- match(apply(loc.marker,1,paste,collapse=":"),beta.names)
         x <- out$fixed$marker <- data.frame(marker=loc.marker$marker,
                                        loc=loc.marker$loc,
                                        effect=as.numeric(beta[ix,1]))
-        
-        
-        marker.cov <- array(0,dim=c(n.loc,n.loc,n.mark),dimnames=list(traits,traits,fix.eff.marker))
-        for (i in 1:n.loc) {
-          for (j in 1:n.loc) {
-            lv <- matrix(x$effect[x$loc==locations[i]],ncol=1)
-            rv <- matrix(x$effect[x$loc==locations[j]],ncol=1)
-            marker.cov[i,j,] <- as.numeric(lv * var.x %*% rv)
-          }
-        }
+        mu_gL <- as.numeric(kronecker(as.matrix(geno@coeff[id,fix.eff.marker]),diag(n.loc))%*%beta[ix,1])
+        vars[1,1,"fixed.marker"] <- pvar(mu=mu_gL,weights=gL.weights) 
       }
     }
   } else {
-    #multi-trait
+    #multi-trait 
+    
     beta <- sans$coef.fixed
     ix <- grep("env_",rownames(beta),fixed=T)
     rownames(beta) <- gsub("env_","",rownames(beta))
@@ -312,20 +354,52 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     out$fixed$env <- data.frame(env=sapply(tmp,"[[",1),trait=sapply(tmp,"[[",2),
                                 effect=as.numeric(beta[ix,1]))
     
+    weights <- as.numeric(table(data$env[data$trait==traits[1]]))
+    weights <- weights/sum(weights)
+    for (i in 1:n.trait) {
+       for (j in i:n.trait) {
+        mu1 <- out$fixed$env$effect[out$fixed$env$trait==traits[i]]
+        mu2 <- out$fixed$env$effect[out$fixed$env$trait==traits[j]]
+        vars[i,j,"env"] <- sum(mu1*mu2*weights) - sum(mu1*weights)*sum(mu2*weights)
+      }
+    }
+
+    if (dominance) {
+      gamma <- (geno@ploidy/2 - 1)/(geno@ploidy - 1)
+      ix <- grep("dom",rownames(beta),fixed=T)
+      out$fixed$heterosis <- data.frame(trait=traits,effect=as.numeric(beta[ix,1]))
+      
+      weights <- id.weights/sum(id.weights)
+      for (i in 1:n.trait) 
+        for (j in i:n.trait) {
+          mu1d <- beta[ix[i],1]*dom.covariate
+          mu2d <- beta[ix[j],1]*dom.covariate
+          vars[i,j,"heterosis"] <- sum(mu1d*mu2d*weights) - sum(mu1d*weights)*sum(mu2d*weights)
+          B[j,i] <- B[i,j] <- gamma^2*(mean(mu1d*mu2d) - mean(mu1d)*mean(mu2d))
+        }
+    } else {
+      gamma <- 0
+    }
+
     if (n.mark > 0) {
-      var.x <- var(as.matrix(geno@coeff[,fix.eff.marker,drop=FALSE]))
       trait.marker <- expand.grid(trait=traits,marker=fix.eff.marker,stringsAsFactors = FALSE)
       ix <- match(apply(trait.marker,1,paste,collapse=":"),rownames(beta))
       x <- out$fixed$marker <- data.frame(marker=trait.marker$marker,
                                        trait=trait.marker$trait,
                                        effect=as.numeric(beta[ix,1]))
-      
-      marker.cov <- array(0,dim=c(n.trait,n.trait,n.mark),dimnames=list(traits,traits,fix.eff.marker))
+      weights <- id.weights/sum(id.weights)
       for (i in 1:n.trait) {
-        for (j in 1:n.trait) {
-          lv <- matrix(x$effect[x$trait==traits[i]],ncol=1)
-          rv <- matrix(x$effect[x$trait==traits[j]],ncol=1)
-          marker.cov[i,j,] <- as.numeric(lv * var.x %*% rv)
+        for (j in i:n.trait) {
+          b1 <- matrix(x[x$trait==traits[i],"effect"],ncol=1)
+          mu1 <- as.numeric(as.matrix(geno@coeff[id,fix.eff.marker])%*%b1)
+          b2 <- matrix(x[x$trait==traits[j],"effect"],ncol=1)
+          mu2 <- as.numeric(as.matrix(geno@coeff[id,fix.eff.marker])%*%b2)
+          vars[i,j,"fixed.marker"] <- sum(mu1*mu2*weights) - sum(mu1*weights)*sum(mu2*weights)
+          if (dominance) {
+            mu1 <- mu1+gamma*mu1d
+            mu2 <- mu2+gamma*mu2d
+          }
+          B[j,i] <- B[i,j] <- mean(mu1*mu2) - mean(mu1)*mean(mu2)
         }
       }
     }
@@ -333,13 +407,23 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     
   #variances 
   vc <- sans$varcomp
-  vc <- vc[-which(vc$bound=="F" & round(vc$component)==1L),c("component","std.error")]
+  vc <- vc[-which(vc$bound=="F" & round(vc$component)==1L),]
   vc.names <- rownames(vc)
+  
+  Imat <- Diagonal(n=n,x=1)
+  dimnames(Imat) <- list(id,id)
   
   if (n.trait==1) {
     resid.vc <- Matrix(vc[grep("units",vc.names,fixed=T),1],ncol=1)
+    
     if (n.loc > 1) {
       rownames(resid.vc) <- locations
+      if (!is.null(vcov)) {
+        vars[1,1,"g x env"] <- pvar(V=diag(as.numeric(resid.vc)),weights=loc.weights)
+      } else {
+        vars[1,1,"residual"] <- pvar(V=diag(as.numeric(resid.vc)),weights=loc.weights)
+      }
+      
       if (is.null(geno)) {
         if (n.loc > 2) {
           iz <- grep("id:fa",vc.names,fixed=T)
@@ -347,41 +431,128 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
           iz <- grep("id:loc",vc.names,fixed=T)
         }
         cov.ans <- f.cov.loc(vc=vc[iz,],locations)
-        g.resid.vc <- cov.ans$cov.mat
-        add.vc <- Matrix(NA,nrow=0,ncol=0)
+        g.iid.vc <- cov.ans$cov.mat
+        dom.vc <- add.vc <- Matrix(NA,nrow=0,ncol=0)
+        vars[1,1,"genotype"] <- mean(g.iid.vc[upper.tri(g.iid.vc,diag=FALSE)])*(1 - 1/n)
+        
+        K <- kronecker(Imat,g.iid.vc,make.dimnames = T)
+        vars[1,1,"g x loc"] <- pvar(V=K,weights=gL.weights) - vars[1,1,"genotype"]
+        
       } else {
-        g.resid.vc <- Matrix(vc[grep("id:loc",vc.names,fixed=T),1],ncol=1)
-        rownames(g.resid.vc) <- locations
         cov.ans <- f.cov.loc(vc[grep("source = asremlG",vc.names,fixed=T),],locations)
         add.vc <- cov.ans$cov.mat
+        vars[1,1,"additive"] <- mean(add.vc[upper.tri(add.vc,diag=FALSE)]) * meanG
+        K <- kronecker(.GlobalEnv$asremlG,add.vc,make.dimnames = T)
+        vars[1,1,"add x loc"] <- pvar(V=K,weights=gL.weights) - vars[1,1,"additive"]
+        
+        if (!dominance) {
+          tmp <- Matrix(vc[grep("id:loc",vc.names,fixed=T),1],ncol=1)
+          rownames(tmp) <- locations
+          g.iid.vc <- coerce_dpo(tcrossprod(sqrt(tmp)))
+          K <- kronecker(Imat,g.iid.vc,make.dimnames = T)
+          vars[1,1,"g.resid"] <- pvar(V=K,weights=gL.weights)
+          dom.vc <- Matrix(NA,nrow=0,ncol=0)
+        } else {
+          tmp <- Matrix(vc[grep("source = asremlD):loc",vc.names,fixed=T),1],ncol=1)
+          rownames(tmp) <- locations
+          dom.vc <- coerce_dpo(tcrossprod(sqrt(tmp)))
+          K <- kronecker(.GlobalEnv$asremlD,dom.vc,make.dimnames = T)
+          vars[1,1,"dominance"] <- pvar(V=K,weights=gL.weights)
+          g.iid.vc <- Matrix(NA,nrow=0,ncol=0)
+        }
+        
       }
       out$uniplot <- cov.ans$plot
+      
     } else {
-      g.resid.vc <- Matrix(vc["id",1],ncol=1)
-      if (!is.null(geno)) {
-        add.vc <- Matrix(vc[grep("source = asremlG",vc.names,fixed=T),1],ncol=1)
+      
+      #one location
+      if (!is.null(vcov)) {
+        vars[1,1,"g x env"] <- as.numeric(resid.vc)*(1 - 1/n.gE)
       } else {
-        add.vc <- Matrix(NA,nrow=0,ncol=0)
+        vars[1,1,"residual"] <- as.numeric(resid.vc)*(1 - 1/n.gE)
+      }
+      
+      if (is.null(geno)) {
+        dom.vc <- add.vc <- Matrix(NA,nrow=0,ncol=0)
+        g.iid.vc <- Matrix(vc["id",1],ncol=1)
+        vars[1,1,"genotype"] <- as.numeric(g.iid.vc)*(1 - 1/n)
+      } else {
+        add.vc <- Matrix(vc[grep("source = asremlG",vc.names,fixed=T),1],ncol=1)
+        vars[1,1,"additive"] <- as.numeric(add.vc)*meanG
+        if (!dominance) {
+          g.iid.vc <- Matrix(vc["id",1],ncol=1)
+          dom.vc <- Matrix(NA,nrow=0,ncol=0)
+          vars[1,1,"g.resid"] <- as.numeric(g.iid.vc)*(1 - 1/n)
+        } else {
+          dom.vc <- Matrix(vc[grep("source = asremlD",vc.names,fixed=T),1],ncol=1)
+          g.iid.vc <- Matrix(NA,nrow=0,ncol=0)
+          vars[1,1,"dominance"] <- as.numeric(dom.vc)*meanD
+        }
       }
     }
   } else {
     #multi-trait
+    
     iv <- grep("env.id:Trait!",vc.names,fixed=T)
     resid.vc <- f.cov.trait(vc[iv,],traits,us=TRUE)
-    vc <- vc[-iv,]
-    iv <- grep("id:Trait!",rownames(vc),fixed=T)
-    g.resid.vc <- f.cov.trait(vc[iv,],traits,us=(n.trait>2))
+    if (!is.null(vcov)) {
+      tmp <- "g x env"
+    } else {
+      tmp <- "residual"
+    }
+    
+    for (i in 1:n.trait)
+      for (j in i:n.trait) 
+        vars[i,j,tmp] <- resid.vc[i,j]*(1 - 1/n.gE)
+    
     vc <- vc[-iv,]
     if (is.null(geno)) {
-      add.vc <- Matrix(NA,nrow=0,ncol=0)
+      dom.vc <- add.vc <- Matrix(NA,nrow=0,ncol=0)
+      g.iid.vc <- f.cov.trait(vc[grep("id:Trait!",rownames(vc),fixed=T),],
+                              traits,us=(n.trait>2))
+      for (i in 1:n.trait)
+        for (j in i:n.trait)
+          vars[i,j,"genotype"] <- g.iid.vc[i,j]*(1 - 1/n)
+      
     } else {
-      add.vc <- f.cov.trait(vc,traits,us=(n.trait>2))
+      add.vc <- f.cov.trait(vc[grep("source = asremlG",rownames(vc),fixed=T),],
+                            traits,us=(n.trait>2))
+      for (i in 1:n.trait) 
+        for (j in i:n.trait) 
+          vars[i,j,"additive"] <- add.vc[i,j]*meanG
+      
+      if (!dominance) {
+        g.iid.vc <- f.cov.trait(vc[grep("id:Trait!",rownames(vc),fixed=T),],
+                              traits,us=(n.trait>2))
+        dom.vc <- Matrix(NA,nrow=0,ncol=0)
+        for (i in 1:n.trait) 
+          for (j in i:n.trait) 
+            vars[i,j,"g.resid"] <- g.iid.vc[i,j]*(1 - 1/n)
+        
+      } else {
+        dom.vc <- f.cov.trait(vc[grep("source = asremlD",rownames(vc),fixed=T),],
+                            traits,us=(n.trait>2))
+        g.iid.vc <- Matrix(NA,nrow=0,ncol=0)
+        for (i in 1:n.trait) 
+          for (j in i:n.trait) 
+            vars[i,j,"dominance"] <- dom.vc[i,j]*meanD
+        
+      }
     }
   }
   
-  out$vars <- new(Class="class_var",add=add.vc,g.resid=g.resid.vc,resid=resid.vc,
-                  meanG=meanG,meanOmega=meanOmega,
-                  fixed.marker.cov=marker.cov)
+  if (n.mark==0)
+    fix.eff.marker <- character(0)
+  
+  if (n.trait > 1) {
+    for (i in 1:11) 
+      vars[,,i][lower.tri(vars[,,i])] <- vars[,,i][upper.tri(vars[,,i])]
+  }
+  
+  out$vars <- new(Class="class_var",add=add.vc,g.iid=g.iid.vc,
+                  dom=dom.vc,resid=resid.vc,diagG=diagG,diagD=diagD,
+                  vars=vars,B=B,fix.eff.marker=fix.eff.marker)
   
   #random effects
   if (n.trait==1) {
@@ -389,15 +560,27 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     if (n.loc > 1) {
       id.loc.names <- expand.grid(loc=locations,id=id,stringsAsFactors = F)[,c(2,1)]
       if (!is.null(geno)) {
-        id.loc <- expand.grid(paste0("loc_",locations),paste0("id_",id),stringsAsFactors = F)[,c(2,1)]
-        ix2 <- match(apply(id.loc,1,paste,collapse=":"),rownames(u))
         if (n.loc==2) {
-          id.loc <- expand.grid(paste0("loc_",locations),paste0("vm(id, source = asremlG, singG = \"PSD\")_",id),stringsAsFactors = F)[,c(2,1)]
+          id.loc <- expand.grid(paste0("loc_",locations),
+                                paste0("vm(id, source = asremlG, singG = \"PSD\")_",id),
+                                stringsAsFactors = F)[,c(2,1)]
         } else {
-          id.loc <- expand.grid(paste0("fa(loc, 2)_",locations),paste0("vm(id, source = asremlG, singG = \"PSD\")_",id),stringsAsFactors = F)[,c(2,1)]
+          id.loc <- expand.grid(paste0("fa(loc, 2)_",locations),
+                                paste0("vm(id, source = asremlG, singG = \"PSD\")_",id),
+                                stringsAsFactors = F)[,c(2,1)]
         }
         ix1 <- match(apply(id.loc,1,paste,collapse=":"),rownames(u))
-        out$random <- data.frame(id.loc.names,add=as.numeric(u[ix1,1]),g.resid=as.numeric(u[ix2,1]))
+        if (!dominance) {
+          id.loc <- expand.grid(paste0("loc_",locations),
+                                paste0("id_",id),stringsAsFactors = F)[,c(2,1)]
+          ix2 <- match(apply(id.loc,1,paste,collapse=":"),rownames(u))
+          out$random <- data.frame(id.loc.names,add=as.numeric(u[ix1,1]),g.iid=as.numeric(u[ix2,1]))
+        } else {
+          id.loc <- expand.grid(paste0("loc_",locations),
+                                paste0("vm(id, source = asremlD)_",id),stringsAsFactors = F)[,c(2,1)]
+          ix2 <- match(apply(id.loc,1,paste,collapse=":"),rownames(u))
+          out$random <- data.frame(id.loc.names,add=as.numeric(u[ix1,1]),dom=as.numeric(u[ix2,1]))
+        }
       } else {
         if (n.loc==2) {
           id.loc <- expand.grid(paste0("loc_",locations),paste0("id_",id),stringsAsFactors = F)[,c(2,1)]
@@ -405,31 +588,46 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
           id.loc <- expand.grid(paste0("fa(loc, 2)_",locations),paste0("id_",id),stringsAsFactors = F)[,c(2,1)]
         }
         ix <- match(apply(id.loc,1,paste,collapse=":"),rownames(u))
-        out$random <- data.frame(id.loc.names,value=as.numeric(u[ix,1]))
+        out$random <- data.frame(id.loc.names,g.iid=as.numeric(u[ix,1]))
       }
     } else {
       if (!is.null(geno)) {
         ix1 <- match(paste("vm(id, source = asremlG, singG = \"PSD\")",id,sep="_"),rownames(u))
-        ix2 <- match(paste("id",id,sep="_"),rownames(u))
-        out$random <- data.frame(id=id,add=as.numeric(u[ix1,1]),g.resid=as.numeric(u[ix2,1]))
+        if (!dominance) {
+          ix2 <- match(paste("id",id,sep="_"),rownames(u))
+          out$random <- data.frame(id=id,add=as.numeric(u[ix1,1]),g.iid=as.numeric(u[ix2,1]))
+        } else {
+          ix2 <- match(paste("vm(id, source = asremlD)",id,sep="_"),rownames(u))
+          out$random <- data.frame(id=id,add=as.numeric(u[ix1,1]),dom=as.numeric(u[ix2,1]))
+        }
       } else {
         ix <- match(paste("id",id,sep="_"),rownames(u))
-        out$random <- data.frame(id=id,value=as.numeric(u[ix,1]))
+        out$random <- data.frame(id=id,g.iid=as.numeric(u[ix,1]))
       }
     }
   } else {
     #multi-trait
     u <- sans$coef.random 
     id.trait.names <- expand.grid(trait=traits,id=id,stringsAsFactors = F)[,c(2,1)]
-    id.trait <- expand.grid(paste0("Trait_",traits),paste0("id_",id),stringsAsFactors = F)[,c(2,1)]
-    ix <- match(apply(id.trait,1,paste,collapse=":"),rownames(u))
+    
     if (is.null(geno)) {
-      out$random <- data.frame(id.trait.names,value=as.numeric(u[ix,1]))
+      id.trait <- expand.grid(paste0("Trait_",traits),paste0("id_",id),stringsAsFactors = F)[,c(2,1)]
+      ix <- match(apply(id.trait,1,paste,collapse=":"),rownames(u))
+      out$random <- data.frame(id.trait.names,g.iid=as.numeric(u[ix,1]))
     } else {
-      id.trait2 <- expand.grid(paste0("Trait_",traits),paste0("vm(id, source = asremlG, singG = \"PSD\")_",id),
-                               stringsAsFactors = F)[,c(2,1)]
-      ix2 <- match(apply(id.trait2,1,paste,collapse=":"),rownames(u))
-      out$random <- data.frame(id.trait.names,add=as.numeric(u[ix2,1]),g.resid=as.numeric(u[ix,1]))
+      id.trait <- expand.grid(paste0("Trait_",traits),paste0("vm(id, source = asremlG, singG = \"PSD\")_",id),
+                              stringsAsFactors = F)[,c(2,1)]
+      ix1 <- match(apply(id.trait,1,paste,collapse=":"),rownames(u))
+      if (!dominance) {
+        id.trait <- expand.grid(paste0("Trait_",traits),paste0("id_",id),stringsAsFactors = F)[,c(2,1)]
+        ix2 <- match(apply(id.trait,1,paste,collapse=":"),rownames(u))
+        out$random <- data.frame(id.trait.names,add=as.numeric(u[ix1,1]),g.iid=as.numeric(u[ix2,1]))
+      } else {
+        id.trait <- expand.grid(paste0("Trait_",traits),paste0("vm(id, source = asremlD)_",id),
+                                stringsAsFactors = F)[,c(2,1)]
+        ix2 <- match(apply(id.trait,1,paste,collapse=":"),rownames(u))
+        out$random <- data.frame(id.trait.names,add=as.numeric(u[ix1,1]),dom=as.numeric(u[ix2,1]))
+      }
     }
   }
   
@@ -437,6 +635,8 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,silent=TRUE,work
     rm("asremlG",envir = .GlobalEnv)
   if (!is.null(vcov))
     rm("asremlOmega",envir = .GlobalEnv)
+  if (dominance)
+    rm("asremlD",envir = .GlobalEnv)
   
   return(out)
 }

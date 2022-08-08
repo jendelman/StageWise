@@ -10,7 +10,8 @@ Stage2(
   geno = NULL,
   fix.eff.marker = NULL,
   silent = TRUE,
-  workspace = "500mb"
+  workspace = "500mb",
+  dominance = FALSE
 )
 }
 \arguments{
@@ -25,12 +26,14 @@ Stage2(
 \item{silent}{TRUE/FALSE, whether to suppress ASReml-R output}
 
 \item{workspace}{Memory limit for ASRreml-R variance estimation}
+
+\item{dominance}{TRUE/FALSE}
 }
 \value{
 List containing
 \describe{
 \item{aic}{AIC}
-\item{vars}{variances, as variable of class \code{\link{class_var}}}
+\item{vars}{variance components for \code{\link{blup_prep}}, as variable of class \code{\link{class_var}}}
 \item{fixed}{Fixed effect estimates for env and markers}
 \item{random}{Random effect predictions}
 \item{uniplot}{uniplot of the genetic correlation between locations}
@@ -40,7 +43,7 @@ List containing
 Stage 2 analysis of multi-environment trials
 }
 \details{
-Stage 2 of the two-stage approach described by Damesa et al. 2017, using ASReml-R for variance component estimation. The variable \code{data} has three mandatory column: id, env, BLUE. Optionally, \code{data} can have a column labeled "loc", which changes the main effect for genotype into a separable genotype-within-location effect, using a FA2 covariance model for the locations. Optionally, \code{data} can have a column labeled "trait", which uses an unstructured covariance model. The multi-location and multi-trait analyses cannot be combined. Missing data are allowed in the multi-trait but not the single-trait analysis. The argument \code{geno} is used to partition genetic values into additive and non-additive (g.resid) components. Any individuals in \code{data} that are not present in \code{geno} are discarded. 
+Stage 2 of the two-stage approach described by Damesa et al. 2017, using ASReml-R for variance component estimation. The variable \code{data} has three mandatory column: id, env, BLUE. Optionally, \code{data} can have a column labeled "loc", which changes the main effect for genotype into a separable genotype-within-location effect, using a FA2 covariance model for the locations. Optionally, \code{data} can have a column labeled "trait", which uses an unstructured covariance model. The multi-location and multi-trait analyses cannot be combined. Missing data are allowed in the multi-trait but not the single-trait analysis. The argument \code{geno} is used to partition genetic values into additive and non-additive components. Any individuals in \code{data} that are not present in \code{geno} are discarded. 
 
 The argument \code{vcov} is used to partition the macro- and micro-environmental variation, which are called GxE and residual in the output. \code{vcov} is a named list of variance-covariance matrices for the BLUEs within each environment, with id for rownames (single trait) or id:trait. The order in \code{vcov} and \code{data} should match. Both \code{data} and \code{vcov} can be created using the function \code{\link{Stage1}}. 
 

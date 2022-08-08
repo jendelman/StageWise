@@ -1,3 +1,30 @@
+sigdig <- function(x,digits=3) {
+  m <- digits - ceiling(log10(max(abs(x),na.rm=T)))
+  if (m > 0) {
+    round(x,m)
+  } else {
+    signif(round(x),digits)
+  }
+}
+
+pvar <- function(mu=0,V=NULL,weights=NULL) {
+  if (!is.null(V)) {
+    n <- nrow(V)
+  } else {
+    n <- length(mu)
+  }
+  if (is.null(weights)) {    
+    weights <- rep(1,n)
+  } 
+  weights <- weights/sum(weights)
+  if (!is.null(V)) {
+    x <- sum(diag(V)*weights) - matrix(weights,nrow=1)%*%V%*%matrix(weights,ncol=1) + sum(mu^2*weights) - sum(mu*weights)^2
+  } else {
+    x <- sum(mu^2*weights) - sum(mu*weights)^2
+  }
+  as.numeric(x)
+}
+
 kron <- function(eigen.A, B) {
   #returns Q such that QtQ is solution
   eigen.B <- eigen(B)
@@ -68,21 +95,6 @@ coerce_dpo <- function(x) {
   }
 }
 
-partition <- function(x) {
-  Va <- mean(x[upper.tri(x,diag=F)])
-  Va <- max(0,Va)
-  VaL <- mean(diag(x)) - Va
-  return(c(Va,VaL))
-}
-
-f.id <- function(vc,lvls,keyword) {
-  vcnames <- rownames(vc)
-  ix1 <- grep(keyword,vcnames,fixed=T)
-  ix2 <- lapply(as.list(lvls),grep,x=vcnames,fixed=T)
-  ix <- sapply(ix2,intersect,y=ix1)
-  return(vc[ix,1])
-}
-
 f.cov.trait <- function(vc,traits,us) {
   n.trait <- length(traits)
   if (us)  {
@@ -101,7 +113,9 @@ f.cov.trait <- function(vc,traits,us) {
     iu <- apply(array(traits),1,grep,x=rownames(vc),fixed=T)
     cov.mat <- diag(vc[iu,1])
     dimnames(cov.mat) <- list(traits,traits)
-    cov.mat[1,2] <- cov.mat[2,1] <- vc[1,1]*sqrt(vc[iu[1],1]*vc[iu[2],1])
+    if (vc[1,4]!="B") {
+      cov.mat[1,2] <- cov.mat[2,1] <- vc[1,1]*sqrt(vc[iu[1],1]*vc[iu[2],1])
+    }
   }
   return(coerce_dpo(cov.mat))
 }

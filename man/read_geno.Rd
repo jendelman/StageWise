@@ -42,7 +42,7 @@ G can be blended with the pedigree relationship matrix (A) by providing a pedigr
 
 If the A matrix is not used, then G is blended with the identity matrix (times the mean diagonal of G) to improve numerical conditioning for matrix inversion. The default for w is 1e-5, which is somewhat arbitrary and based on tests with the vignette dataset. 
 
-When \code{dominance=FALSE}, non-additive effects are captured using a residual genetic effect, with zero covariance. If \code{dominance=TRUE}, a (digenic) dominance covariance matrix D is used instead. 
+When \code{dominance=FALSE}, non-additive effects are captured using a residual genetic effect, with zero covariance. If \code{dominance=TRUE}, a (digenic) dominance covariance matrix is used instead. 
 
 The argument \code{min.minor.allele} specifies the minimum number of individuals that must contain the minor allele. Markers that do not meet this threshold are discarded.
 }

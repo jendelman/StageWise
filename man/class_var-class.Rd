@@ -13,14 +13,20 @@ S4 class for variances
 \describe{
 \item{\code{add}}{additive}
 
-\item{\code{g.resid}}{genetic residual}
+\item{\code{g.iid}}{iid genotype effect}
+
+\item{\code{dom}}{dominance}
 
 \item{\code{resid}}{residual}
 
-\item{\code{meanG}}{mean of diagonal of G}
+\item{\code{diagG}}{average diagonal element of the G matrix}
 
-\item{\code{meanOmega}}{mean of diagonal of Omega}
+\item{\code{diagD}}{average diagonal element of the D matrix}
 
-\item{\code{fixed.marker.cov}}{contribution of marker fixed effects to additive covariance between locations}
+\item{\code{vars}}{variances for reporting}
+
+\item{\code{B}}{var-cov matrix of fixed effects for gain}
+
+\item{\code{fix.eff.marker}}{names of fixed effect markers}
 }}
 

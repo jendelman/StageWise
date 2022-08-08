@@ -1,15 +1,24 @@
 #' S4 class for variances
 #' 
 #' @slot add additive
-#' @slot g.resid genetic residual
+#' @slot g.iid iid genotype effect
+#' @slot dom dominance 
 #' @slot resid residual
-#' @slot meanG mean of diagonal of G
-#' @slot meanOmega mean of diagonal of Omega
-#' @slot fixed.marker.cov contribution of marker fixed effects to additive covariance between locations
+#' @slot diagG average diagonal element of the G matrix
+#' @slot diagD average diagonal element of the D matrix
+#' @slot vars variances for reporting
+#' @slot B var-cov matrix of fixed effects for gain
+#' @slot fix.eff.marker names of fixed effect markers
 #' 
 #' @import methods
 #' @import Matrix
 #' @export
-class_var <- setClass("class_var",slots=c(add="Matrix",g.resid="Matrix",resid="Matrix",
-                                            meanG="numeric",meanOmega="matrix",
-                                            fixed.marker.cov="array"))
+class_var <- setClass("class_var",slots=c(add="Matrix",
+                                          g.iid="Matrix",
+                                          dom="Matrix",
+                                          resid="Matrix",
+                                          diagG="numeric",
+                                          diagD="numeric",
+                                          vars="array",
+                                          B="matrix",
+                                          fix.eff.marker="character"))
