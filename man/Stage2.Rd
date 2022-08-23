@@ -36,7 +36,7 @@ List containing
 \item{vars}{variance components for \code{\link{blup_prep}}, as variable of class \code{\link{class_var}}}
 \item{fixed}{Fixed effect estimates for env and markers}
 \item{random}{Random effect predictions}
-\item{uniplot}{uniplot of the genetic correlation between locations}
+\item{loadings}{scaled loadings for the FA2 multi-loc model}
 }
 }
 \description{

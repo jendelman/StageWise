@@ -27,7 +27,9 @@ pvar <- function(mu=0,V=NULL,weights=NULL) {
 
 kron <- function(eigen.A, B) {
   #returns Q such that QtQ is solution
-  eigen.B <- eigen(B)
+  #eigen.B <- eigen(B)
+  tmp <- svd(B)
+  eigen.B <- list(values=tmp$d,vectors=tmp$u)
   V1 <- kronecker(Diagonal(x=sqrt(eigen.A$values)),Diagonal(x=sqrt(eigen.B$values)))
   V1.inv <- kronecker(Diagonal(x=1/sqrt(eigen.A$values)),Diagonal(x=1/sqrt(eigen.B$values)))
   V2 <- as(Matrix(eigen.B$vectors,dimnames=list(rownames(B),rownames(B))),"dgeMatrix")
@@ -56,17 +58,6 @@ get_x <- function(map) {
   b <- c(0,apply(array(1:(n-1)),1,function(k){sum(a[1:k])}))
   x <- map[,2] + rep(b,times=m)
   return(x)
-}
-
-uniplot <- function(z) {
-  x <- seq(-1,1,by=0.01)
-  y1 <- sqrt(1-x^2)
-  y2 <- -y1
-  plot.data <- data.frame(name=rownames(z),x=z[,1],y=z[,2])
-  p <- ggplot(data=data.frame(x,y1,y2)) + geom_line(mapping=aes(x=.data$x,y=.data$y1),colour="red") + geom_line(mapping=aes(x=.data$x,y=.data$y2),colour="red") + theme_bw() + coord_fixed(ratio=1) +
-    geom_point(mapping=aes(x=.data$x,y=.data$y),data=plot.data) + xlab("") + ylab("") + 
-    theme(axis.text = element_blank(),axis.ticks = element_blank()) 
-  p + geom_text_repel(aes(x=.data$x,y=.data$y,label=.data$name),nudge_x=-0.1,plot.data,segment.colour="blue",force=2)
 }
 
 coerce_dpo <- function(x) {
@@ -139,9 +130,16 @@ f.cov.loc <- function(vc,locs) {
     fa.mat[,2] <- vc[ix,1]
     cov.mat <- tcrossprod(fa.mat) + psi
   }
+  
+  #rotate
+  tmp <- svd(fa.mat)
+  fa.mat <- tmp$u %*% diag(tmp$d)
+  #scale
   D <- diag(1/sqrt(diag(cov.mat)))
   dimnames(D) <- list(locs,locs)
-  return(list(cov.mat=coerce_dpo(cov.mat),plot=uniplot(D%*%fa.mat)))
+  
+  return(list(cov.mat=coerce_dpo(cov.mat),
+              loadings=D%*%fa.mat))
 }
 
 cov_to_cor <- function(x) {

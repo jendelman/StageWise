@@ -22,7 +22,7 @@ List containing
 \describe{
 \item{quad.mat}{quadratic matrix for the ellipsoid}
 \item{plot}{ellipse plot}
-\item{result}{data frame with gain and coefficients for the traits}
+\item{table}{data frame with gain and coefficients for the traits}
 }
 }
 \description{

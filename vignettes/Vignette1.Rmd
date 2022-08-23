@@ -44,8 +44,6 @@ The phenotypes for this tutorial are based on six years (2015-2020) of variety t
 
 * vine maturity (1=early to 9=late)
 
-* specific gravity
-
 * fry color, measured in units of Hunter Lightness (L) after 6 months of storage
 
 The data files also contain the stand count for each plot (out of 15 total plants), which is included as a covariate in the Stage 1 model. 
@@ -141,7 +139,7 @@ geno <- read_geno(filename=geno.file, ploidy=4, map=TRUE, min.minor.allele=5,
 
 The function `read_geno` computes genomic relationship matrices from the markers. At a minimum, the additive (G) matrix is computed. When `dominance=TRUE`, the dominance (D) matrix is also computed. These matrices and other information needed for the `Stage2` function are stored in the returned object as an S4 class. 
 
-The `summary` function returns a matrix with information about the G and (when present) D matrices. Column 1 is the diagonal elements of G. Column 2 is the diagonal elements of D. Column 3 contains the genomic inbreeding coefficients $F_g$ from the dominance matrix, which have an expected value of 1 for homozygous lines. The population mean $\overline F_g$ represents the deviation from panmictic (i.e., Hardy-Weinberg) proportions, and its mathematical relationship to the mean of the diagonal elements of G is identical to the mathematical relationship between the diagonal elements of the pedigree relationship matrix and the inbreeding coefficient based on kinship. For ploidy $\phi$, the formula is $\overline F_g = \frac{\overline G_{..} - 1}{\phi - 1}$. The result for $\overline F_g$ is negative for this tetraploid potato population, indicating there is excess heterozygosity, which may be expected when there is inbreeding depression. 
+The `summary` function returns a matrix with information about the G and (when present) D matrices. Column 1 is the diagonal elements of G, and Column 2 contains the genomic inbreeding coefficients $F_g$ from the dominance matrix, which have an expected value of 1 for homozygous lines. The population mean $\overline F_g$ represents the deviation from panmictic (i.e., Hardy-Weinberg) proportions, and its mathematical relationship to the mean of the diagonal elements of G is identical to the mathematical relationship between the diagonal elements of the pedigree relationship matrix and the inbreeding coefficient based on kinship. For ploidy $\phi$, the formula is $\overline F_g = \frac{\overline G_{..} - 1}{\phi - 1}$. The result for $\overline F_g$ is negative for this tetraploid potato population, indicating there is excess heterozygosity, which may be expected when there is inbreeding depression. 
 
 ```{r}
 x <- summary(geno)
@@ -180,14 +178,14 @@ ans2d <- Stage2(data=stage1.blue,vcov=stage1.vcov,geno=geno,
 data.frame(Dominance=c(FALSE,TRUE),AIC=c(ans2c$aic,ans2d$aic))
 ```
 
-Based on the AIC values, we select the model with dominance. To compare AIC values for models with marker data to models without marker data, one needs to ensure that all individuals analyzed in Stage1 are in the marker data file. Because Stage2 excludes ungenotyped individuals from the analysis, the populations will not be the same. In this potato dataset, there are 1294 clones in the phenotype file but only 944 with marker data. 
+Based on the AIC values, we select the model with dominance. To compare AIC values for models with marker data to models without marker data, one needs to ensure that all individuals analyzed in Stage1 are in the marker data file. Because Stage2 excludes ungenotyped individuals from the analysis, the populations will not be the same. In this potato dataset, there are 1294 clones in the phenotype file but only 943 with marker data. 
 
 ```{r}
 kable(summary(ans2c$vars))
 kable(summary(ans2d$vars))
 ```
 
-When dominance is not included, the variance table has rows for "additive" and "genotype", which is the iid residual genetic effect. The output for the dominance model includes rows for "dominance" and "heterosis"; the former is based on the variance of a random effect with zero mean, while the latter is due to the mean ([Varona et al. 2018](https://doi.org/10.3389/fgene.2018.00078)). The ability to estimate heterosis is limited by the lack of variation for inbreeding in the population.
+When dominance is not included, the variance table has rows for "additive" and "genotype", which is the iid residual genetic effect. The output for the dominance model includes rows for "dominance" and "heterosis"; the former is based on the variance of a random effect with zero mean, while the latter is due to the mean ([Varona et al. 2018](https://doi.org/10.3389/fgene.2018.00078)). 
 
 ### Pedigree data
 
@@ -238,19 +236,17 @@ ggplot(result) + geom_line(mapping=aes(x=w,y=h2)) + geom_line(mapping=aes(x=w,y=
 Based on the above figure, the blending parameter w=0.4 is chosen, at which there is no longer much dominance variance. The optimal value for w will not be the same for all traits. 
 
 ```{r}
-#Select w=0.5
 w.vec[3]
 genoH <- geno[[3]] 
 ans2H <- ans2[[3]]
 kable(summary(ans2H$vars))
 ```
 
-
 One last point about `Stage2`: the function returns the fixed effect estimates under "fixed", and the predicted random effects for the individuals in the training set are returned under "random". 
 
 ### BLUP Reliability
 
-The calculation of BLUPs is split into two functions: `blup_prep` and `blup`. The computationally intensive steps occur in `blup_prep`, which combines the phenotype and genotype information used in `Stage2` with the variance component estimates to estimate the var-cov matrix of the predicted random effects. The `blup` command is faster because it merely extracts the appropriate linear combination of predictions based on the argument "what", which has 5 possible values:
+The calculation of BLUPs is split into two functions: `blup_prep` and `blup`. The computationally intensive steps occur in `blup_prep`, which combines the phenotype and genotype information used in `Stage2` with the variance component estimates to estimate the var-cov matrix of the predicted random effects. The `blup` command extracts the appropriate linear combination of predictions based on the argument "what", which has 5 possible values:
 
 * AV = additive values 
 
@@ -330,18 +326,14 @@ plot.data <- merge(AV1, AV2, by="id")
 ggplot(plot.data,aes(x=value.x,y=value.y)) + geom_point() + xlab("RR-BLUP") + ylab("G-BLUP") + theme_bw()
 ```
 
-The marker effects can be standardized to compute GWAS -log10(p) scores that are equivalent to the traditional fixed effect method ([Duarte et al. (2014)](http://www.biomedcentral.com/1471-2105/15/246); [Bernal Rubio et al. 2016](https://doi.org/10.1111/age.12378)). This calculation is easily parallelized, and the argument `gwas.ncore` specifies how many cores to use (the default is 0, which skips computing the GWAS scores). The `gwas_threshold` command computes the -log10(p) threshold for QTL discovery based on an effective number of markers ([Moskvina and Schmidt, 2008](https://doi.org/10.1002/gepi.20331)), and `manhattan_plot` displays the result. For yield there were no significant QTL, so results for the vine maturity trait are shown instead. For this trait, the model with residual genetic effects was superior to the dominance model based on AIC.
+The marker effects can be standardized to compute GWAS -log10(p) scores that are equivalent to the traditional fixed effect method ([Duarte et al. (2014)](http://www.biomedcentral.com/1471-2105/15/246); [Bernal Rubio et al. 2016](https://doi.org/10.1111/age.12378)). This calculation is easily parallelized, and the argument `gwas.ncore` specifies how many cores to use (the default is 0, which skips computing the GWAS scores). The `gwas_threshold` command computes the -log10(p) threshold for QTL discovery based on an effective number of markers ([Moskvina and Schmidt, 2008](https://doi.org/10.1002/gepi.20331)), and `manhattan_plot` displays the result. For yield there were no significant QTL, so results for the vine maturity trait are shown instead. 
 
 ```{r,fig.height=3,fig.width=4}
 effects <- data.frame(name="block",fixed=FALSE,factor=TRUE)
 ans1vm <- Stage1(filename=pheno1a.file,traits="vine.maturity",
                 effects=effects,solver="asreml",silent=TRUE)
 ans2vm <- Stage2(data=ans1vm$blue, vcov=ans1vm$vcov, geno=geno[[1]], 
-                 dominance = FALSE)
-ans2vm.D <- Stage2(data=ans1vm$blue, vcov=ans1vm$vcov, geno=geno[[1]], 
                  dominance = TRUE)
-
-data.frame(Dominance=c(FALSE,TRUE),AIC=c(ans2vm$aic,ans2vm.D$aic))
 
 prep <- blup_prep(ans1vm$blue, ans1vm$vcov, geno[[1]], ans2vm$vars)
 gwas.ans <- blup(prep, geno[[1]], what="AM", gwas.ncore=2)
@@ -360,11 +352,7 @@ ans2vm.1 <- Stage2(data=ans1vm$blue,
                vcov=ans1vm$vcov,
                geno=geno[[1]],
                fix.eff.marker="solcap_snp_c2_22964")
-ans2vm.1$aic
-```
-The AIC decreased by 71 points when including the marker linked to *CDF1* as a fixed effect. 
 
-```{r}
 # Fixed effect for the marker
 ans2vm.1$fixed$marker
 
@@ -372,4 +360,4 @@ ans2vm.1$fixed$marker
 kable(summary(ans2vm.1$vars))
 ```
 
-The fixed effect estimate of -0.78 for solcap_snp_c2_22964 implies that, on average, each additional copy of the alternate allele reduced vine maturity by 0.78 (on a 1-9 visual scale). According to the proportion of variance table, the marker accounted for 0.124/(0.124 + 0.234) = 35% of the breeding value.
+The fixed effect estimate of -0.78 for solcap_snp_c2_22964 implies that, on average, each additional copy of the alternate allele reduced vine maturity by 0.78 (on a 1-9 visual scale). According to the proportion of variance table, the marker accounted for 0.123/(0.123 + 0.235) = 34% of the breeding value.

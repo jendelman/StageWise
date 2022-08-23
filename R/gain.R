@@ -14,7 +14,7 @@
 #' \describe{
 #' \item{quad.mat}{quadratic matrix for the ellipsoid}
 #' \item{plot}{ellipse plot}
-#' \item{result}{data frame with gain and coefficients for the traits}
+#' \item{table}{data frame with gain and coefficients for the traits}
 #' }
 #' 
 #' @import ggplot2
@@ -81,6 +81,8 @@ gain <- function(input,traits=NULL,coeff=NULL,restricted=NULL,solver="ECOS") {
     dimnames(quad.mat) <- list(trait.names,trait.names)
   } else {
     quad.mat <- input
+    trait.names <- rownames(quad.mat)
+    n.trait <- length(trait.names)
   } 
   
   if (!is.null(coeff)) {
@@ -94,6 +96,7 @@ gain <- function(input,traits=NULL,coeff=NULL,restricted=NULL,solver="ECOS") {
     constraints <- list(quad_form(x,quad.mat) <= 1)
     
     if (!is.null(restricted)) {
+      stopifnot(colnames(restricted)==c("trait","sign"))
       rest <- match(restricted$trait,trait.names,nomatch=0)
       if (any(rest==0))
         stop("Restricted trait names do not match input")
@@ -139,7 +142,7 @@ gain <- function(input,traits=NULL,coeff=NULL,restricted=NULL,solver="ECOS") {
     result <- data.frame(trait=trait.names,
                          response=round(x.opt,3),
                          coeff=round(c.opt,3))
-    out <- list(quad.mat=quad.mat,result=result)
+    out <- list(quad.mat=quad.mat,table=result)
   } else {
     out <- list(quad.mat=quad.mat)
   }

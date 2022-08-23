@@ -1,3 +1,8 @@
+Changes in 0.26
+* Updated vignette dataset
+* Stage2 returns factor loadings instead of uniplot (now public function)
+* renamed index.weights index.coeff in blup function
+
 Changes in 0.25
 * directional dominance
 * modified variance partitioning

@@ -14,7 +14,7 @@ knitr::opts_knit$set(root.dir="~/Box Sync/Endelman/Software/StageWise")
 load("~/Box Sync/Endelman/Software/StageWise/Vignette2.rda")
 ```
 
-This vignette builds on the information in [Vignette 1](https://jendelman.github.io/StageWise/Vignette1.html), which covered analysis at a single location. This vignette illustrates how to model the covariance between multiple locations, using a dataset of potato yield trials across 9 locations and 6 years and a population size of 336 genotypes ([Schmitz Carley et al. 2019](https://doi.org/10.2135/cropsci2018.05.0314)). 
+This vignette builds on the information in [Vignette 1](https://jendelman.github.io/StageWise/Vignette1.html), which covered analysis at a single location. This vignette illustrates how to model the covariance between multiple locations, using a dataset of potato yield trials across 8 locations (TX was excluded) and 6 years, with a population of 336 genotypes ([Schmitz Carley et al. 2019](https://doi.org/10.2135/cropsci2018.05.0314)). 
 
 ```{r}
 library(StageWise)
@@ -41,30 +41,28 @@ The above figure shows the variation in broad-sense heritability across location
 
 When the data frame of BLUEs passed to `Stage2` has a column labeled 'loc', genotype x location effects are included using a separable covariance structure. When marker data are included, the genetic covariance between locations for the additive effects follows a 2nd order factor-analytic (FA2) model. Based on experience with a few datasets, attempts to also model covariance between residual genetic effect were unsuccessful, so the correlation is constrained at 1 in the current implementation. If marker data are not included, the genetic covariance between locations follows the FA2 model. For large datasets with many locations (such as this one), I recommend first analyzing it without marker data, as the computation proceeds more quickly. 
 
-Here is a joint analysis of all 9 locations without using the marker data.
-```{r, eval=FALSE}
+Here is a joint analysis of the 8 locations without using the marker data.
+```{r,eval=FALSE}
 ans2a <- Stage2(data=ans1$blue, vcov=ans1$vcov)
 ```
 ```{r}
 summary(ans2a$vars)
 ```
 
-As in the single location analysis, running the `summary` command on the 'vars' output shows the partitioning of variance, but now a g x loc effect is also present. Because g x year effects are not repeatable and often small, they are not included in the `Stage2` model.
+As in the single location analysis, running the `summary` command on the 'vars' output shows the partitioning of variance, but now a g x loc effect is also present. Because g x year effects are not repeatable and often small, they are not included in the `Stage2` model. 
 
-The `summary` command also returns the correlation matrix between the locations. One way to visualize this information is with a dendrogram, which shows that the TX site, and to a lesser extent the FL and CA sites, are different than the other six. 
-
-```{r}
-plot(hclust(as.dist(1-summary(ans2a$vars)[[2]])),
-     hang = -1,xlab="")
-```
-
-The FA2 model should have enough complexity for a set of correlated locations used by a single breeding program, but it may be inadequate when analyzing disparate locations, such as in this dataset. Stage2 returns a uniplot ([Cullis et al. 2010](https://doi.org/10.1139/G10-080)), which displays the locations against a unit circle (radius=1) to visualize model sufficiency and correlation structure.
+The FA2 model should have enough complexity for a set of correlated locations used by a single breeding program, but it may be inadequate when analyzing disparate locations. The factor loadings returned by `Stage2` can be used with the function `uniplot` to visualize model sufficiency and correlation structure ([Cullis et al. 2010](https://doi.org/10.1139/G10-080)).
 
 ```{r, fig.width=3,fig.height=3}
-ans2a$uniplot
+uniplot(ans2a$loadings)
 ```
 
-The squared radius for each location is the proportion of genetic variance explained by the latent factors. With the exception of TX and FL, the FA2 model appears to provide a good representation of the covariance structure. The cosine of the angle between locations equals the correlation due to the latent factors (recall cos(0) = 1). Focusing on the 6 highly correlated locations-WI,MI,NC,OR,NY,MO-we will now add the marker data to `Stage2` to estimate the additive correlation and predict breeding values.
+The squared radius for each location is the proportion of variance explained (PVE) by the latent factors. With the exception of FL, the FA2 model appears to provide a good representation of the covariance structure. The numeric PVE values can be obtained as follows:
+```{r}
+apply(ans2a$loadings,1,norm,type="f")^2
+```
+
+The cosine of the angle between locations equals the correlation due to the latent factors (recall cos(0) = 1). Focusing on the 6 highly correlated locations-WI,MI,NC,OR,NY,MO-we will now add the marker data to `Stage2` to estimate the additive correlation and predict breeding values.
 
 ```{r}
 locs <- c("WI","MI","OR","NY","NC","MO")
@@ -85,12 +83,12 @@ The dominance model is selected over the genetic residual model because of its l
 
 ```{r,fig.width=3,fig.height=3}
 summary(ans2c$vars)
-ans2c$uniplot
+uniplot(ans2c$loadings)
 ```
 
 The correlation matrix and uniplot, which are based on the additive values, show that yield in NC was somewhat different compared to the other five sites. 
 
-Compared to the single location analysis in Vignette 1, an additional argument is needed for the `blup` function to specify the index weights, which are interpreted as the relative weight for each location after standardization to unit variance. The following code compares the reliability for BV predictions in WI vs. NC. 
+Compared to the single location analysis in Vignette 1, an additional argument is needed for the `blup` function to specify the index coefficients, which are interpreted as the relative weight for each location after standardization to unit variance. The following code compares the reliability for BV predictions in WI vs. NC. 
 
 ```{r,fig.width=3,fig.height=3}
 prep1 <- blup_prep(data=blues,vcov=vcov,geno=geno,vars=ans2c$vars)
@@ -98,8 +96,8 @@ prep1 <- blup_prep(data=blues,vcov=vcov,geno=geno,vars=ans2c$vars)
 WI.index <- c(WI=1, NC=0, OR=0, NY=0, MO=0, MI=0)  
 NC.index <- c(WI=0, NC=1, OR=0, NY=0, MO=0, MI=0)  
 
-WI.pred <- blup(data=prep1,geno=geno,index.weights=WI.index,what="BV")
-NC.pred <- blup(data=prep1,geno=geno,index.weights=NC.index,what="BV")
+WI.pred <- blup(data=prep1,geno=geno,index.coeff=WI.index,what="BV")
+NC.pred <- blup(data=prep1,geno=geno,index.coeff=NC.index,what="BV")
 
 pred <- merge(NC.pred,WI.pred,by="id")
 colnames(pred) <- c("id","BV.NC","r2.NC","BV.WI","r2.WI")
@@ -108,7 +106,7 @@ ggplot(pred,aes(x=r2.NC,y=r2.WI)) + geom_point() + coord_fixed(ratio=1) + xlim(0
   xlab("NC") + ylab("WI") + ggtitle("BV Reliability")
 ```
 
-The above figure shows that breeding values were predicted with higher reliability in WI than NC, which is to be expected from the high correlation between WI and the other four sites (OR,MO,MI,NY) compared to NC. 
+The above figure shows that breeding values were predicted with higher reliability in WI than NC, which is to be expected from the high correlation between WI and the other four sites (OR,MO,MI,NY) compared to NC.
 
 The `mask` argument for `blup_prep` can be used to mask individuals at one or more locations, to explore the accuracy of prediction into new environments. Whereas the previous analysis determined the reliability of GEBVs in WI when WI phenotypes are available, the next analysis excludes WI phenotypes: 
 
@@ -118,7 +116,7 @@ WI.env <- unique(blues$env[blues$loc=="WI"])
 prep2 <- blup_prep(data=blues,vcov=vcov,geno=geno,vars=ans2c$vars,
                    mask=data.frame(env=WI.env))
 
-pred2 <- blup(data=prep2,geno=geno,index.weights=WI.index,what="BV")
+pred2 <- blup(data=prep2,geno=geno,index.coeff=WI.index,what="BV")
 
 plot.data <- merge(pred2[,c("id","r2")],WI.pred[,c("id","r2")],by="id")
 colnames(plot.data) <- c("id","without.WI.pheno","with.WI.pheno")

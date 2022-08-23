@@ -24,7 +24,7 @@
 #' \item{vars}{variance components for \code{\link{blup_prep}}, as variable of class \code{\link{class_var}}}
 #' \item{fixed}{Fixed effect estimates for env and markers}
 #' \item{random}{Random effect predictions}
-#' \item{uniplot}{uniplot of the genetic correlation between locations}
+#' \item{loadings}{scaled loadings for the FA2 multi-loc model}
 #' }
 #' 
 #' @importFrom stats model.matrix var
@@ -141,7 +141,6 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
       gL <- apply(tmp[,c("id","loc")],1,paste,collapse=":")
       data$gL <- factor(data$gL,levels=gL)
       gL.weights <- table(data$gL)
-      out <- c(out,uniplot=list(NULL))
     } 
   }
   
@@ -462,7 +461,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
         }
         
       }
-      out$uniplot <- cov.ans$plot
+      out <- c(out,loadings=list(cov.ans$loadings))
       
     } else {
       

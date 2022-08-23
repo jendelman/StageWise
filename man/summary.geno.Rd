@@ -7,11 +7,11 @@
 \item{object}{object of \code{\link{class_geno}}}
 }
 \value{
-matrix
+data frame
 }
 \description{
 Summarize information about genomic relationships
 }
 \details{
-First column contains diagonal elements of the G matrix. For objects with dominance, column 2 is diagonal elements of the D matrix, and column 3 is the genomic inbreeding coefficient (scaled row-sum of the D matrix).
+First column contains diagonal elements of the G matrix. For objects with dominance, second column contains the genomic inbreeding coefficients (scaled row-sum of the D matrix).
 }

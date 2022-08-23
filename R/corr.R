@@ -9,7 +9,8 @@
 #' @param effect name of effect
 #' 
 #' @return matrix
-#' 
+#' @export
+
 corr <- function(vars,traits=NULL,effect=NULL) {
   stopifnot(is.null(traits)|is.null(effect))
   stopifnot(!is.null(traits)|!is.null(effect))
@@ -19,10 +20,10 @@ corr <- function(vars,traits=NULL,effect=NULL) {
   if (!is.null(traits)) {
     stopifnot(length(traits)==2)
     x <- summary(vars)
-    stopifnot(traits %in% colnames(x$prop.var))
-    y <- lapply(as.list(rownames(x$prop.var)),function(x){corr(vars,effect=x)})
+    stopifnot(traits %in% colnames(x$PVE))
+    y <- lapply(as.list(rownames(x$PVE)),function(x){corr(vars,effect=x)})
     corrs <- sapply(y,function(z){z[traits[1],traits[2]]})
-    z <- apply(cbind(x$prop.var[,traits],corrs),1,function(v){v[3]*sqrt(v[1])*sqrt(v[2])})
+    z <- apply(cbind(x$PVE[,traits],corrs),1,function(v){v[3]*sqrt(v[1])*sqrt(v[2])})
     tmp <- matrix(c(z,sum(z)),ncol=1)
     colnames(tmp) <- "Corr"
     rownames(tmp) <- c(names(z),"Total")

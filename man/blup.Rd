@@ -4,7 +4,7 @@
 \alias{blup}
 \title{BLUP}
 \usage{
-blup(data, geno = NULL, what, index.weights = NULL, gwas.ncore = 0L)
+blup(data, geno = NULL, what, index.coeff = NULL, gwas.ncore = 0L)
 }
 \arguments{
 \item{data}{object of \code{\link{class_prep}} from \code{\link{blup_prep}}}
@@ -13,7 +13,7 @@ blup(data, geno = NULL, what, index.weights = NULL, gwas.ncore = 0L)
 
 \item{what}{One of the following: AV, BV, GV, AM, DM. See Details.}
 
-\item{index.weights}{named vector of index weights for the locations or traits}
+\item{index.coeff}{named vector of index coefficients for the locations or traits}
 
 \item{gwas.ncore}{Integer indicating number of cores to use for GWAS (default is 0 for no GWAS).}
 }
@@ -24,5 +24,5 @@ Data frame of BLUPs
 BLUP
 }
 \details{
-The argument \code{what} takes 5 possible values: "AV" (additive value), "BV" (breeding value), "GV" (genotypic value), "AM" (additive marker effect), and "DM" (dominance marker effect). "Values" refer to predictions for individuals, as opposed to markers. Predicted values include the average fixed effect of the environments, whereas predicted marker effects do not. Argument \code{index.weights} is a named vector (matching the names of the locations or traits), and the values are interpreted for standardized traits.
+The argument \code{what} takes 5 possible values: "AV" (additive value), "BV" (breeding value), "GV" (genotypic value), "AM" (additive marker effect), and "DM" (dominance marker effect). "Values" refer to predictions for individuals, as opposed to markers. Predicted values include the average fixed effect of the environments, whereas predicted marker effects do not. Argument \code{index.coeff} is a named vector (matching the names of the locations or traits), and the values are interpreted for standardized traits.
 }

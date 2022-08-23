@@ -2,7 +2,7 @@
 #'
 #' Displays variances and correlations
 #' 
-#' For a single trait, the 'var' output is a data frame with two columns of information for the various effects: the first is the variance and the second is the proportion of variance, excluding the environment effect. For multiple locations or traits, the 'cor' output is the correlation matrix for additive effects (does not include fixed effect markers). For multiple traits, the variance and proportion of variance results are returned as separate data frames, 'var' and 'prop.var', respectively. 
+#' For a single trait, the 'var' output is a data frame with two columns of information for the various effects: the first is the variance and the second is the proportion of variance explained (PVE), excluding the environment effect. For multiple locations or traits, the 'cor' output is the correlation matrix for additive effects (does not include fixed effect markers). For multiple traits, the variance and PVE results are returned as separate data frames.
 #' 
 #' @param object object of \code{\link{class_var}}
 #' @param digits number of digits for rounding
@@ -31,9 +31,11 @@ setMethod("summary",c(object="class_var"),
               }
               vars <- t(vars)
               prop.var <- t(t(vars[-1,])/apply(vars[-1,],2,sum,na.rm=T))
+              prop.var <- round(prop.var[!is.na(prop.var[,1]),],3)
+              
               vars <- apply(vars[!is.na(vars[,1]),],2,sigdig,digits=digits)
-              return(list(var=vars,
-                          prop.var=round(prop.var[!is.na(prop.var[,1]),],3),
+              return(list(var=data.frame(vars),
+                          PVE=data.frame(prop.var),
                           cor.mat=round(cor.mat,3)))
             } else {
               if (max(n1,n2) > 1) {
@@ -43,12 +45,12 @@ setMethod("summary",c(object="class_var"),
                 } else {
                   cor.mat <- cov_to_cor(object@g.iid)
                 }
-                x <- cbind(Variance=sigdig(vars,digits),
-                           Prop.Var=round(c(NA,vars[-1]/sum(vars[-1],na.rm=T)),3))
+                x <- data.frame(Variance=sigdig(vars,digits),
+                           PVE=round(c(NA,vars[-1]/sum(vars[-1],na.rm=T)),3))
                 return(list(var=x[!is.na(x[,1]),],cor=round(cor.mat,3)))
               } else {
-                x <- cbind(Variance=sigdig(vars,digits),
-                           Prop.Var=round(c(NA,vars[-1]/sum(vars[-1],na.rm=T)),3))
+                x <- data.frame(Variance=sigdig(vars,digits),
+                           PVE=round(c(NA,vars[-1]/sum(vars[-1],na.rm=T)),3))
                 return(x[!is.na(x[,1]),])
                 }
             }
