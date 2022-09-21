@@ -1,8 +1,8 @@
 #' S4 class for variances
 #' 
-#' @slot add additive
-#' @slot g.iid iid genotype effect
-#' @slot dom dominance 
+#' @slot geno1 first genetic effect
+#' @slot geno2 second genetic effect
+#' @slot model 0=no markers, 1=add, 2=add+g.resid, 3=add+dom
 #' @slot resid residual
 #' @slot diagG average diagonal element of the G matrix
 #' @slot diagD average diagonal element of the D matrix
@@ -13,9 +13,9 @@
 #' @import methods
 #' @import Matrix
 #' @export
-class_var <- setClass("class_var",slots=c(add="Matrix",
-                                          g.iid="Matrix",
-                                          dom="Matrix",
+class_var <- setClass("class_var",slots=c(geno1="Matrix",
+                                          geno2="Matrix",
+                                          model="integer",
                                           resid="Matrix",
                                           diagG="numeric",
                                           diagD="numeric",

@@ -32,7 +32,7 @@ Stage1(
 \value{
 List containing
 \describe{
-\item{blue}{data frame of BLUEs}
+\item{blues}{data frame of BLUEs}
 \item{vcov}{list of variance-covariance matrices for the BLUEs, one per experiment (env)}
 \item{fit}{data frame with broad-sense H2 (plot basis) and/or AIC}
 \item{resid}{For single trait, list of diagnostic plots and data frame of residuals. For multi-trait, list of resid var-cov matrices.}

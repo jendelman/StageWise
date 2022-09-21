@@ -29,10 +29,10 @@ S4 class to prepare for blup
 
 \item{\code{random}}{random effect estimates}
 
-\item{\code{add}}{matrix of additive variances from \code{\link{class_var}}}
+\item{\code{geno1.var}}{first var-cov matrix from \code{\link{class_var}}}
 
-\item{\code{g.iid}}{matrix of g.iid variances from \code{\link{class_var}}}
+\item{\code{geno2.var}}{second var-cov matrix from \code{\link{class_var}}}
 
-\item{\code{dom}}{matrix of dominance variances from \code{\link{class_var}}}
+\item{\code{model}}{model from \code{\link{class_var}}}
 }}
 

@@ -31,8 +31,8 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
     method <- toupper(method)
     stopifnot(method %in% c("MME","VINV"))
   }
-  dominance <- (nrow(vars@dom) > 0)
-  if (dominance)
+
+  if (vars@model==3L)
     stopifnot(class(geno)=="class_genoD")
   
   n.trait <- 1
@@ -77,8 +77,10 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
   }
   
   if (n.trait > 1) {
+    data <- data[order(data$env,data$id,data$trait),]
     tmp <- paste(data$id,data$trait,sep=":")
   } else {
+    data <- data[order(data$env,data$id),]
     tmp <- data$id
   }
   if (!is.null(vcov)) {
@@ -176,24 +178,25 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
       Z <- Z[,Znames] #loc within id
       
       if (is.null(geno)) {
-        Gmat <- kron(eigen.A=eigen.I, B=vars@g.iid)
-        
+        Gmat <- kron(eigen.A=eigen.I, B=vars@geno1)
       } else {
-        Gmat1 <- kron(eigen.A=geno@eigen.G, B=vars@add)
-        if (dominance) {
-          Gmat2 <- kron(eigen.A=geno@eigen.D, B=vars@dom)
-          
-          #add to X matrix
-          dom.covariate <- Z %*% kronecker(geno@coeff.D %*% matrix(1,nrow=ncol(geno@coeff.D),ncol=1),
-                                                      diag(n.loc))
-          colnames(dom.covariate) <- paste("heterosis",locations,sep=".")
-          X <- cbind(X,dom.covariate/(geno@scale*(ploidy-1)))
-          
+        if (vars@model==1L) {
+          Gmat <- kron(eigen.A=geno@eigen.G, B=vars@geno1)
         } else {
-          Gmat2 <- kron(eigen.A=eigen.I, B=vars@g.iid)
+          Gmat1 <- kron(eigen.A=geno@eigen.G, B=vars@geno1)
+          if (vars@model==3L) {
+            Gmat2 <- kron(eigen.A=geno@eigen.D, B=vars@geno2)
+          
+            #add to X matrix
+            dom.covariate <- Z %*% kronecker(geno@coeff.D %*% matrix(1,nrow=ncol(geno@coeff.D),ncol=1),
+                                                      diag(n.loc))
+            colnames(dom.covariate) <- paste("heterosis",locations,sep=":")
+            X <- cbind(X,dom.covariate/(geno@scale*(ploidy-1)))
+          } else {
+            Gmat2 <- kron(eigen.A=eigen.I, B=vars@geno2)
+          }
+          Gmat <- list(mat=bdiag(Gmat1$mat,Gmat2$mat),inv=bdiag(Gmat1$inv,Gmat2$inv))
         }
-        Gmat <- list(mat=bdiag(Gmat1$mat,Gmat2$mat),inv=bdiag(Gmat1$inv,Gmat2$inv))
-        
       } 
     } else {
       
@@ -201,19 +204,21 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
       colnames(Z) <- sub("id__","",colnames(Z),fixed=T)
 
       if (is.null(geno)) {
-        Gmat <- kron(eigen.A = eigen.I, B=vars@g.iid)
+        Gmat <- kron(eigen.A = eigen.I, B=vars@geno1)
       } else {
-        Gmat1 <- kron(eigen.A = geno@eigen.G, B=vars@add)
-        if (dominance) {
-          Gmat2 <- kron(eigen.A=geno@eigen.D, B=vars@dom)
-          
-          dom.covariate <- as.numeric(Z %*% geno@coeff.D %*% matrix(1,nrow=ncol(geno@coeff.D),ncol=1))
-          X <- cbind(X,heterosis=dom.covariate/(geno@scale*(ploidy-1)))
-          
+        if (vars@model==1L) {
+          Gmat <- kron(eigen.A = geno@eigen.G, B=vars@geno1)
         } else {
-          Gmat2 <- kron(eigen.A=eigen.I, B=vars@g.iid)
+          Gmat1 <- kron(eigen.A = geno@eigen.G, B=vars@geno1)
+          if (vars@model==3L) {
+            Gmat2 <- kron(eigen.A=geno@eigen.D, B=vars@geno2)
+            dom.covariate <- as.numeric(Z %*% geno@coeff.D %*% matrix(1,nrow=ncol(geno@coeff.D),ncol=1))
+            X <- cbind(X,heterosis=dom.covariate/(geno@scale*(ploidy-1)))
+          } else {
+            Gmat2 <- kron(eigen.A=eigen.I, B=vars@geno2)
+          }
+          Gmat <- list(mat=bdiag(Gmat1$mat,Gmat2$mat),inv=bdiag(Gmat1$inv,Gmat2$inv))
         }
-        Gmat <- list(mat=bdiag(Gmat1$mat,Gmat2$mat),inv=bdiag(Gmat1$inv,Gmat2$inv))
       }
     }
   } else {
@@ -238,29 +243,29 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
     Z <- Z[,Znames] #trait within id
 
     if (is.null(geno)) {
-      Gmat <- kron(eigen.A=eigen.I, B=vars@g.iid)
-      
+      Gmat <- kron(eigen.A=eigen.I, B=vars@geno1)
     } else {
-      Gmat1 <- kron(eigen.A=geno@eigen.G, B=vars@add)
-      if (dominance) {
-        Gmat2 <- kron(eigen.A=geno@eigen.D, B=vars@dom)
-        
-        #add to X matrix
-        dom.covariate <- Z %*% kronecker(geno@coeff.D %*% matrix(1,nrow=ncol(geno@coeff.D),ncol=1),
-                                         diag(n.trait))
-        colnames(dom.covariate) <- paste("heterosis",traits,sep=".")
-        X <- cbind(X,dom.covariate/(geno@scale*(ploidy-1)))
-
+      if (vars@model==1L) {
+        Gmat <- kron(eigen.A=geno@eigen.G, B=vars@geno1)
       } else {
-        Gmat2 <- kron(eigen.A=eigen.I, B=vars@g.iid)
+        Gmat1 <- kron(eigen.A=geno@eigen.G, B=vars@geno1)
+        if (vars@model==3L) {
+          Gmat2 <- kron(eigen.A=geno@eigen.D, B=vars@geno2)
+        
+          #add to X matrix
+          dom.covariate <- Z %*% kronecker(geno@coeff.D %*% matrix(1,nrow=ncol(geno@coeff.D),ncol=1),
+                                         diag(n.trait))
+          colnames(dom.covariate) <- paste("heterosis",traits,sep=":")
+          X <- cbind(X,dom.covariate/(geno@scale*(ploidy-1)))
+        } else {
+          Gmat2 <- kron(eigen.A=eigen.I, B=vars@geno2)
+        }
+        Gmat <- list(mat=bdiag(Gmat1$mat,Gmat2$mat),inv=bdiag(Gmat1$inv,Gmat2$inv))
       }
-      
-      Gmat <- list(mat=bdiag(Gmat1$mat,Gmat2$mat),inv=bdiag(Gmat1$inv,Gmat2$inv))
-      
     } 
   }
   
-  if (!is.null(geno)) {
+  if (vars@model > 1L) {
     Z <- cbind(Z,Z)
   }
 
@@ -381,10 +386,10 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
   }
   
   nlt <- max(n.loc,n.trait)
-  if (dominance) {
+  if (vars@model==3L) {
     heterosis <- fixed[n.env+1:nlt]
     if (length(missing.loc)>0)
-      heterosis[paste("heterosis",missing.loc,sep=".")] <- mean(heterosis,na.rm=T)
+      heterosis[paste("heterosis",missing.loc,sep=":")] <- mean(heterosis,na.rm=T)
     if (n.mark > 0) 
       fixed.marker <- fixed[n.env+nlt+1:(n.mark*nlt)]
   } else {
@@ -397,6 +402,7 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
   
   new(Class="class_prep",id=id,ploidy=ploidy,var.u=var.u,var.uhat=var.uhat,
       avg.env=avg.env,heterosis=heterosis,fixed.marker=fixed.marker,B=vars@B,
-      random=random, add=vars@add, g.iid=vars@g.iid, dom=vars@dom)
+      random=random, geno1.var=vars@geno1, geno2.var=vars@geno2, 
+      model=vars@model)
   
 }    

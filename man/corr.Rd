@@ -20,5 +20,5 @@ matrix
 Trait correlations
 }
 \details{
-Use either the argument \code{traits} or \code{effect}, not both. Using \code{traits} leads to a partitioning of the total correlation between those two traits, based on path analysis. Using \code{effect} displays the correlation between all traits for that effect. Use the \code{summary} command to see the names of the possible effects.
+Use either the argument \code{traits} or \code{effect}, not both. Using \code{traits} leads to a partitioning of the total correlation between those two traits, based on path analysis, assuming no correlation between the effects of the Stage 2 model. Using \code{effect} displays the correlation between all traits for that effect. Use the \code{summary} command to see the names of the possible effects.
 }

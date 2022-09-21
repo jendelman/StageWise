@@ -20,22 +20,19 @@
 #' @import ggplot2
 #' @importFrom ggforce geom_ellipse
 #' @import CVXR
+#' @export
 
 gain <- function(input,traits=NULL,coeff=NULL,restricted=NULL,solver="ECOS") {
   
   if (class(input)[1]=="class_prep") {
     # need to compute var.bhat
-    n1 <- ncol(input@add)
-    n2 <- ncol(input@g.iid)
-    n.trait <- max(n1,n2)
+    n.trait <- ncol(input@geno1.var)
     if (n.trait==1) 
       stop("Input is not multi-trait")
     
     B <- matrix(0,nrow=n.trait,ncol=n.trait)
     
-    if (input@ploidy==0) {
-      #no marker data
-
+    if (input@model < 2L) {
       nt <- nrow(input@var.uhat)
       n <- nt/n.trait
       ix <- split(1:nt,f=rep(1:n.trait,times=n))
@@ -48,20 +45,20 @@ gain <- function(input,traits=NULL,coeff=NULL,restricted=NULL,solver="ECOS") {
           B[i,j] <- B[j,i] <- mean(diag(L)) - mean(L)
         }
       B <- B + input@B
-      trait.names <- colnames(input@g.iid)
-      trait.scale <- sqrt(diag(input@g.iid))
+      trait.names <- colnames(input@geno1.var)
+      trait.scale <- sqrt(diag(input@geno1.var))
     } else {
       
       #additive and non-additive
       nt <- nrow(input@var.uhat)/2
       n <- nt/n.trait
       ix <- split(1:nt,f=rep(1:n.trait,times=n))
-      if (ncol(input@dom) > 1) {
+      if (input@model==3L) {
         gamma <- (input@ploidy/2 - 1)/(input@ploidy - 1)
-        trait.scale <- sqrt(diag(input@add)+gamma^2*diag(input@dom))
+        trait.scale <- sqrt(diag(input@geno1.var)+gamma^2*diag(input@geno2.var))
       } else {
         gamma <- 0
-        trait.scale <- sqrt(diag(input@add))
+        trait.scale <- sqrt(diag(input@geno1.var))
       }
       M <- cbind(diag(n),gamma*diag(n))
       
@@ -73,7 +70,7 @@ gain <- function(input,traits=NULL,coeff=NULL,restricted=NULL,solver="ECOS") {
           B[i,j] <- B[j,i] <- mean(diag(L)) - mean(L)
         }
       B <- B + input@B
-      trait.names <- colnames(input@add)
+      trait.names <- colnames(input@geno1.var)
     }
     
     D <- diag(trait.scale)

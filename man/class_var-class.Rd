@@ -11,11 +11,11 @@ S4 class for variances
 \section{Slots}{
 
 \describe{
-\item{\code{add}}{additive}
+\item{\code{geno1}}{first genetic effect}
 
-\item{\code{g.iid}}{iid genotype effect}
+\item{\code{geno2}}{second genetic effect}
 
-\item{\code{dom}}{dominance}
+\item{\code{model}}{0=no markers, 1=add, 2=add+g.resid, 3=add+dom}
 
 \item{\code{resid}}{residual}
 

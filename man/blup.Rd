@@ -7,7 +7,7 @@
 blup(data, geno = NULL, what, index.coeff = NULL, gwas.ncore = 0L)
 }
 \arguments{
-\item{data}{object of \code{\link{class_prep}} from \code{\link{blup_prep}}}
+\item{data}{one object, or list of objects, of \code{\link{class_prep}} from \code{\link{blup_prep}}}
 
 \item{geno}{object of \code{\link{class_geno}} from \code{\link{read_geno}}}
 
@@ -24,5 +24,7 @@ Data frame of BLUPs
 BLUP
 }
 \details{
-The argument \code{what} takes 5 possible values: "AV" (additive value), "BV" (breeding value), "GV" (genotypic value), "AM" (additive marker effect), and "DM" (dominance marker effect). "Values" refer to predictions for individuals, as opposed to markers. Predicted values include the average fixed effect of the environments, whereas predicted marker effects do not. Argument \code{index.coeff} is a named vector (matching the names of the locations or traits), and the values are interpreted for standardized traits.
+The argument \code{what} takes 5 possible values: "AV" (additive value), "BV" (breeding value), "GV" (genotypic value), "AM" (additive marker effect), and "DM" (dominance marker effect). "Values" refer to predictions for individuals, as opposed to markers. Predicted values include the average fixed effect of the environments, whereas predicted marker effects do not. Argument \code{index.coeff} is a named vector (matching the names of the locations or traits), and the values are interpreted for standardized traits. 
+
+When multiple objects of \code{\link{class_prep}} are used for \code{data}, they must be based on the same marker data and genetic model. Also, reliabilities are not computed.
 }

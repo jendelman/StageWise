@@ -10,7 +10,7 @@
 #' @slot scale.D Scaling factor between markers and indiv for dominance effects
 #' @slot D Dominance relationship matrix
 #' @slot eigen.D list of eigenvalues and eigenvectors for D
-#' @slot Fg genomic inbreeding coefficient
+#' @slot Fg genomic inbreeding coefficient (based on dominance)
 #' 
 #' @import methods
 #' @import Matrix

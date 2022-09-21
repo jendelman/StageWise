@@ -16,7 +16,7 @@
 #' @param fix.eff.marker markers in \code{geno} to include as additive fixed effect covariates
 #' @param silent TRUE/FALSE, whether to suppress ASReml-R output
 #' @param workspace Memory limit for ASRreml-R variance estimation
-#' @param dominance TRUE/FALSE
+#' @param non.add one of the following: "none","g.resid","dom"
 #' 
 #' @return List containing
 #' \describe{
@@ -37,11 +37,12 @@
 #' @export
 
 Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
-                   silent=TRUE,workspace="500mb",dominance=FALSE) {
+                   silent=TRUE,workspace="500mb",non.add="g.resid") {
   
   stopifnot(inherits(data,"data.frame"))
   stopifnot(requireNamespace("asreml"))
-  if (dominance)
+  stopifnot(non.add %in% c("none","g.resid","dom"))
+  if (non.add=="dom")
     stopifnot(class(geno)=="class_genoD")
   library(asreml)
   stopifnot(c("id","env","BLUE") %in% colnames(data))
@@ -66,7 +67,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     meanG <- as.numeric(pvar(V=.GlobalEnv$asremlG,weights=id.weights))
     diagG <- mean(diag(.GlobalEnv$asremlG))
 
-    if (dominance) {
+    if (non.add=="dom") {
       .GlobalEnv$asremlD <- geno@D[id,id]
       meanD <- as.numeric(pvar(V=.GlobalEnv$asremlD,weights=id.weights))
 
@@ -96,8 +97,8 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
   
   envs <- unique(data$env)
   n.env <- length(envs)
-  if (n.env==1 & !dominance) {
-    stop("Need more than one environment")
+  if (n.env==1 & (non.add=="g.resid")) {
+    stop("Need more than one environment for g.resid model")
   }
   data$env <- factor(data$env,levels=envs)
   data$id <- factor(data$id,levels=id)
@@ -157,7 +158,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     } else {
       model <- "asreml(data=data,fixed=BLUE~FIX-1,random=~RANDOM,residual=~dsum(~idv(units)|loc)"
     }
-    if (n.mark > 0 | dominance) {
+    if (n.mark > 0 | (non.add=="dom")) {
       if (n.loc==1) {
         model <- sub("FIX",paste(c("env",fix.eff.marker,dom),collapse="+"),model,fixed=T)
       } else {
@@ -168,7 +169,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     }
   } else {
     model <- "asreml(data=data,fixed=BLUE~FIX-1,random=~RANDOM,residual=~id(env.id):us(Trait)"
-    if (n.mark > 0 | dominance) {
+    if (n.mark > 0 | (non.add=="dom")) {
       model <- sub("FIX",paste(paste0(c("env",fix.eff.marker,dom),":Trait"),collapse="+"),model,fixed=T)
     } else {
       model <- sub("FIX","env:Trait",model,fixed=T)
@@ -187,39 +188,48 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     }
   } else {
     if (n.trait > 1) {
-      if (!dominance) {
-        if (n.trait==2) {
-          random.effects <- "id:corh(Trait)+vm(id,source=asremlG,singG='PSD'):corh(Trait)"
-        } else {
-          random.effects <- "id:us(Trait)+vm(id,source=asremlG,singG='PSD'):us(Trait)"
-        }
+      if (n.trait==2) {
+        random.effects <- "vm(id,source=asremlG,singG='PSD'):corh(Trait)"
       } else {
+        random.effects <- "vm(id,source=asremlG,singG='PSD'):us(Trait)"
+      }
+      if (non.add=="g.resid") {
         if (n.trait==2) {
-          random.effects <- "vm(id,source=asremlD):corh(Trait)+vm(id,source=asremlG,singG='PSD'):corh(Trait)"
+          random.effects <- paste(random.effects,"id:corh(Trait)",sep="+")
         } else {
-          random.effects <- "vm(id,source=asremlD):us(Trait)+vm(id,source=asremlG,singG='PSD'):us(Trait)"
+          random.effects <- paste(random.effects,"id:us(Trait)",sep="+")
+        }
+      } 
+      if (non.add=="dom") {
+        if (n.trait==2) {
+          random.effects <- paste(random.effects,"vm(id,source=asremlD):corh(Trait)",sep="+")
+        } else {
+          random.effects <- paste(random.effects,"vm(id,source=asremlD):us(Trait)",sep="+")
         }
       }
     } else {
-      if (!dominance) {
-        if (n.loc > 1) {
-          if (n.loc==2) {
-            random.effects <- "id:corh(loc)+vm(id,source=asremlG,singG='PSD'):corh(loc)"
-          } else {
-            random.effects <- "id:corh(loc)+vm(id,source=asremlG,singG='PSD'):fa(loc,2)"
-          }
+      if (n.loc > 1) {
+        if (n.loc==2) {
+          random.effects <- "vm(id,source=asremlG,singG='PSD'):corh(loc)"
         } else {
-          random.effects <- "id+vm(id,source=asremlG,singG='PSD')"
+          random.effects <- "vm(id,source=asremlG,singG='PSD'):fa(loc,2)"
         }
       } else {
+        random.effects <- "vm(id,source=asremlG,singG='PSD')"
+      }
+      
+      if (non.add=="g.resid") {
         if (n.loc > 1) {
-          if (n.loc==2) {
-            random.effects <- "vm(id,source=asremlD):corh(loc)+vm(id,source=asremlG,singG='PSD'):corh(loc)"
-          } else {
-            random.effects <- "vm(id,source=asremlD):corh(loc)+vm(id,source=asremlG,singG='PSD'):fa(loc,2)"
-          }
+          random.effects <- paste(random.effects,"id:corh(loc)",sep="+")
         } else {
-          random.effects <- "vm(id,source=asremlD)+vm(id,source=asremlG,singG='PSD')"
+          random.effects <- paste(random.effects,"id",sep="+")
+        }
+      }
+      if (non.add=="dom") {
+        if (n.loc > 1) {
+          random.effects <- paste(random.effects,"vm(id,source=asremlD):corh(loc)",sep="+")
+        } else {
+          random.effects <- paste(random.effects,"vm(id,source=asremlD)",sep="+")
         }
       }
     }
@@ -260,7 +270,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
       }
   }
 
-  asreml::asreml.options(workspace=workspace,maxit=30,trace=!silent)
+  asreml::asreml.options(workspace=workspace,maxit=20,trace=!silent)
   model <- sub(pattern="RANDOM",replacement=random.effects,model,fixed=T)
 
   start.table <- eval(parse(text=paste0(model,",start.values = TRUE)")))$vparameters.table
@@ -302,7 +312,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     out$fixed$env <- data.frame(env=levels(data$env),effect=as.numeric(beta[ix,1]))
     vars[1,1,"env"] <- pvar(mu=out$fixed$env$effect,weights=as.numeric(table(data$env)))
   
-    if (dominance) {
+    if (non.add=="dom") {
       ix <- grep("dom",beta.names,fixed=T)
       if (n.loc==1) {
         vars[1,1,"heterosis"] <- pvar(mu=dom.covariate*beta[ix,1],weights=id.weights)
@@ -363,7 +373,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
       }
     }
 
-    if (dominance) {
+    if (non.add=="dom") {
       gamma <- (geno@ploidy/2 - 1)/(geno@ploidy - 1)
       ix <- grep("dom",rownames(beta),fixed=T)
       out$fixed$heterosis <- data.frame(trait=traits,effect=as.numeric(beta[ix,1]))
@@ -394,7 +404,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
           b2 <- matrix(x[x$trait==traits[j],"effect"],ncol=1)
           mu2 <- as.numeric(as.matrix(geno@coeff[id,fix.eff.marker])%*%b2)
           vars[i,j,"fixed.marker"] <- sum(mu1*mu2*weights) - sum(mu1*weights)*sum(mu2*weights)
-          if (dominance) {
+          if (non.add=="dom") {
             mu1 <- mu1+gamma*mu1d
             mu2 <- mu2+gamma*mu2d
           }
@@ -430,34 +440,38 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
           iz <- grep("id:loc",vc.names,fixed=T)
         }
         cov.ans <- f.cov.loc(vc=vc[iz,],locations)
-        g.iid.vc <- cov.ans$cov.mat
-        dom.vc <- add.vc <- Matrix(NA,nrow=0,ncol=0)
-        vars[1,1,"genotype"] <- mean(g.iid.vc[upper.tri(g.iid.vc,diag=FALSE)])*(1 - 1/n)
+        geno1.vc <- cov.ans$cov.mat
+        geno2.vc <- Matrix(NA,nrow=0,ncol=0)
+        model <- 0L
+        vars[1,1,"genotype"] <- mean(geno1.vc[upper.tri(geno1.vc,diag=FALSE)])*(1 - 1/n)
         
-        K <- kronecker(Imat,g.iid.vc,make.dimnames = T)
+        K <- kronecker(Imat,geno1.vc,make.dimnames = T)
         vars[1,1,"g x loc"] <- pvar(V=K,weights=gL.weights) - vars[1,1,"genotype"]
         
       } else {
         cov.ans <- f.cov.loc(vc[grep("source = asremlG",vc.names,fixed=T),],locations)
-        add.vc <- cov.ans$cov.mat
-        vars[1,1,"additive"] <- mean(add.vc[upper.tri(add.vc,diag=FALSE)]) * meanG
-        K <- kronecker(.GlobalEnv$asremlG,add.vc,make.dimnames = T)
+        geno1.vc <- cov.ans$cov.mat
+        geno2.vc <- Matrix(NA,nrow=0,ncol=0)
+        vars[1,1,"additive"] <- mean(geno1.vc[upper.tri(geno1.vc,diag=FALSE)]) * meanG
+        K <- kronecker(.GlobalEnv$asremlG,geno1.vc,make.dimnames = T)
         vars[1,1,"add x loc"] <- pvar(V=K,weights=gL.weights) - vars[1,1,"additive"]
+        model <- 1L
         
-        if (!dominance) {
+        if (non.add=="g.resid") {
           tmp <- Matrix(vc[grep("id:loc",vc.names,fixed=T),1],ncol=1)
           rownames(tmp) <- locations
-          g.iid.vc <- coerce_dpo(tcrossprod(sqrt(tmp)))
-          K <- kronecker(Imat,g.iid.vc,make.dimnames = T)
+          geno2.vc <- coerce_dpo(tcrossprod(sqrt(tmp)))
+          K <- kronecker(Imat,geno2.vc,make.dimnames = T)
           vars[1,1,"g.resid"] <- pvar(V=K,weights=gL.weights)
-          dom.vc <- Matrix(NA,nrow=0,ncol=0)
-        } else {
+          model <- 2L
+        }
+        if (non.add=="dom") {
           tmp <- Matrix(vc[grep("source = asremlD):loc",vc.names,fixed=T),1],ncol=1)
           rownames(tmp) <- locations
-          dom.vc <- coerce_dpo(tcrossprod(sqrt(tmp)))
-          K <- kronecker(.GlobalEnv$asremlD,dom.vc,make.dimnames = T)
+          geno2.vc <- coerce_dpo(tcrossprod(sqrt(tmp)))
+          K <- kronecker(.GlobalEnv$asremlD,geno2.vc,make.dimnames = T)
           vars[1,1,"dominance"] <- pvar(V=K,weights=gL.weights)
-          g.iid.vc <- Matrix(NA,nrow=0,ncol=0)
+          model <- 3L
         }
         
       }
@@ -473,20 +487,24 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
       }
       
       if (is.null(geno)) {
-        dom.vc <- add.vc <- Matrix(NA,nrow=0,ncol=0)
-        g.iid.vc <- Matrix(vc["id",1],ncol=1)
-        vars[1,1,"genotype"] <- as.numeric(g.iid.vc)*(1 - 1/n)
+        model <- 0L
+        geno1.vc <- Matrix(vc["id",1],ncol=1)
+        geno2.vc <- Matrix(NA,nrow=0,ncol=0)
+        vars[1,1,"genotype"] <- as.numeric(geno1.vc)*(1 - 1/n)
       } else {
-        add.vc <- Matrix(vc[grep("source = asremlG",vc.names,fixed=T),1],ncol=1)
-        vars[1,1,"additive"] <- as.numeric(add.vc)*meanG
-        if (!dominance) {
-          g.iid.vc <- Matrix(vc["id",1],ncol=1)
-          dom.vc <- Matrix(NA,nrow=0,ncol=0)
-          vars[1,1,"g.resid"] <- as.numeric(g.iid.vc)*(1 - 1/n)
-        } else {
-          dom.vc <- Matrix(vc[grep("source = asremlD",vc.names,fixed=T),1],ncol=1)
-          g.iid.vc <- Matrix(NA,nrow=0,ncol=0)
-          vars[1,1,"dominance"] <- as.numeric(dom.vc)*meanD
+        model <- 1L
+        geno1.vc <- Matrix(vc[grep("source = asremlG",vc.names,fixed=T),1],ncol=1)
+        geno2.vc <- Matrix(NA,nrow=0,ncol=0)
+        vars[1,1,"additive"] <- as.numeric(geno1.vc)*meanG
+        if (non.add=="g.resid") {
+          geno2.vc <- Matrix(vc["id",1],ncol=1)
+          model <- 2L
+          vars[1,1,"g.resid"] <- as.numeric(geno2.vc)*(1 - 1/n)
+        }
+        if (non.add=="dom") {
+          geno2.vc <- Matrix(vc[grep("source = asremlD",vc.names,fixed=T),1],ncol=1)
+          model <- 3L
+          vars[1,1,"dominance"] <- as.numeric(geno2.vc)*meanD
         }
       }
     }
@@ -507,35 +525,39 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     
     vc <- vc[-iv,]
     if (is.null(geno)) {
-      dom.vc <- add.vc <- Matrix(NA,nrow=0,ncol=0)
-      g.iid.vc <- f.cov.trait(vc[grep("id:Trait!",rownames(vc),fixed=T),],
+      model <- 0L
+      geno2.vc <- Matrix(NA,nrow=0,ncol=0)
+      geno1.vc <- f.cov.trait(vc[grep("id:Trait!",rownames(vc),fixed=T),],
                               traits,us=(n.trait>2))
       for (i in 1:n.trait)
         for (j in i:n.trait)
-          vars[i,j,"genotype"] <- g.iid.vc[i,j]*(1 - 1/n)
+          vars[i,j,"genotype"] <- geno1.vc[i,j]*(1 - 1/n)
       
     } else {
-      add.vc <- f.cov.trait(vc[grep("source = asremlG",rownames(vc),fixed=T),],
+      model <- 1L
+      geno2.vc <- Matrix(NA,nrow=0,ncol=0)
+      geno1.vc <- f.cov.trait(vc[grep("source = asremlG",rownames(vc),fixed=T),],
                             traits,us=(n.trait>2))
       for (i in 1:n.trait) 
         for (j in i:n.trait) 
-          vars[i,j,"additive"] <- add.vc[i,j]*meanG
+          vars[i,j,"additive"] <- geno1.vc[i,j]*meanG
       
-      if (!dominance) {
-        g.iid.vc <- f.cov.trait(vc[grep("id:Trait!",rownames(vc),fixed=T),],
+      if (non.add=="g.resid") {
+        geno2.vc <- f.cov.trait(vc[grep("id:Trait!",rownames(vc),fixed=T),],
                               traits,us=(n.trait>2))
-        dom.vc <- Matrix(NA,nrow=0,ncol=0)
+        model <- 2L
         for (i in 1:n.trait) 
           for (j in i:n.trait) 
-            vars[i,j,"g.resid"] <- g.iid.vc[i,j]*(1 - 1/n)
+            vars[i,j,"g.resid"] <- geno2.vc[i,j]*(1 - 1/n)
         
-      } else {
-        dom.vc <- f.cov.trait(vc[grep("source = asremlD",rownames(vc),fixed=T),],
+      } 
+      if (non.add=="dom") {
+        geno2.vc <- f.cov.trait(vc[grep("source = asremlD",rownames(vc),fixed=T),],
                             traits,us=(n.trait>2))
-        g.iid.vc <- Matrix(NA,nrow=0,ncol=0)
+        model <- 3L
         for (i in 1:n.trait) 
           for (j in i:n.trait) 
-            vars[i,j,"dominance"] <- dom.vc[i,j]*meanD
+            vars[i,j,"dominance"] <- geno2.vc[i,j]*meanD
         
       }
     }
@@ -549,8 +571,8 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
       vars[,,i][lower.tri(vars[,,i])] <- vars[,,i][upper.tri(vars[,,i])]
   }
   
-  out$vars <- new(Class="class_var",add=add.vc,g.iid=g.iid.vc,
-                  dom=dom.vc,resid=resid.vc,diagG=diagG,diagD=diagD,
+  out$vars <- new(Class="class_var",geno1=geno1.vc,geno2=geno2.vc,model=model,
+                  resid=resid.vc,diagG=diagG,diagD=diagD,
                   vars=vars,B=B,fix.eff.marker=fix.eff.marker)
   
   #random effects
@@ -569,16 +591,19 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
                                 stringsAsFactors = F)[,c(2,1)]
         }
         ix1 <- match(apply(id.loc,1,paste,collapse=":"),rownames(u))
-        if (!dominance) {
+        out$random <- data.frame(id.loc.names,add=as.numeric(u[ix1,1]))
+        
+        if (non.add=="g.resid") {
           id.loc <- expand.grid(paste0("loc_",locations),
                                 paste0("id_",id),stringsAsFactors = F)[,c(2,1)]
           ix2 <- match(apply(id.loc,1,paste,collapse=":"),rownames(u))
-          out$random <- data.frame(id.loc.names,add=as.numeric(u[ix1,1]),g.iid=as.numeric(u[ix2,1]))
-        } else {
+          out$random$g.iid=as.numeric(u[ix2,1])
+        } 
+        if (non.add=="dom") {
           id.loc <- expand.grid(paste0("loc_",locations),
                                 paste0("vm(id, source = asremlD)_",id),stringsAsFactors = F)[,c(2,1)]
           ix2 <- match(apply(id.loc,1,paste,collapse=":"),rownames(u))
-          out$random <- data.frame(id.loc.names,add=as.numeric(u[ix1,1]),dom=as.numeric(u[ix2,1]))
+          out$random$dom=as.numeric(u[ix2,1])
         }
       } else {
         if (n.loc==2) {
@@ -592,12 +617,14 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     } else {
       if (!is.null(geno)) {
         ix1 <- match(paste("vm(id, source = asremlG, singG = \"PSD\")",id,sep="_"),rownames(u))
-        if (!dominance) {
+        out$random <- data.frame(id=id,add=as.numeric(u[ix1,1]))
+        if (non.add=="g.resid") {
           ix2 <- match(paste("id",id,sep="_"),rownames(u))
-          out$random <- data.frame(id=id,add=as.numeric(u[ix1,1]),g.iid=as.numeric(u[ix2,1]))
-        } else {
+          out$random$g.iid=as.numeric(u[ix2,1])
+        }
+        if (non.add=="dom") {
           ix2 <- match(paste("vm(id, source = asremlD)",id,sep="_"),rownames(u))
-          out$random <- data.frame(id=id,add=as.numeric(u[ix1,1]),dom=as.numeric(u[ix2,1]))
+          out$random$dom=as.numeric(u[ix2,1])
         }
       } else {
         ix <- match(paste("id",id,sep="_"),rownames(u))
@@ -617,15 +644,17 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
       id.trait <- expand.grid(paste0("Trait_",traits),paste0("vm(id, source = asremlG, singG = \"PSD\")_",id),
                               stringsAsFactors = F)[,c(2,1)]
       ix1 <- match(apply(id.trait,1,paste,collapse=":"),rownames(u))
-      if (!dominance) {
+      out$random <- data.frame(id.trait.names,add=as.numeric(u[ix1,1]))
+      if (non.add=="g.resid") {
         id.trait <- expand.grid(paste0("Trait_",traits),paste0("id_",id),stringsAsFactors = F)[,c(2,1)]
         ix2 <- match(apply(id.trait,1,paste,collapse=":"),rownames(u))
-        out$random <- data.frame(id.trait.names,add=as.numeric(u[ix1,1]),g.iid=as.numeric(u[ix2,1]))
-      } else {
+        out$random$g.iid=as.numeric(u[ix2,1])
+      }
+      if (non.add=="dom") {
         id.trait <- expand.grid(paste0("Trait_",traits),paste0("vm(id, source = asremlD)_",id),
                                 stringsAsFactors = F)[,c(2,1)]
         ix2 <- match(apply(id.trait,1,paste,collapse=":"),rownames(u))
-        out$random <- data.frame(id.trait.names,add=as.numeric(u[ix1,1]),dom=as.numeric(u[ix2,1]))
+        out$random$dom=as.numeric(u[ix2,1])
       }
     }
   }
@@ -634,7 +663,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     rm("asremlG",envir = .GlobalEnv)
   if (!is.null(vcov))
     rm("asremlOmega",envir = .GlobalEnv)
-  if (dominance)
+  if (non.add=="dom")
     rm("asremlD",envir = .GlobalEnv)
   
   return(out)

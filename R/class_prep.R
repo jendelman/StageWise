@@ -9,14 +9,14 @@
 #' @slot fixed.marker fixed marker effects
 #' @slot B var-cov matrix for fixed effects
 #' @slot random random effect estimates
-#' @slot add matrix of additive variances from \code{\link{class_var}}
-#' @slot g.iid matrix of g.iid variances from \code{\link{class_var}}
-#' @slot dom matrix of dominance variances from \code{\link{class_var}}
+#' @slot geno1.var first var-cov matrix from \code{\link{class_var}}
+#' @slot geno2.var second var-cov matrix from \code{\link{class_var}}
+#' @slot model model from \code{\link{class_var}}
 #' 
 #' @import methods
 #' @import Matrix
 #' @export
 class_prep <- setClass("class_prep",slots=c(id="character",ploidy="integer",var.u="Matrix",
                                             var.uhat="Matrix",avg.env="numeric",heterosis="numeric",
-                                            fixed.marker="numeric",B="matrix",random="numeric",add="Matrix",g.iid="Matrix",
-                                            dom="Matrix"))
+                                            fixed.marker="numeric",B="matrix",random="numeric",
+                                            geno1.var="Matrix",geno2.var="Matrix",model="integer"))

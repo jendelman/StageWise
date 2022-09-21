@@ -28,7 +28,7 @@
 #' 
 #' @return List containing
 #' \describe{
-#' \item{blue}{data frame of BLUEs}
+#' \item{blues}{data frame of BLUEs}
 #' \item{vcov}{list of variance-covariance matrices for the BLUEs, one per experiment (env)}
 #' \item{fit}{data frame with broad-sense H2 (plot basis) and/or AIC}
 #' \item{resid}{For single trait, list of diagnostic plots and data frame of residuals. For multi-trait, list of resid var-cov matrices.}
@@ -51,6 +51,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   solver <- toupper(solver)
   stopifnot(solver %in% c("ASREML","SPATS"))
   stopifnot(traits %in% colnames(data))
+  stopifnot(effects$name %in% colnames(data))
   n.trait <- length(traits)
   
   stopifnot(requireNamespace("asreml"))
@@ -384,13 +385,13 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
       stat_boxplot(outlier.color="red") + theme_bw() + theme(axis.text.x=element_text(angle=90,vjust=0.5))
     p2 <- ggplot(data=blup.resid,aes(sample=.data$resid)) + stat_qq() + stat_qq_line() + facet_wrap(~expt) + theme_bw() + xlab("Expected") + ylab("Observed")
     if (solver=="ASREML")
-      return(list(blue=blue.out,vcov=vcov,fit=fit,
+      return(list(blues=blue.out,vcov=vcov,fit=fit,
                   resid=list(boxplot=p1,qqplot=p2,table=blup.resid)))
     if (solver=="SPATS")
-      return(list(blue=blue.out,vcov=vcov,fit=fit,
+      return(list(blues=blue.out,vcov=vcov,fit=fit,
                   resid=list(boxplot=p1,qqplot=p2,spatial=spatial.plot,table=blup.resid)))
   } else {
     #Multi-trait
-    return(list(blue=blue.out,vcov=vcov,fit=fit,resid=resid.vc))
+    return(list(blues=blue.out,vcov=vcov,fit=fit,resid=resid.vc))
   }
 }

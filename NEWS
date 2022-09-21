@@ -1,3 +1,10 @@
+Changes in 0.27
+* renamed output blue to blues in Stage1
+* changed internal representation for class_var and class_prep
+* blup now accepts list of class_prep objects as input for multi-trait prediction
+* use inbreeding command instead of summary for class_geno object
+* changed dominance argument in Stage2 with non.add
+
 Changes in 0.26
 * Updated vignette dataset
 * Stage2 returns factor loadings instead of uniplot (now public function)

@@ -31,6 +31,6 @@ S4 class for marker genotype data with dominance
 
 \item{\code{eigen.D}}{list of eigenvalues and eigenvectors for D}
 
-\item{\code{Fg}}{genomic inbreeding coefficient}
+\item{\code{Fg}}{genomic inbreeding coefficient (based on dominance)}
 }}
 

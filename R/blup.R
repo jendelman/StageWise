@@ -4,7 +4,9 @@
 #' 
 #' The argument \code{what} takes 5 possible values: "AV" (additive value), "BV" (breeding value), "GV" (genotypic value), "AM" (additive marker effect), and "DM" (dominance marker effect). "Values" refer to predictions for individuals, as opposed to markers. Predicted values include the average fixed effect of the environments, whereas predicted marker effects do not. Argument \code{index.coeff} is a named vector (matching the names of the locations or traits), and the values are interpreted for standardized traits. 
 #' 
-#' @param data object of \code{\link{class_prep}} from \code{\link{blup_prep}}
+#' When multiple objects of \code{\link{class_prep}} are used for \code{data}, they must be based on the same marker data and genetic model. Also, reliabilities are not computed.
+#' 
+#' @param data one object, or list of objects, of \code{\link{class_prep}} from \code{\link{blup_prep}}
 #' @param geno object of \code{\link{class_geno}} from \code{\link{read_geno}}
 #' @param what One of the following: AV, BV, GV, AM, DM. See Details.
 #' @param index.coeff named vector of index coefficients for the locations or traits
@@ -17,70 +19,131 @@
 #' @importFrom parallel makeCluster clusterExport parRapply stopCluster
 #' @export
 
-blup <- function(data,geno=NULL,what,index.coeff=NULL,gwas.ncore=0L) {
+blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
   
   if (what %in% c("id","marker")) {
     stop("The options for 'what' have changed. See Details.")
   }
   what <- toupper(what)
-  stopifnot(what %in% c("AV","BV","GV","AM","DM"))
+  stopifnot(substr(what,1,2) %in% c("AV","BV","GV","AM","DM"))
   
-  if (nrow(data@add) > 0 & is.null(geno))
+  if (class(data)=="list") {
+    stopifnot(sapply(data,class)=="class_prep")
+    multi.prep <- TRUE
+  } else {
+    stopifnot(class(data)=="class_prep")
+    multi.prep <- FALSE
+    data2 <- data
+    data <- list(data)
+  }
+  
+  if (data[[1]]@model > 0L & is.null(geno))
     stop("Missing geno argument")
   
-  if (nrow(data@add)==0 & (!is.null(geno) | what %in% c("AM","DM","AV","BV")))
+  if (data[[1]]@model==0L & (!is.null(geno) | what %in% c("AM","DM","AV","BV")))
     stop("Marker data was not used in blup_prep")
   
-  if (what=="DM" & (!(class(geno)=="class_genoD") | nrow(data@dom)==0))
+  if (substr(what,1,2)=="DM" & (!(class(geno)=="class_genoD") | data[[1]]@model < 3L))
     stop("Dominance model is required in geno and data")
   
   gamma <- 0
   if (!is.null(geno)) {
-    if (what=="GV")  
+    if (substr(what,1,2)=="GV")  
       gamma <- 1
-    if (what=="BV" & nrow(data@dom) > 0)
+    if (substr(what,1,2)=="BV" & data[[1]]@model==3L)
       gamma <- (geno@ploidy/2 - 1)/(geno@ploidy - 1)
-    
-    if (nrow(data@dom) > 0) {
-      index.scale <- sqrt(diag(as.matrix(data@add) + gamma^2*diag(as.matrix(data@dom))))
-    } else {
-      index.scale <- sqrt(diag(as.matrix(data@add) + gamma^2*diag(as.matrix(data@g.iid))))
-    }
-  } else {
-    index.scale <- sqrt(diag(as.matrix(data@g.iid)))
   }
   
-  n.id <- length(data@id)
+  if (data[[1]]@model < 2L) {
+    index.scale <- sqrt(unlist(sapply(data,function(z){diag(as.matrix(z@geno1.var))})))
+  } else {
+    index.scale <- sqrt(unlist(sapply(data,function(z){diag(as.matrix(z@geno1.var))})) + 
+                          gamma^2*unlist(sapply(data,function(z){diag(as.matrix(z@geno2.var))})))
+  } 
+
+  n.id <- length(data[[1]]@id)
+  
+  if (!multi.prep) {
+    data <- data2
+    names(index.scale) <- rownames(data@geno1.var)
+    rm("data2")
+  } else {
+    nt <- sapply(data,function(z){nrow(z@geno1.var)})
+    ix <- which(nt==1)
+    if (length(ix) > 0) {
+      for (k in ix)
+        rownames(data[[k]]@geno1.var) <- names(data)[k]
+    }
+    names(index.scale) <- unlist(sapply(data,function(z){rownames(z@geno1.var)}))
+  }
+  
+  
   nlt <- length(index.scale) #number of loc/traits
   
   if (nlt > 1) {
-    if (is.null(index.coeff)) {
-      index.coeff <- 1/index.scale
+    traits <- names(index.scale)
+    ix <- match(traits,names(index.coeff))
+    if (any(is.na(ix))) {stop("Check names of loc/traits in index.coeff")}
+    index.coeff <- index.coeff[ix]
+    
+    if (nchar(what)==2) {
+      index.coeff <- index.coeff/as.numeric(index.scale)
+      index.coeff <- index.coeff/sqrt(sum(index.coeff^2))
     } else {
-      ix <- match(names(index.scale),names(index.coeff))
-      if (any(is.na(ix))) {stop("Check names of loc or traits in index.coeff")}
-      index.coeff <- index.coeff[ix]/index.scale
+      #do not rescale
+      what <- substr(what,1,2)
     }
-    index.coeff <- index.coeff/sqrt(sum(index.coeff^2))  
+    names(index.coeff) <- traits
+  } else {
+    if (nchar(what)==2) {
+      index.coeff <- 1
+    } else {
+      what <- substr(what,1,2)
+    }
+  }
+  
+  if (multi.prep) {
+    for (i in 1:length(data)) {
+      ix <- match(rownames(data[[i]]@geno1.var),names(index.coeff))
+      tmp <- blup(data[[i]],geno=geno,what=paste0(what,"*"),index.coeff=index.coeff[ix])
+      if (i==1) {
+        if (what %in% c("AM","DM")) {
+          out <- tmp$effect
+        } else {
+          out <- tmp[,1:2]
+        }
+      } else {
+        if (what %in% c("AM","DM")) {
+          out <- out + tmp$effect
+        } else {
+          out <- merge(out,tmp[,1:2],by="id")
+        }
+      }
+    }
+    if (what %in% c("AM","DM")) {
+      tmp$effect <- out
+      return(tmp[,1:4])
+    } else {
+      return(data.frame(id=out$id, value=apply(out[,-1],1,sum)))
+    }
+  }
+  
+  if (nlt > 1) {
     fix.value <- sum(index.coeff*data@avg.env[names(index.coeff)])
   } else {
-    index.coeff <- 1
-    fix.value <- data@avg.env
+    fix.value <- data@avg.env*index.coeff
   }
   
   n.mark <- length(data@fixed.marker)/nlt
   if (n.mark > 0) {
     if (nlt > 1) {
       fixed.markers <- unique(sapply(strsplit(names(data@fixed.marker),split=":",fixed=T),"[[",1))
-      beta <- matrix(data@fixed.marker,ncol=1)
-      tmp <- kronecker(geno@coeff[,fixed.markers,drop=FALSE],matrix(index.coeff,nrow=1)) %*% beta
-      fix.value <- fix.value + as.numeric(tmp)
-      
     } else {
       fixed.markers <- names(data@fixed.marker)
-      beta <- matrix(data@fixed.marker,ncol=1)
-      fix.value <- fix.value + as.numeric(geno@coeff[,fixed.markers,drop=FALSE] %*% beta)
-    } 
+    }
+    beta <- matrix(data@fixed.marker,ncol=1)
+    tmp <- kronecker(geno@coeff[,fixed.markers,drop=FALSE],matrix(index.coeff,nrow=1)) %*% beta
+    fix.value <- fix.value + as.numeric(tmp)
   }
   
   if (length(data@heterosis) > 0 & what %in% c("BV","GV")) {
@@ -92,7 +155,7 @@ blup <- function(data,geno=NULL,what,index.coeff=NULL,gwas.ncore=0L) {
       stop("GWAS option requires either AM or DM for 'what' ")
     
     M <- kronecker(Diagonal(n=n.id),Matrix(index.coeff,nrow=1))
-    if (!is.null(geno)) {
+    if (data@model > 1L) {
       M <- cbind(M,gamma*M)
     }
     out <- data.frame(id=data@id,value=as.numeric(M%*%Matrix(data@random,ncol=1)) + fix.value)

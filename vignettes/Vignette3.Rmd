@@ -1,0 +1,198 @@
+---
+title: "Vignette 3: Multi-trait analysis"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{StageWise Vignette1}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+```{r include=FALSE}
+library(knitr)
+opts_chunk$set(echo = TRUE,message=FALSE,warning=FALSE,comment="##",
+                      fig.width=4,fig.height=4,dpi=150)
+opts_knit$set(root.dir="~/Box Sync/Endelman/Software/StageWise")
+load("~/Software/StageWise/data/wheat.rda")
+```
+
+
+In [Vignette 1](https://jendelman.github.io/StageWise/Vignette1.html), three traits were analyzed independently in a dataset of 943 potato clones: yield, maturity, and fry color. Like most crops, a large number of traits are evaluated in potato breeding; in fact, too many to analyze jointly in StageWise. To make the analysis manageable, I recommend identifying groups of highly correlated traits based on the Stage 1 BLUEs. A simple loop can be used for this:
+
+```{r}
+library(StageWise)
+pheno.file <- system.file("vignette_data", "pheno1a.csv", package = "StageWise")
+effects <- data.frame(name=c("block","stand.count"),
+                      fixed=c(FALSE,TRUE),
+                      factor=c(TRUE,FALSE))
+traits <- c("total.yield","vine.maturity","fry.color")
+n.trait <- length(traits)
+
+stage1.blues <- NULL
+for (i in 1:n.trait) {
+  tmp <- Stage1(filename=pheno.file,traits=traits[i],effects=effects)
+  if (!is.null(stage1.blues)) {
+    stage1.blues <- merge(stage1.blues,tmp$blue,by=c("id","env"))
+  } else {
+    stage1.blues <- tmp$blue
+  }
+}
+colnames(stage1.blues) <- c("id","env",traits)
+head(stage1.blues)
+
+#Calculate corr matrix for each env
+lapply(X = split(stage1.blues,stage1.blues$env),
+       FUN = function(data){round(cor(data[,2+1:n.trait]),2)})
+``` 
+
+The output shows that in four of the five years, the phenotypic correlation between yield and vine maturity exceeded 0.3, while the correlation between fry color and these traits was consistently less than 0.2 in magnitude. We will therefore proceed with a correlated trait analysis for yield and maturity and combine the results with fry color later.
+
+The syntax for analyzing multiple traits closely follows the workflow for one trait: 
+
+```{r}
+ans1 <- Stage1(filename=pheno.file,traits=c("total.yield","vine.maturity"),
+              effects=effects)
+names(ans1)
+```
+
+As with the single trait analysis, `Stage1` returns a data frame of BLUEs and a list of their var-cov matrices. Instead of residual diagnostic plots, however, the residual covariance matrices are returned in "resid". Here is the code to analyze Stage 2 with directional dominance:
+
+```{r}
+geno.file <- system.file("vignette_data", "geno1.csv", package = "StageWise")
+geno <- read_geno(geno.file,ploidy=4,map=TRUE,dominance = TRUE)
+ans2 <- Stage2(data=ans1$blue, vcov=ans1$vcov, geno=geno, non.add="dom",
+               silent=FALSE)
+summary(ans2$vars)
+```
+
+The `summary` command shows the variances and proportion of variation explained (PVE) as separate tables, as well as the additive genetic correlation between the traits, which was 0.52. The results show dominance was more important for yield than maturity.
+
+The next commands in the workflow are `blup_prep` and `blup`. For the latter, we need to specify the index coefficients for the standardized traits, which represent their relative economic weights. For selection on yield without considering maturity, the code looks like this:
+
+```{r}
+prep1 <- blup_prep(ans1$blues, vcov=ans1$vcov, geno=geno,vars=ans2$vars)
+
+index1 <- c(total.yield=1, vine.maturity=0)
+GEBV1 <- blup(prep1, geno, what="BV", index.coeff=index1)
+```
+
+However, because yield and late maturity are correlated, the above index will lead to later maturity, which is undesirable. The `gain` command can be used to compute the expected response for different indices, in units of intensity x standard deviation ($i\sigma$), and its input is the output from `blup_prep`:
+```{r,fig.width=3,fig.height=3}
+gain1 <- gain(input=prep1, traits=c("total.yield","vine.maturity"), 
+              coeff=index1)
+kable(gain1$table)
+gain1$plot
+```
+
+The above plot is the ellipse of possible responses for the two traits (in units of $i\sigma$). The dashed red line represents the direction of the index vector, which we specified to have zero weight for maturity. The blue line segment shows the response that maximizes genetic merit, which in this case is the point on the ellipse with the largest value for yield. However, as the table and figure show, this leads maturity to increase by 0.41$i\sigma$.
+
+To select for higher yield without increasing maturity, we need a *restricted* index. Intuitively, we know this requires putting negative weight on maturity in the index. The optimal index coefficient can be determined using `gain` by including a table of constraints with two columns: "trait" and "sign". The "sign" column can have one of three symbols for each trait: "=", "<", ">", which indicate whether the response is $= 0$, $\leq 0$, or $\geq 0$, respectively. In this case, we want the maturity response to be less than or equal to zero:
+
+```{r,fig.width=3,fig.height=3}
+gain2 <- gain(input=prep1, traits=c("total.yield","vine.maturity"),
+              coeff=index1,
+              restricted=data.frame(trait="vine.maturity", sign="<"))
+kable(gain2$table)
+gain2$plot
+```
+
+The table output shows the index coefficients to achieve zero response for maturity while maximizing yield. Comparing with the earlier table, the yield response decreases from $0.69i\sigma$ to $0.56i\sigma$ with the restricted index. The ellipse plot shows the changes visually.
+
+We can use this information to calculate breeding values for the restricted index:
+
+```{r}
+index2 <- gain2$table$coeff
+names(index2) <- gain2$table$trait
+GEBV2 <- blup(prep1, geno, what="BV", index.coeff=index2)
+```
+
+The following code helps visualize how the ranking of genotypes is different with the restricted index. 
+
+```{r}
+# Rank genotypes from high to low 
+GEBV1$y <- rank(-GEBV1$value)
+GEBV2$y <- rank(-GEBV2$value)
+
+seg1 <- merge(GEBV1[,c("id","y")],GEBV2[,c("id","y")],by="id")
+colnames(seg1) <- c("id","y","yend")
+plot.data <- data.frame(seg1[seg1$y <= 10 | seg1$yend <= 10,],x=0,xend=1)
+
+library(ggplot2)
+ggplot(plot.data,aes(x=x,y=y,xend=xend,yend=yend)) + geom_segment() + theme_bw() + 
+  scale_y_reverse(lim=c(20,0),breaks=c(1,5,10,15,20),labels=c(1,5,10,15,20),minor_breaks = NULL,name="Rank",
+                  sec.axis = sec_axis(trans=~.*1,breaks=c(1,5,10,15,20),labels=c(1,5,10,15,20))) +
+  scale_x_continuous(breaks=c(0,1),labels=c("unrestricted","restricted"),name="") +
+  theme(axis.text=element_text(size=13),axis.title=element_text(size=13))
+```
+
+
+Now that we have a GEBV for yield and maturity, we can add fry color with equal weight to yield in the index. This is accomplished by giving a list of class "prep" objects (the output from `blup_prep`) to the `blup` command: the first one is from above for yield and maturity, and the second one is for fry color. The same genetic model (i.e., with dominance) is needed for all traits to combine them.
+
+```{r}
+fry1 <- Stage1(filename=pheno.file,traits="fry.color",
+              effects=effects)
+fry2 <- Stage2(data=fry1$blues, vcov=fry1$vcov, geno=geno, non.add="dom")
+fry.prep <- blup_prep(fry1$blues, fry1$vcov, geno, fry2$vars)
+
+index3 <- c(index2, fry.color=as.numeric(index2["total.yield"]))
+index3
+GEBV3 <- blup(data=list(prep1,fry.color=fry.prep), geno=geno, what="BV",
+              index.coeff=index3)
+              
+```
+
+
+### Genomic prediction with secondary traits
+
+The “mask” argument for `blup_prep` makes it easy to investigate the potential benefit of using a correlated, secondary trait to improve genomic selection. For example, many plant breeding programs are exploring the use of spectral measurements from high-throughput phenotyping platforms to improve selection for yield. The following example is based on data from Rutkoski et al. (2016), who showed that canopy temperature (CT) during grain fill was predictive of yield in wheat. The G matrix and Stage 1 BLUEs from the drought and extreme drought environments are distributed with the package. As with the potato dataset in Vignette 1, including the Stage 1 errors in Stage 2 lowers the AIC substantially.
+
+```{r}
+data(wheat) #load the wheat data
+head(wheat.blues)
+
+ans2a <- Stage2(data=wheat.blues, vcov=wheat.vcov, geno=wheat.geno,
+                non.add="none")
+ans2b <- Stage2(data=wheat.blues, geno=wheat.geno, non.add="none")
+
+data.frame(vcov=c(TRUE,FALSE), AIC=c(ans2a$aic,ans2b$aic))
+```
+
+Because the wheat lines are inbred, the genetic residual option in StageWise would be appropriate for modeling non-additive values, but this led to convergence problems with ASReml-R. Thus, non-additive effects were omitted using the argument non.add="none". Genomic heritability was 0.45-0.50 for yield and canopy temperature, with an additive genetic correlation of -0.81. 
+
+```{r}
+summary(ans2a$vars)
+```
+
+Now on to the genomic predictions. First we will do a tenfold cross validation without using CT data for the selection candidates, which can be called marker-based selection (MBS, see Vignette 1). Since the goal is yield prediction, the index coefficients are 1 and 0 for GY and CT, respectively.
+```{r}
+id <- unique(wheat.blues$id)
+N <- length(id)
+folds <- split(sample(id),cut(1:N,10))
+MBS <- NULL
+for (i in 1:10) {
+  prep <- blup_prep(wheat.blues, wheat.vcov, wheat.geno, ans2a$vars, 
+                    mask=data.frame(id=folds[[i]]))
+  pred <- blup(prep, geno=wheat.geno, what="BV", 
+               index.coeff=c(GY=1, CT=0))
+  MBS <- rbind(MBS, pred[pred$id %in% folds[[i]],])
+}
+```
+
+In the above code, the "mask" argument for `blup_prep` only has the variable "id", which means that all Stage 1 BLUEs for those individuals are masked. To only mask grain yield and use CT as a secondary trait for  marker-assisted selection (MAS), a second variable named "trait" is used.
+
+```{r}
+MAS <- NULL
+for (i in 1:10) {
+  prep <- blup_prep(wheat.blues, wheat.vcov, wheat.geno, ans2a$vars, 
+                    mask=data.frame(id=folds[[i]], trait="GY"))
+  pred <- blup(prep, geno=wheat.geno, what="BV", 
+               index.coeff=c(GY=1, CT=0))
+  MAS <- rbind(MAS, pred[pred$id %in% folds[[i]],])
+}
+
+ans <- merge(MBS,MAS,by="id")
+
+ggplot(ans,aes(x=r2.x, y=r2.y)) + geom_hex() + coord_fixed(ratio=1) + geom_line(data=data.frame(x=c(0.2,0.8),y=c(0.2,0.8)),mapping=aes(x=x,y=y),linetype=2) +  ggtitle("Reliability") +
+  xlab("MBS") + ylab("MAS")
+```
+
+The above figure shows that using CT increased the reliability of genomic prediction, by 0.2 on average.

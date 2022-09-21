@@ -11,7 +11,7 @@ vignette: >
 knitr::opts_chunk$set(echo = TRUE,message=FALSE,warning=FALSE,comment="##",
                       fig.width=4,fig.height=4,dpi=150)
 knitr::opts_knit$set(root.dir="~/Box Sync/Endelman/Software/StageWise")
-load("~/Box Sync/Endelman/Software/StageWise/Vignette2.rda")
+#load("~/Box Sync/Endelman/Software/StageWise/Vignette2.rda")
 ```
 
 This vignette builds on the information in [Vignette 1](https://jendelman.github.io/StageWise/Vignette1.html), which covered analysis at a single location. This vignette illustrates how to model the covariance between multiple locations, using a dataset of potato yield trials across 8 locations (TX was excluded) and 6 years, with a population of 336 genotypes ([Schmitz Carley et al. 2019](https://doi.org/10.2135/cropsci2018.05.0314)). 
@@ -30,8 +30,8 @@ table(pheno$loc)
 The input file contains not only a column named 'env' for environment but also one named 'loc' for location. The location information is not explicitly used by `Stage1` but is automatically detected and retained in the output for use in `Stage2`.
 
 ```{r, fig.width=4, fig.height=3}
-ans1 <- Stage1(filename=pheno.file, traits='Yield.Mg.ha',silent=TRUE)
-head(ans1$blue)
+ans1 <- Stage1(filename=pheno.file, traits='Yield.Mg.ha')
+head(ans1$blues)
 
 library(ggplot2)
 ggplot(data=ans1$fit,aes(x=loc,y=H2)) + stat_boxplot(outlier.color="red") + xlab("Location") + ylab(expression(paste("Broad-sense ",H^2," (plot basis)")))
@@ -39,11 +39,11 @@ ggplot(data=ans1$fit,aes(x=loc,y=H2)) + stat_boxplot(outlier.color="red") + xlab
 
 The above figure shows the variation in broad-sense heritability across locations and years. 
 
-When the data frame of BLUEs passed to `Stage2` has a column labeled 'loc', genotype x location effects are included using a separable covariance structure. When marker data are included, the genetic covariance between locations for the additive effects follows a 2nd order factor-analytic (FA2) model. Based on experience with a few datasets, attempts to also model covariance between residual genetic effect were unsuccessful, so the correlation is constrained at 1 in the current implementation. If marker data are not included, the genetic covariance between locations follows the FA2 model. For large datasets with many locations (such as this one), I recommend first analyzing it without marker data, as the computation proceeds more quickly. 
+When the data frame of BLUEs passed to `Stage2` has a column labeled 'loc', genotype x location effects are included using a separable covariance structure. The genetic covariance between locations for the highest order genetic effect (i.e., additive when marker data are included) follows a 2nd order factor-analytic (FA2) model. (For non-additive genetic effects, the correlation is constrained at 1.) For large datasets with many locations (such as this one), I recommend first analyzing it without marker data, as the computation proceeds more quickly. 
 
 Here is a joint analysis of the 8 locations without using the marker data.
-```{r,eval=FALSE}
-ans2a <- Stage2(data=ans1$blue, vcov=ans1$vcov)
+```{r}
+ans2a <- Stage2(data=ans1$blues, vcov=ans1$vcov)
 ```
 ```{r}
 summary(ans2a$vars)
@@ -62,21 +62,21 @@ The squared radius for each location is the proportion of variance explained (PV
 apply(ans2a$loadings,1,norm,type="f")^2
 ```
 
-The cosine of the angle between locations equals the correlation due to the latent factors (recall cos(0) = 1). Focusing on the 6 highly correlated locations-WI,MI,NC,OR,NY,MO-we will now add the marker data to `Stage2` to estimate the additive correlation and predict breeding values.
+The cosine of the angle between locations equals the correlation due to the latent factors (recall cos(0) = 1). Focusing on the 6 highly correlated locations-WI,MI,NC,OR,NY,MO-we now add the marker data to `Stage2` to estimate the additive correlation and predict breeding values.
 
 ```{r}
 locs <- c("WI","MI","OR","NY","NC","MO")
-blues <- ans1$blue[ans1$blue$loc %in% locs,]
+blues <- ans1$blues[ans1$blues$loc %in% locs,]
 tmp <- sapply(strsplit(names(ans1$vcov),split="_"),"[[",1)
 vcov <- ans1$vcov[tmp %in% locs]
 ```
-```{r, eval=FALSE}
-ans2b <- Stage2(data=blues,vcov=vcov,geno=geno,dominance=FALSE)
-ans2c <- Stage2(data=blues,vcov=vcov,geno=geno,dominance=TRUE)
+```{r}
+ans2b <- Stage2(data=blues,vcov=vcov,geno=geno,non.add="g.resid")
+ans2c <- Stage2(data=blues,vcov=vcov,geno=geno,non.add="dom")
 ```
 
 ```{r,fig.width=3,fig.height=3}
-data.frame(dominance=c(FALSE,TRUE), AIC=c(ans2b$aic,ans2c$aic))
+data.frame(non.add=c("g.resid","dom"), AIC=c(ans2b$aic,ans2c$aic))
 ```
 
 The dominance model is selected over the genetic residual model because of its lower AIC.

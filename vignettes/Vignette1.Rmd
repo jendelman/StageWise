@@ -16,7 +16,7 @@ opts_knit$set(root.dir="~/Box Sync/Endelman/Software/StageWise")
 
 ### Preface
 
-This vignette illustrates basic features of the package using a potato breeding dataset of nearly 950 genotypes (i.e., clones), with phenotype data from six years at one location. It is an updated version of the dataset published by [Endelman et al. (2018)](https://doi.org/10.1534/genetics.118.300685). This vignette covers single trait analysis, under the assumption that all environments have the same genetic correlation (i.e., compound symmetry). The analysis of multiple locations with different correlations are covered in [Vignette 2](https://jendelman.github.io/StageWise/Vignette2.html), and the analysis of correlated traits is covered in [Vignette 3](https://jendelman.github.io/StageWise/Vignette3.html).
+This vignette illustrates basic features of the package using a potato breeding dataset of 943 genotypes (i.e., clones), with phenotype data from six years at one location. It is an updated version of the dataset published by [Endelman et al. (2018)](https://doi.org/10.1534/genetics.118.300685). This vignette covers single trait analysis, under the assumption that all environments have the same genetic correlation (i.e., compound symmetry). The analysis of multiple locations with different correlations are covered in [Vignette 2](https://jendelman.github.io/StageWise/Vignette2.html), and the analysis of correlated traits is covered in [Vignette 3](https://jendelman.github.io/StageWise/Vignette3.html).
 
 There are five main functions in the package:
 
@@ -74,13 +74,13 @@ effects <- data.frame(name=c("block","stand.count"),
 effects
 library(StageWise)
 ans1a <- Stage1(filename=pheno1a.file,traits="total.yield",
-                effects=effects,solver="asreml",silent=FALSE)
+                effects=effects,solver="asreml")
 ```
 
 The `Stage1` function returns a list with several results. List element "blue" is a data frame of the individual BLUEs per environment. Element "fit" contains the broad-sense heritability on a plot basis (H2) and the AIC.
 
 ```{r}
-head(ans1a$blue)
+head(ans1a$blues)
 ans1a$fit
 ```
 
@@ -99,13 +99,13 @@ effects <- data.frame(name=c("row","range","stand.count","trial"),
                       factor=c(TRUE,TRUE,FALSE,TRUE))
 effects
 model1 <- Stage1(filename=pheno1b.file, traits="total.yield",
-                effects=effects, solver="asreml",silent=TRUE)
+                effects=effects, solver="asreml")
 model1$fit
 
-model2 <- Stage1(filename=pheno1b.file, traits="total.yield",silent=TRUE,
+model2 <- Stage1(filename=pheno1b.file, traits="total.yield",
                 effects=effects[3:4,], solver="spats", spline=c("row","range"))
 model2$fit
-compare <- merge(model1$blue,model2$blue,by=c("id","env"))
+compare <- merge(model1$blues,model2$blues,by=c("id","env"))
 ggplot(data=compare,aes(x=BLUE.x,y=BLUE.y)) + geom_point() + xlab("i.i.d. Random Effects") + ylab("2D Spline") + theme_bw() + geom_abline(intercept=0,slope=1) + coord_cartesian(xlim=c(25,90),ylim=c(25,90)) + ggtitle("2020 Yield BLUEs (Mg/ha)")
 ```
 
@@ -118,7 +118,7 @@ model2$resid$spatial
 Before proceeding to Stage 2, the BLUEs and variance-covariance matrices from the 2015-19 analysis and 2020 analysis need to be combined. (If other software is used for Stage 1, it can be incorporated in a similar manner.) The model with i.i.d. row and column effects is selected based on the higher estimate for H2.
 
 ```{r}
-stage1.blue <- rbind(ans1a$blue,model1$blue)
+stage1.blues <- rbind(ans1a$blues,model1$blues)
 stage1.vcov <- c(ans1a$vcov,model1$vcov)
 ```
 
@@ -139,14 +139,14 @@ geno <- read_geno(filename=geno.file, ploidy=4, map=TRUE, min.minor.allele=5,
 
 The function `read_geno` computes genomic relationship matrices from the markers. At a minimum, the additive (G) matrix is computed. When `dominance=TRUE`, the dominance (D) matrix is also computed. These matrices and other information needed for the `Stage2` function are stored in the returned object as an S4 class. 
 
-The `summary` function returns a matrix with information about the G and (when present) D matrices. Column 1 is the diagonal elements of G, and Column 2 contains the genomic inbreeding coefficients $F_g$ from the dominance matrix, which have an expected value of 1 for homozygous lines. The population mean $\overline F_g$ represents the deviation from panmictic (i.e., Hardy-Weinberg) proportions, and its mathematical relationship to the mean of the diagonal elements of G is identical to the mathematical relationship between the diagonal elements of the pedigree relationship matrix and the inbreeding coefficient based on kinship. For ploidy $\phi$, the formula is $\overline F_g = \frac{\overline G_{..} - 1}{\phi - 1}$. The result for $\overline F_g$ is negative for this tetraploid potato population, indicating there is excess heterozygosity, which may be expected when there is inbreeding depression. 
+The command `inbreeding` returns genomic inbreeding coefficients, estimated from either the diagonal elements of the G matrix or the average dominance coefficient. As shown below, the two methods are very similar and have the same population mean. The negative inbreeding coefficient indicates excess heterozygosity relative to panmictic equilibrium, which may be expected when there is inbreeding depression. 
 
 ```{r}
-x <- summary(geno)
+x <- inbreeding(geno)
 head(x)
-avg <- apply(x,2,mean)
-avg
-(as.numeric(avg[1])-1)/(4-1)  #equals mean Fg
+apply(x,2,mean)
+
+ggplot(x,aes(x=F.G,y=F.D)) + geom_hex()
 ```
 
 ### Stage 2
@@ -154,8 +154,8 @@ avg
 The `Stage2` function uses the BLUEs from Stage 1 as the response variable, as well as their variance-covariance matrix to partition micro-environmental variation from GxE. It is also possible to run `Stage2` without the covariance of the BLUEs from Stage 1, e.g.,  when there are no replicated entries within environment. In this case, use `vcov=NULL`. The benefit of including the covariance information is reflected in the lower value of AIC, which is a penalized likelihood to measure goodness-of-fit.
 
 ```{r}
-ans2a <- Stage2(data=stage1.blue, vcov=NULL)
-ans2b <- Stage2(data=stage1.blue, vcov=stage1.vcov)
+ans2a <- Stage2(data=stage1.blues, vcov=NULL)
+ans2b <- Stage2(data=stage1.blues, vcov=stage1.vcov)
 
 data.frame(vcov=c(FALSE,TRUE), AIC=c(ans2a$aic,ans2b$aic))
 
@@ -165,17 +165,17 @@ kable(summary(ans2b$vars))
 
 Several other pieces of information are in the list output from `Stage2`. The variance components are contained in "vars" as an S4 class, which is used by the `blup_prep` function (see below). As shown above, the `summary` command returns a matrix with two columns: the first is the variance, in units of the trait; the second is the proportion of variance excluding the environment effect, which makes the result for genotype comparable to heritability (environment basis). Including the Stage1 var-cov matrix for the BLUEs enables partitioning of the residual into GxE and Stage1 error.
 
-The above Stage 2 analysis did not include the marker data. To partition the genotype effects into additive and non-additive effects, the output from `read_geno` is included in the function call. StageWise has two ways of modeling non-additive effects. The option `dominance=FALSE` leads to a residual genetic model, with independent and identically distributed (iid) effects. When `dominance=TRUE` (which requires that `read_geno` was run with dominance=TRUE), the covariance of the non-additive effects follows the D matrix. The AIC can be used to assess which model is better.
+The above Stage 2 analysis did not include the marker data. To partition the genotype effects into additive and non-additive effects, the output from `read_geno` is included in the function call. StageWise has two ways of modeling non-additive effects. The argument non.add="g.resid" leads to a genetic residual, with independent and identically distributed (iid) effects. When non.add="dom" (which requires that `read_geno` was run with dominance=TRUE), the covariance of the non-additive effects follows the D matrix. To omit non-additive effects, use non.add="none". The AIC can be used to assess which model is better.
 
 The following example also shows the `silent=FALSE` option (default is TRUE), which shows the convergence progress from ASReml-R.
 
 ```{r}
-ans2c <- Stage2(data=stage1.blue,vcov=stage1.vcov,geno=geno,
-                silent=FALSE,dominance=FALSE)
-ans2d <- Stage2(data=stage1.blue,vcov=stage1.vcov,geno=geno,
-                silent=FALSE,dominance=TRUE)
+ans2c <- Stage2(data=stage1.blues,vcov=stage1.vcov,geno=geno,
+                silent=FALSE, non.add="g.resid")
+ans2d <- Stage2(data=stage1.blues,vcov=stage1.vcov,geno=geno,
+                silent=FALSE, non.add="dom")
 
-data.frame(Dominance=c(FALSE,TRUE),AIC=c(ans2c$aic,ans2d$aic))
+data.frame(non.add=c("g.resid","dom"),AIC=c(ans2c$aic,ans2d$aic))
 ```
 
 Based on the AIC values, we select the model with dominance. To compare AIC values for models with marker data to models without marker data, one needs to ensure that all individuals analyzed in Stage1 are in the marker data file. Because Stage2 excludes ungenotyped individuals from the analysis, the populations will not be the same. In this potato dataset, there are 1294 clones in the phenotype file but only 943 with marker data. 
@@ -185,11 +185,11 @@ kable(summary(ans2c$vars))
 kable(summary(ans2d$vars))
 ```
 
-When dominance is not included, the variance table has rows for "additive" and "genotype", which is the iid residual genetic effect. The output for the dominance model includes rows for "dominance" and "heterosis"; the former is based on the variance of a random effect with zero mean, while the latter is due to the mean ([Varona et al. 2018](https://doi.org/10.3389/fgene.2018.00078)). 
+The output for the dominance model includes rows for "dominance" and "heterosis"; the former is based on the variance of a random effect with zero mean, while the latter is due to the mean ([Varona et al. 2018](https://doi.org/10.3389/fgene.2018.00078)). 
 
 ### Pedigree data
 
-Estimating additive relationships using both marker and pedigree data is often beneficial because they have complementary properties. Unlike the G matrix, the A matrix is "sparse", meaning it has zero covariance between unrelated individuals. However, the A matrix does not account for segregation within biparental families or capture LD between founders. The G and A matrices can be combined into an "H" matrix, which also allows ungenotyped individuals to be included in the relationship matrix ([Legarra et al. 2009](https://doi.org/10.3168/jds.2009-2061); [Christensen and Lund 2010](https://doi.org/10.1186/1297-9686-42-2)). 
+Estimating additive relationships using both marker and pedigree data is often beneficial because they have complementary properties. Unlike the G matrix, the A matrix is "sparse", meaning it has zero covariance between unrelated individuals. However, the A matrix does not account for segregation within biparental families or capture LD between founders. The G and A matrices can be combined into an "H" matrix, which also allows ungenotyped individuals to be included in the relationship matrix ([Legarra et al. 2009](https://doi.org/10.3168/jds.2009-2061); [Christensen and Lund 2010](https://doi.org/10.1186/1297-9686-42-2)). (The inclusion of ungenotyped individuals is only available with the genetic residual model.)
 
 To illustrate this feature, a three-column pedigree file for the potato population is included with the package. When combining the G and A matrices, their relative weights must be specified using the argument `w` in `read_geno`, such that H = (1-w)G + wA. 
 ```{r}
@@ -197,13 +197,8 @@ ped.file <- system.file("vignette_data", "ped.csv", package = "StageWise")
 ped <- read.csv(ped.file)
 geno2 <- read_geno(geno.file,ploidy=4,map=TRUE,ped=ped,w=0.1,dominance = TRUE)
 ```
-```{r,eval=FALSE}
-ans2e <- Stage2(data=stage1.blue,vcov=stage1.vcov,geno=geno2,dominance=TRUE)
-```
-```{r,include=FALSE}
-load("~/Box Sync/Endelman/Software/StageWise/Vignette1.rda")
-```
 ```{r}
+ans2e <- Stage2(data=stage1.blues,vcov=stage1.vcov,geno=geno2,non.add="dom")
 ans2e$aic
 kable(summary(ans2e$vars))
 ```
@@ -214,11 +209,11 @@ The above result shows that blending G and A at w=0.1 slightly reduced the AIC a
 w.vec <- c(1e-5, seq(0.2,0.8,by=0.2))
 geno <- read_geno(geno.file,ploidy=4,map=TRUE,ped=ped,w=w.vec,dominance=TRUE)
 ```
-```{r, eval=FALSE}
+```{r}
 result <- data.frame(w=w.vec, aic=numeric(5), h2=numeric(5))
 ans2 <- vector("list",5)
 for (i in 1:5) {
-  ans2[[i]] <- Stage2(data=stage1.blue,vcov=stage1.vcov,geno=geno[[i]],dominance=TRUE)
+  ans2[[i]] <- Stage2(data=stage1.blues,vcov=stage1.vcov,geno=geno[[i]],non.add="dom")
   result$aic[i] <- ans2[[i]]$aic
   result$h2[i] <- summary(ans2[[i]]$vars)[2,2]
 }
@@ -242,7 +237,7 @@ ans2H <- ans2[[3]]
 kable(summary(ans2H$vars))
 ```
 
-One last point about `Stage2`: the function returns the fixed effect estimates under "fixed", and the predicted random effects for the individuals in the training set are returned under "random". 
+To include ungenotyped individuals in the H matrix, put a fourth column in the pedigree data frame with binary (0/1) values to indicate which individuals should be included.
 
 ### BLUP Reliability
 
@@ -263,7 +258,7 @@ The "values" are properties of individuals, as opposed to markers. Breeding valu
 The following code illustrates the prediction of genotypic values:
 
 ```{r}
-prep1 <- blup_prep(data=stage1.blue,
+prep1 <- blup_prep(data=stage1.blues,
               vcov=stage1.vcov,
               geno=genoH,
               vars=ans2H$vars)
@@ -276,7 +271,7 @@ The figure below illustrates how the reliability of genotypic value predictions 
 ```{r,fig.height=3,fig.width=3}
 
 #predict genotypic values without marker data
-prep2 <- blup_prep(data=stage1.blue,
+prep2 <- blup_prep(data=stage1.blues,
               vcov=stage1.vcov,
               vars=ans2b$vars)
 GV2 <- blup(prep2, what="GV")
@@ -289,11 +284,11 @@ ggplot(plot.data,aes(x=r2.x,y=r2.y)) + geom_point() + ggtitle("GV Reliability") 
 The `blup_prep` function allows for masking the phenotypes of some individuals before making the predictions, which allows for cross-validation. All else being equal, predictions for individuals without phenotypes, which is called marker-based selection, have lower reliability than predictions for individuals with phenotypes, which is called marker-assisted selection. To illustrate, we will mask the phenotypes for the most recent cohort of breeding lines in the dataset (which have names beginning with "W17") and compare with the previous prediction.
 
 ```{r, fig.height=3,fig.width=3}
-id <- stage1.blue$id
+id <- stage1.blues$id
 mask <- data.frame(id=unique(id[substr(id,1,3)=="W17"]))
 head(mask)
 
-prep3 <- blup_prep(data=stage1.blue,
+prep3 <- blup_prep(data=stage1.blues,
               vcov=stage1.vcov,
               geno=genoH,
               vars=ans2H$vars,
@@ -315,7 +310,7 @@ Using what="AM" or "DM" leads to the prediction of additive or dominance marker 
 
 ```{r,fig.height=3,fig.width=3}
 #w = 0
-prep <- blup_prep(data=stage1.blue,vcov=stage1.vcov,geno=geno[[1]],vars=ans2[[1]]$vars)
+prep <- blup_prep(data=stage1.blues,vcov=stage1.vcov,geno=geno[[1]],vars=ans2[[1]]$vars)
 marker.effects <- blup(data=prep, geno=geno[[1]], what="AM")
 head(marker.effects)
 AV1 <- predict(geno[[1]], marker.effects)
@@ -331,11 +326,11 @@ The marker effects can be standardized to compute GWAS -log10(p) scores that are
 ```{r,fig.height=3,fig.width=4}
 effects <- data.frame(name="block",fixed=FALSE,factor=TRUE)
 ans1vm <- Stage1(filename=pheno1a.file,traits="vine.maturity",
-                effects=effects,solver="asreml",silent=TRUE)
-ans2vm <- Stage2(data=ans1vm$blue, vcov=ans1vm$vcov, geno=geno[[1]], 
-                 dominance = TRUE)
+                effects=effects,solver="asreml")
+ans2vm <- Stage2(data=ans1vm$blues, vcov=ans1vm$vcov, geno=geno[[1]], 
+                 non.add="dom")
 
-prep <- blup_prep(ans1vm$blue, ans1vm$vcov, geno[[1]], ans2vm$vars)
+prep <- blup_prep(ans1vm$blues, ans1vm$vcov, geno[[1]], ans2vm$vars)
 gwas.ans <- blup(prep, geno[[1]], what="AM", gwas.ncore=2)
 head(gwas.ans)
 gwas_threshold(geno[[1]], alpha=0.05, n.core=2)
@@ -348,10 +343,11 @@ The GWAS peak on chr05 is near the gene *CDF1*, which is known to have a large e
 k <- which.max(gwas.ans$score)
 gwas.ans[k,]
 
-ans2vm.1 <- Stage2(data=ans1vm$blue,
+ans2vm.1 <- Stage2(data=ans1vm$blues,
                vcov=ans1vm$vcov,
                geno=geno[[1]],
-               fix.eff.marker="solcap_snp_c2_22964")
+               fix.eff.marker="solcap_snp_c2_22964",
+               non.add="g.resid")
 
 # Fixed effect for the marker
 ans2vm.1$fixed$marker

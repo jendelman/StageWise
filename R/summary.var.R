@@ -20,15 +20,9 @@ setMethod("summary",c(object="class_var"),
             
             n.trait <- ncol(object@resid)
             vars <- apply(object@vars,3,diag)
-            n1 <- ncol(object@add)
-            n2 <- ncol(object@g.iid)
-            
+
             if (n.trait > 1) {
-              if (n1 > 1) {
-                cor.mat <- cov_to_cor(object@add)
-              } else {
-                cor.mat <- cov_to_cor(object@g.iid)
-              }
+              cor.mat <- cov_to_cor(object@geno1)
               vars <- t(vars)
               prop.var <- t(t(vars[-1,])/apply(vars[-1,],2,sum,na.rm=T))
               prop.var <- round(prop.var[!is.na(prop.var[,1]),],3)
@@ -38,13 +32,9 @@ setMethod("summary",c(object="class_var"),
                           PVE=data.frame(prop.var),
                           cor.mat=round(cor.mat,3)))
             } else {
-              if (max(n1,n2) > 1) {
+              if (nrow(object@geno1) > 1) {
                 #multiple locations
-                if (n1 > 1) {
-                  cor.mat <- cov_to_cor(object@add)
-                } else {
-                  cor.mat <- cov_to_cor(object@g.iid)
-                }
+                cor.mat <- cov_to_cor(object@geno1)
                 x <- data.frame(Variance=sigdig(vars,digits),
                            PVE=round(c(NA,vars[-1]/sum(vars[-1],na.rm=T)),3))
                 return(list(var=x[!is.na(x[,1]),],cor=round(cor.mat,3)))

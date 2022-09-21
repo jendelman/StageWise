@@ -11,7 +11,7 @@ Stage2(
   fix.eff.marker = NULL,
   silent = TRUE,
   workspace = "500mb",
-  dominance = FALSE
+  non.add = "g.resid"
 )
 }
 \arguments{
@@ -27,7 +27,7 @@ Stage2(
 
 \item{workspace}{Memory limit for ASRreml-R variance estimation}
 
-\item{dominance}{TRUE/FALSE}
+\item{non.add}{one of the following: "none","g.resid","dom"}
 }
 \value{
 List containing
