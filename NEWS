@@ -1,3 +1,6 @@
+Changes in 0.28
+* Updated Vignette 3, including wheat dataset
+
 Changes in 0.27
 * renamed output blue to blues in Stage1
 * changed internal representation for class_var and class_prep
