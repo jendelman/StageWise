@@ -1,0 +1,10 @@
+citHeader("To cite the StageWise package in publications, please use")
+
+citEntry(entry="Article",
+	title="Fully efficient, two-stage analysis of multi-environment trials with directional dominance and multi-trait genomic selection",
+	author=personList(as.person("J. B. Endelman")),
+	year=2022,
+	journal="bioRxiv",
+    pages="BIORXIV/2022/509884",	
+    textVersion="Endelman JB (2022) Fully efficient, two-stage analysis of multi-environment trials with directional dominance and multi-trait genomic selection. BIORXIV/2022/509884"
+)

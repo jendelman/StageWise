@@ -11,7 +11,7 @@ efficiently with a two-stage analysis, in which best linear unbiased
 estimates (BLUEs) of genotypic value are computed for each environment
 in Stage 1 and then used as the response variable in Stage 2. To fully
 utilize the data, however, the variance-covariance matrix of the
-estimates from Stage 1 must be included in Stage 2 ([Piepho et
+estimates from Stage 1 should be included in Stage 2 ([Piepho et
 al. 2012](https://doi.org/10.1002/bimj.201100219); [Damesa et
 al. 2017](https://doi.org/10.2134/agronj2016.07.0395)), which is not
 possible with most software packages for genomics-assisted breeding.
