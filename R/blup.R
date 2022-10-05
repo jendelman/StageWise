@@ -155,9 +155,9 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
       stop("GWAS option requires either AM or DM for 'what' ")
     
     M <- kronecker(Diagonal(n=n.id),Matrix(index.coeff,nrow=1))
-    if (data@model > 1L) {
+    if (data@model > 1L) 
       M <- cbind(M,gamma*M)
-    }
+    
     out <- data.frame(id=data@id,value=as.numeric(M%*%Matrix(data@random,ncol=1)) + fix.value)
     numer <- diag(M%*% tcrossprod(data@var.uhat,M))
     denom <- diag(M%*% tcrossprod(data@var.u,M))
@@ -168,9 +168,11 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
   }
   
   #marker effects
-  n.random <- length(data@random)
-  if (!is.null(geno)) 
-    n.random <- n.random/2
+  if (data@model > 1L) {
+    n.random <- length(data@random)/2
+  } else {
+    n.random <- length(data@random)
+  }
   
   if (what=="AM") {
     G <- kron(geno@eigen.G,1)

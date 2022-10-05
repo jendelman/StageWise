@@ -1,3 +1,6 @@
+Changes in 0.91
+* Fixed bug for GWAS with non.add="none" option
+
 Changes in 0.90
 * Updated README, preparing for submission
 
