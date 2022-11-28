@@ -367,6 +367,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
     vcov <- c(vcov2,vcov3)
     names(vcov) <- c(names(vcov2),envs[j])
     blue.out <- rbind(blue.out[-ix,],blue3)
+    rm("asremlOmega",envir = .GlobalEnv)
   }
   
   if (n.trait==1) {

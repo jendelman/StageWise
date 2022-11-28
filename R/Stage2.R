@@ -17,6 +17,7 @@
 #' @param silent TRUE/FALSE, whether to suppress ASReml-R output
 #' @param workspace Memory limit for ASRreml-R variance estimation
 #' @param non.add one of the following: "none","g.resid","dom"
+#' @param max.iter maximum number of iterations for asreml
 #' 
 #' @return List containing
 #' \describe{
@@ -37,7 +38,7 @@
 #' @export
 
 Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
-                   silent=TRUE,workspace="500mb",non.add="g.resid") {
+                   silent=TRUE,workspace="500mb",non.add="g.resid",max.iter=20) {
   
   stopifnot(inherits(data,"data.frame"))
   stopifnot(requireNamespace("asreml"))
@@ -270,7 +271,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
       }
   }
 
-  asreml::asreml.options(workspace=workspace,maxit=20,trace=!silent)
+  asreml::asreml.options(workspace=workspace,maxit=max.iter,trace=!silent)
   model <- sub(pattern="RANDOM",replacement=random.effects,model,fixed=T)
 
   start.table <- eval(parse(text=paste0(model,",start.values = TRUE)")))$vparameters.table
@@ -287,15 +288,18 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     start.table$Constraint[k] <- "F"
   }
   ans <- eval(parse(text=paste0(model,",G.param=start.table)")))
-  while (!ans$converge) {
-    cat("ASReml-R failed to converge. Do you wish to continue running? y/n \n")
-    input <- readLines(n=1)
-    if (input=="y") {
-      ans <- asreml::update.asreml(ans)
-    } else {
-      return()
-    }
+  if (!ans$converge) {
+    stop("ASReml-R did not converge. Try increasing max.iter")
   }
+  # while (!ans$converge) {
+  #   cat("ASReml-R failed to converge. Do you wish to continue running? y/n \n")
+  #   input <- readLines(n=1)
+  #   if (input=="y") {
+  #     ans <- asreml::update.asreml(ans)
+  #   } else {
+  #     return()
+  #   }
+  # }
   
   sans <- summary(ans,coef=TRUE)
   out$aic <- as.numeric(sans$aic)

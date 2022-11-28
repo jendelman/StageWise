@@ -11,7 +11,8 @@ Stage2(
   fix.eff.marker = NULL,
   silent = TRUE,
   workspace = "500mb",
-  non.add = "g.resid"
+  non.add = "g.resid",
+  max.iter = 20
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ Stage2(
 \item{workspace}{Memory limit for ASRreml-R variance estimation}
 
 \item{non.add}{one of the following: "none","g.resid","dom"}
+
+\item{max.iter}{maximum number of iterations for asreml}
 }
 \value{
 List containing
