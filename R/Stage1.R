@@ -241,11 +241,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
     #BLUP model
     if (n.trait==1) {
       ans <- try(eval(parse(text=blup.model)),silent=TRUE)
-      if (class(ans)=="try-error") {
-        cat("BLUP model failed to converge.\n")
-        next
-      }
-      if ((solver=="ASREML")&&(!ans$converge)) {
+      if ((class(ans)=="try-error") || ((solver=="ASREML")&&(!ans$converge))) {
         cat("BLUP model failed to converge.\n")
         next
       }
@@ -274,53 +270,54 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
     #BLUE model
     asreml::asreml.options(trace=!silent)
     ans <- try(eval(parse(text=blue.model)),silent=TRUE)
-    if (class(ans)=="try-error" | ((solver=="ASREML")&&(!ans$converge))) {
+    if ((class(ans)=="try-error") || ((solver=="ASREML")&&(!ans$converge))) {
       cat("BLUE model failed to converge.\n")
     } else {
-    asreml::asreml.options(trace=FALSE)
+      asreml::asreml.options(trace=FALSE)
       
-    if (n.trait==1) {
-      if (solver=="ASREML") {
-        predans <- asreml::predict.asreml(ans,classify="id",vcov = TRUE)
-        tmp <- predans$pvals[,c("id","predicted.value")]
-        colnames(tmp) <- c("id","BLUE")
-        vcov[[j]] <- predans$vcov
-        fit$AIC[j] <- round(as.numeric(summary(ans)$aic),1)
-      }
-      if (solver=="SPATS") {
-        predans <- predict.SpATS(object=ans,which="id",predFixed="marginal",
-                                 return.vcov.matrix = TRUE)
-        tmp <- predans[,c("id","predicted.values")]
-        colnames(tmp) <- c("id","BLUE")
-        tmp2 <- Matrix(spam::as.dgCMatrix.spam(attr(predans,"vcov")))
-        vcov[[j]] <- as(forceSymmetric(tmp2),"dspMatrix")
-      }
-      tmp$id <- as.character(tmp$id)
-      dimnames(vcov[[j]]) <- list(tmp$id,tmp$id)
-      blue.out <- rbind(blue.out,data.frame(expt=expts[j],tmp))
+      if (n.trait==1) {
+        if (solver=="ASREML") {
+          predans <- asreml::predict.asreml(ans,classify="id",vcov = TRUE)
+          tmp <- predans$pvals[,c("id","predicted.value")]
+          colnames(tmp) <- c("id","BLUE")
+          vcov[[j]] <- predans$vcov
+          fit$AIC[j] <- round(as.numeric(summary(ans)$aic),1)
+        }
+        if (solver=="SPATS") {
+          predans <- predict.SpATS(object=ans,which="id",predFixed="marginal",
+                                   return.vcov.matrix = TRUE)
+          tmp <- predans[,c("id","predicted.values")]
+          colnames(tmp) <- c("id","BLUE")
+          tmp2 <- Matrix(spam::as.dgCMatrix.spam(attr(predans,"vcov")))
+          vcov[[j]] <- as(forceSymmetric(tmp2),"dspMatrix")
+        }
+        tmp$id <- as.character(tmp$id)
+        dimnames(vcov[[j]]) <- list(tmp$id,tmp$id)
+        blue.out <- rbind(blue.out,data.frame(expt=expts[j],tmp))
     
-    } else {
-      vc <- summary(ans)$varcomp
-      vc <- vc[-which(vc$bound=="F" & round(vc$component)==1L),c("component","std.error")]
-      vc.names <- rownames(vc)
-      iv <- grep("units:trait!",vc.names,fixed=T)
-      resid.vc[[j]] <- f.cov.trait(vc[iv,],traits,us=TRUE)
-      
-      fit$AIC[j] <- round(as.numeric(summary(ans)$aic),1)
-      predans <- asreml::predict.asreml(ans,classify="id:trait",vcov = TRUE)
-      tmp <- predans$pvals[,c("id","trait","predicted.value")]
-      colnames(tmp) <- c("id","trait","BLUE")
-      vcov[[j]] <- predans$vcov
-      tmp$id <- as.character(tmp$id)
-      id.trait <- apply(tmp[,1:2],1,paste,collapse=":")
-      dimnames(vcov[[j]]) <- list(id.trait,id.trait)
-      blue.out <- rbind(blue.out,data.frame(expt=expts[j],tmp))
-    }
+      } else {
+        vc <- summary(ans)$varcomp
+        vc <- vc[-which(vc$bound=="F" & round(vc$component)==1L),c("component","std.error")]
+        vc.names <- rownames(vc)
+        iv <- grep("units:trait!",vc.names,fixed=T)
+        resid.vc[[j]] <- f.cov.trait(vc[iv,],traits,us=TRUE)
+        
+        fit$AIC[j] <- round(as.numeric(summary(ans)$aic),1)
+        predans <- asreml::predict.asreml(ans,classify="id:trait",vcov = TRUE)
+        tmp <- predans$pvals[,c("id","trait","predicted.value")]
+        colnames(tmp) <- c("id","trait","BLUE")
+        vcov[[j]] <- predans$vcov
+        tmp$id <- as.character(tmp$id)
+        id.trait <- apply(tmp[,1:2],1,paste,collapse=":")
+        dimnames(vcov[[j]]) <- list(id.trait,id.trait)
+        blue.out <- rbind(blue.out,data.frame(expt=expts[j],tmp))
+      }
     }
   }
   
   ik <- which(!sapply(vcov,is.null))
   vcov <- vcov[ik]
+  expt.in.env <- expt.in.env[ik]
   blue.out$env <- data$env[match(blue.out$expt,data$expt)]
   
   nee <- sapply(expt.in.env,length)
