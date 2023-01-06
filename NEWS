@@ -1,5 +1,5 @@
 Changes in 0.93
-* Fixed bug for handling missing environment with multiple traits
+* Fixed bug encountered with missing environment and multiple traits
 
 Changes in 0.92
 * Added max.iter argument to Stage2, to control maximum number of ASReml-R iterations.
