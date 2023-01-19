@@ -32,7 +32,7 @@ kron <- function(eigen.A, B) {
   eigen.B <- list(values=tmp$d,vectors=tmp$u)
   V1 <- kronecker(Diagonal(x=sqrt(eigen.A$values)),Diagonal(x=sqrt(eigen.B$values)))
   V1.inv <- kronecker(Diagonal(x=1/sqrt(eigen.A$values)),Diagonal(x=1/sqrt(eigen.B$values)))
-  V2 <- as(Matrix(eigen.B$vectors,dimnames=list(rownames(B),rownames(B))),"dgeMatrix")
+  V2 <- as(as(Matrix(eigen.B$vectors,dimnames=list(rownames(B),rownames(B))),"generalMatrix"),"unpackedMatrix")
   V3 <- kronecker(eigen.A$vectors,V2,make.dimnames=T)
   return(list(mat=tcrossprod(V1,V3), inv=tcrossprod(V1.inv,V3)))
 }

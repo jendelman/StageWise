@@ -132,7 +132,8 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
     tmp <- split(data$id,data$env)
     tmp2 <- lapply(tmp,function(id) {
       n.id <- length(id)
-      eigen.I <- list(values=rep(1,n.id),vectors=as(Diagonal(n.id,1),"dgeMatrix"))
+      #eigen.I <- list(values=rep(1,n.id),vectors=as(Diagonal(n.id,1),"dgeMatrix"))
+      eigen.I <- list(values=rep(1,n.id),vectors=as(as(Diagonal(n.id,1),"generalMatrix"),"unpackedMatrix"))
       dimnames(eigen.I$vectors) <- list(id,id)
       crossprod(kron(eigen.I,vars@resid)$mat)
     })
@@ -156,7 +157,7 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
     data <- merge(data,dat2,by="id")
   }
   
-  eigen.I <- list(values=rep(1,n.id),vectors=as(Diagonal(n.id,1),"dgeMatrix"))
+  eigen.I <- list(values=rep(1,n.id),vectors=as(as(Diagonal(n.id,1),"generalMatrix"),"unpackedMatrix"))
   dimnames(eigen.I$vectors) <- list(id,id)
   
   if (n.trait==1) {

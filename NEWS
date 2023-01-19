@@ -1,3 +1,6 @@
+Changes in 0.94
+* Changed dgeMatrix call due to Matrix package update
+
 Changes in 0.93
 * Fixed bug encountered with missing environment and multiple traits
 
