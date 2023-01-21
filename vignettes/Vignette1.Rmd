@@ -38,7 +38,7 @@ In Stage 1, the data for each environment are analyzed independently, which allo
 
 There are two required columns in the CSV file of phenotype data used in `Stage1`: "id" contains the individual identifier and is matched against the information from the genotype input file; and "env" is the name of the environment, which is typically a location x year combination. (This vignette illustrates the analysis of multiple years from one location, or when multiple locations are similar enough that the genotype x location effect can be neglected. For the analysis of correlated locations, consult [Vignette 2](https://jendelman.github.io/StageWise/Vignette2.html) after you complete this vignette.) The other columns in the input file contain traits, cofactors, or covariates.
 
-The phenotypes for this tutorial are based on six years (2015-2020) of variety trials at the Hancock Research Station of the University of Wisconsin. Data for the first five years are in the file "pheno1a", which includes a column with an incomplete blocking factor. The 2020 data are provided in the file "pheno1b" and consists of two adjacent, partially replicated trials (preliminary and advanced), with row and range information to illustrate spatial analysis.  
+The phenotypes for this tutorial are based on six years (2015-2020) of variety trials at the Hancock Research Station of the University of Wisconsin. Data for the first five years are in the file "pheno1a", which includes a column with an incomplete blocking factor. The 2020 data are provided in the file "pheno1b" and consists of two partially replicated trials (preliminary and advanced), with row and range information to illustrate spatial analysis. 
 
 * total yield (Mg per ha) 
 
@@ -91,19 +91,21 @@ ans1a$resid$boxplot
 ans1a$resid$qqplot
 ```
 
-For the 2020 data, we will compare a model based on random row and range effects vs. a 2D spline model, which requires the additional argument `spline` to indicate the names of the variables in the input file with the x and y coordinates.
+The reserved word "expt" in the input file, which is short for "experiment", directs Stage1 to fit separate models for each experiment within an environment. Then, in a second step, a single BLUE for each genotype in that environment is estimated, including the full var-cov matrix. Compared to simply use "expt" as a factor in a single step, this two-step procedure within Stage1 allows for separate spatial models.
+
+The 2020 data file contains two experiments: a preliminary and advanced trial. Here is a comparison of using random row and range effects vs. a 2D spline, which requires the additional argument `spline` to indicate the names of the variables in the input file with the x and y coordinates. 
 
 ```{r}
-effects <- data.frame(name=c("row","range","stand.count","trial"),
-                      fixed=c(FALSE,FALSE,TRUE,TRUE),
-                      factor=c(TRUE,TRUE,FALSE,TRUE))
+effects <- data.frame(name=c("row","range","stand.count"),
+                      fixed=c(FALSE,FALSE,TRUE),
+                      factor=c(TRUE,TRUE,FALSE))
 effects
 model1 <- Stage1(filename=pheno1b.file, traits="total.yield",
                 effects=effects, solver="asreml")
 model1$fit
 
 model2 <- Stage1(filename=pheno1b.file, traits="total.yield",
-                effects=effects[3:4,], solver="spats", spline=c("row","range"))
+                effects=effects[3,], solver="spats", spline=c("row","range"))
 model2$fit
 compare <- merge(model1$blues,model2$blues,by=c("id","env"))
 ggplot(data=compare,aes(x=BLUE.x,y=BLUE.y)) + geom_point() + xlab("i.i.d. Random Effects") + ylab("2D Spline") + theme_bw() + geom_abline(intercept=0,slope=1) + coord_cartesian(xlim=c(25,90),ylim=c(25,90)) + ggtitle("2020 Yield BLUEs (Mg/ha)")
@@ -112,7 +114,7 @@ ggplot(data=compare,aes(x=BLUE.x,y=BLUE.y)) + geom_point() + xlab("i.i.d. Random
 The above figure shows that the BLUEs are similar with the two different models. A figure showing the 2D spline and spatial distribution of residuals is also returned when SpATS is used:
 
 ```{r}
-model2$resid$spatial
+model2$resid$spatial$advanced
 ```
 
 Before proceeding to Stage 2, the BLUEs and variance-covariance matrices from the 2015-19 analysis and 2020 analysis need to be combined. (If other software is used for Stage 1, it can be incorporated in a similar manner.) The model with i.i.d. row and column effects is selected based on the higher estimate for H2.
@@ -320,6 +322,20 @@ AV2 <- blup(data=prep, geno=geno[[1]], what="AV")
 plot.data <- merge(AV1, AV2, by="id")
 ggplot(plot.data,aes(x=value.x,y=value.y)) + geom_point() + xlab("RR-BLUP") + ylab("G-BLUP") + theme_bw()
 ```
+
+This equivalency also holds for genotypic values (A + D):
+
+```{r}
+DM <- blup(data=prep, geno=geno[[1]], what="DM")
+DV1 <- predict(geno[[1]], DM)
+GEGV1 <- data.frame(id=AV1$id, value=AV1$value + DV1$value)
+
+GEGV2 <- blup(data=prep, geno=geno[[1]], what="GV")
+plot.data <- merge(GEGV1,GEGV2,by="id")
+
+ggplot(plot.data,aes(x=value.x,y=value.y)) + geom_point() + xlab("RR-BLUP") + ylab("GD-BLUP") + theme_bw()
+```
+
 
 The marker effects can be standardized to compute GWAS -log10(p) scores that are equivalent to the traditional fixed effect method ([Duarte et al. (2014)](http://www.biomedcentral.com/1471-2105/15/246); [Bernal Rubio et al. 2016](https://doi.org/10.1111/age.12378)). This calculation is easily parallelized, and the argument `gwas.ncore` specifies how many cores to use (the default is 0, which skips computing the GWAS scores). The `gwas_threshold` command computes the -log10(p) threshold for QTL discovery based on an effective number of markers ([Moskvina and Schmidt, 2008](https://doi.org/10.1002/gepi.20331)), and `manhattan_plot` displays the result. For yield there were no significant QTL, so results for the vine maturity trait are shown instead. 
 

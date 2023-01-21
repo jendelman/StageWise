@@ -124,7 +124,6 @@ ggplot(plot.data,aes(x=x,y=y,xend=xend,yend=yend)) + geom_segment() + theme_bw()
   theme(axis.text=element_text(size=13),axis.title=element_text(size=13))
 ```
 
-
 Now that we have a GEBV for yield and maturity, we can add fry color with equal weight to yield in the index. This is accomplished by giving a list of class "prep" objects (the output from `blup_prep`) to the `blup` command: the first one is from above for yield and maturity, and the second one is for fry color. The same genetic model (i.e., with dominance) is needed for all traits to combine them.
 
 ```{r}

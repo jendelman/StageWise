@@ -1,3 +1,6 @@
+Changes in 0.95
+* corrected missing heterosis in dominance marker effect blups
+
 Changes in 0.94
 * Changed dgeMatrix call due to Matrix package update
 

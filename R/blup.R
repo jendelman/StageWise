@@ -182,7 +182,9 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
   } else {
     D <- kron(geno@eigen.D,1)
     M <- kronecker(crossprod(geno@coeff.D,crossprod(D$inv)),matrix(index.coeff,nrow=1))/geno@scale.D
-    effect <- as.numeric(M %*% matrix(data@random[n.random + 1:n.random],ncol=1))
+    dhat <- -kronecker(matrix(geno@Fg[data@id],ncol=1),matrix(data@heterosis,ncol=1)) + 
+      matrix(data@random[n.random + 1:n.random],ncol=1)
+    effect <- as.numeric(M %*% dhat)
     V <- data@var.uhat[n.random+1:n.random,n.random+1:n.random] #used for GWAS
   }
   

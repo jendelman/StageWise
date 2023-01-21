@@ -73,7 +73,9 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   
   if (!is.element("expt",colnames(data))) {
     data$expt <- data$env
+    no.expt <- TRUE
   } else {
+    no.expt <- FALSE
     tmp <- split(data$env,data$expt)
     tmp2 <- sapply(tmp,function(z){length(unique(z))})
     if (any(tmp2 > 1)) {
@@ -200,17 +202,23 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   resid.blup <- NULL
   vcov <- vector("list",n.expt)
   names(vcov) <- expts
-  if (n.trait==1) {
-    if (solver=="ASREML") {
-      fit <- data.frame(expt=expts,H2=as.numeric(NA),AIC=as.numeric(NA))
-    } else {
-      fit <- data.frame(expt=expts,H2=as.numeric(NA))
-    }
-    if ("loc" %in% colnames(data)) 
-      fit$loc <- data$loc[match(fit$expt,data$expt)]
+  
+  if ("loc" %in% colnames(data)) {
+    fit <- data[!duplicated(data$expt),c("loc","env","expt")]
   } else {
-    fit <- data.frame(expt=expts,AIC=as.numeric(NA))
+    fit <- data[!duplicated(data$expt),c("env","expt")]
   }
+  
+  fit <- fit[match(expts,fit$expt),]
+  if (n.trait==1) {
+    fit$H2 <- as.numeric(NA)
+    if (solver=="ASREML") 
+      fit$AIC <- as.numeric(NA)
+  } else {
+    fit$AIC <- as.numeric(NA)
+  }
+  if (no.expt)
+    fit <- fit[,-match("expt",colnames(fit))]
 
   blue.out <- NULL
   blup.resid <- NULL
@@ -289,7 +297,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
           tmp <- predans[,c("id","predicted.values")]
           colnames(tmp) <- c("id","BLUE")
           tmp2 <- Matrix(spam::as.dgCMatrix.spam(attr(predans,"vcov")))
-          vcov[[j]] <- as(forceSymmetric(tmp2),"dspMatrix")
+          vcov[[j]] <- as(forceSymmetric(tmp2),"packedMatrix")
         }
         tmp$id <- as.character(tmp$id)
         dimnames(vcov[[j]]) <- list(tmp$id,tmp$id)
@@ -378,7 +386,6 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   }
   
   if (n.trait==1) {
-    #fit <- fit[ik,]
     p1 <- ggplot(data=blup.resid,aes(y=.data$resid,x=.data$expt)) + ylab("Residual") + xlab("") +
       stat_boxplot(outlier.color="red") + theme_bw() + theme(axis.text.x=element_text(angle=90,vjust=0.5))
     p2 <- ggplot(data=blup.resid,aes(sample=.data$resid)) + stat_qq() + stat_qq_line() + facet_wrap(~expt) + theme_bw() + xlab("Expected") + ylab("Observed")
