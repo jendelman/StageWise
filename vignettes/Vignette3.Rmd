@@ -16,6 +16,21 @@ load("~/Software/StageWise/data/wheat.rda")
 ```
 
 
+### Multi-Trait Model
+
+When estimating BLUEs in Stage1, an unstructured trait covariance matrix for the residuals is included. The phenotypes for one environment are denoted $y_{ikl}$, where $i$ represents genotype, $k$ is trait, and $l$ represents one or more indices for treatments, covariates, etc.
+
+$$ y_{ikl} = \mu + g_{ik} + \dots + \epsilon_{ikl} $$ 
+The genotype effects $g_{ik}$ are fixed, and the residuals are multivariate normal with $var[\boldsymbol{\epsilon}] = \mathbf{I} \otimes \boldsymbol\Sigma_\epsilon$, where $\boldsymbol\Sigma_\epsilon$ is an unstructured var-cov matrix for traits.
+
+The response variable for Stage2 is $BLUE[g_{ijk}]$, where the subscript $j$ is now included to represent environment. The Stage2 model with multivariate normal additive $\boldsymbol{a}$ and dominance $\boldsymbol{d}$ effects is
+
+$$BLUE[g_{ijk}] = E_{jk} + a_{ik} + d_{ik} - b_k F_i + gE_{ijk} + s_{ijk}$$
+
+where $E_{jk}$ is the fixed effect for environment, and $F_i$ is the genomic inbreeding coefficient, with regression coefficient $b_k$. The other effects are multivariate normal with zero mean and  $var[\boldsymbol{a}]=\mathbf{G} \otimes \boldsymbol\Sigma_a$, $var[\boldsymbol{d}]=\mathbf{D} \otimes \boldsymbol\Sigma_d$, and $var[\boldsymbol{gE}]=\mathbf{I} \otimes \boldsymbol\Sigma_{gE}$. The preceding $\boldsymbol\Sigma$ are unstructured var-cov matrices for traits. The Stage1 error term $\boldsymbol{s}$ is also multivariate normal, with var-cov matrix equal to the direct sum of the var-cov matrices of the Stage1 BLUEs for each environment.
+
+### Potato dataset
+
 In [Vignette 1](https://jendelman.github.io/StageWise/Vignette1.html), three traits were analyzed independently in a dataset of 943 potato clones: yield, maturity, and fry color. Like most crops, a large number of traits are evaluated in potato breeding; in fact, too many to analyze jointly in StageWise. To make the analysis manageable, I recommend identifying groups of highly correlated traits based on the Stage 1 BLUEs. A simple loop can be used for this:
 
 ```{r}
