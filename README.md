@@ -18,10 +18,11 @@ possible with most software packages for genomics-assisted breeding.
 
 R package StageWise was developed to provide a simple interface for
 genomic selection and GWAS based on a fully efficient, two-stage
-analysis. Each phenotypic record is associated with a single genotype
-id, which is suitable for clonal and inbred lines but not hybrid crops.
-The ASReml-R package is used for variance component estimation, which
-requires a license from [VSN
+analysis [(Endelman 2023)](https://doi.org/10.1007/s00122-023-04298-x).
+Each phenotypic record is associated with a single genotype id, which is
+suitable for clonal and inbred lines but not hybrid crops. The ASReml-R
+package is used for variance component estimation, which requires a
+license from [VSN
 International](https://www.vsni.co.uk/software/asreml-r).
 
 Software development has been supported by USDA Hatch Project 1013047
