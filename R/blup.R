@@ -122,7 +122,7 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
     }
     if (what %in% c("AM","DM")) {
       tmp$effect <- out
-      return(tmp[,1:4])
+      return(tmp)
     } else {
       return(data.frame(id=out$id, value=apply(out[,-1],1,sum)))
     }

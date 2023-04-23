@@ -1,3 +1,6 @@
+Changes in 1.00
+* fixed bug in blup for AM/DM when using list of blup_prep inputs
+
 Changes in 0.95
 * corrected missing heterosis in dominance marker effect blups
 
