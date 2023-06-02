@@ -23,7 +23,7 @@
 #' \describe{
 #' \item{aic}{AIC}
 #' \item{vars}{variance components for \code{\link{blup_prep}}, as variable of class \code{\link{class_var}}}
-#' \item{fixed}{Fixed effect estimates for env and markers}
+#' \item{params}{Estimates and SE for fixed effects and variance components}
 #' \item{random}{Random effect predictions}
 #' \item{loadings}{scaled loadings for the FA2 multi-loc model}
 #' }
@@ -313,14 +313,17 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     beta.names <- rownames(beta)
     beta.names <- gsub("env_","",beta.names)
     ix <- match(levels(data$env),beta.names)
-    out$fixed$env <- data.frame(env=levels(data$env),effect=as.numeric(beta[ix,1]))
-    vars[1,1,"env"] <- pvar(mu=out$fixed$env$effect,weights=as.numeric(table(data$env)))
+    out$params$env <- data.frame(env=levels(data$env),
+                                 estimate=as.numeric(beta[ix,1]),
+                                 SE=as.numeric(beta[ix,2]))
+    vars[1,1,"env"] <- pvar(mu=out$params$env$estimate,weights=as.numeric(table(data$env)))
   
     if (non.add=="dom") {
       ix <- grep("dom",beta.names,fixed=T)
       if (n.loc==1) {
         vars[1,1,"heterosis"] <- pvar(mu=dom.covariate*beta[ix,1],weights=id.weights)
-        out$fixed$heterosis <- as.numeric(beta[ix,1])
+        out$params$heterosis <- data.frame(estimate=as.numeric(beta[ix,1]),
+                                           SE=as.numeric(beta[ix,2]))
       } else {
         beta.names[ix] <- gsub("loc_","",beta.names[ix])
         beta.names[ix] <- gsub("dom","",beta.names[ix])
@@ -328,13 +331,17 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
         ix <- ix[match(locations,beta.names[ix])]
         mu <- as.numeric(kronecker(matrix(dom.covariate,ncol=1),beta[ix,1]))
         vars[1,1,"heterosis"] <- pvar(mu=mu,weights=gL.weights)
-        out$fixed$heterosis <- data.frame(loc=locations,effect=as.numeric(beta[ix,1]))
+        out$params$heterosis <- data.frame(loc=locations,
+                                           estimate=as.numeric(beta[ix,1]),
+                                           SE=as.numeric(beta[ix,2]))
       }
     }
     if (n.mark > 0) {
       if (n.loc==1) {
         ix <- match(fix.eff.marker,beta.names)
-        out$fixed$marker <- data.frame(marker=fix.eff.marker,effect=as.numeric(beta[ix,1]))
+        out$params$marker <- data.frame(marker=fix.eff.marker,
+                                        estimate=as.numeric(beta[ix,1]),
+                                        SE=as.numeric(beta[ix,2]))
         mu <- as.numeric(as.matrix(geno@coeff[id,fix.eff.marker])%*%beta[ix,1])
         vars[1,1,"fixed.marker"] <- pvar(mu=mu,weights=id.weights)
       } else {
@@ -349,9 +356,10 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
                                   stringsAsFactors = FALSE)
         loc.marker <- loc.marker[,c(2,1)]
         ix <- match(apply(loc.marker,1,paste,collapse=":"),beta.names)
-        x <- out$fixed$marker <- data.frame(marker=loc.marker$marker,
+        x <- out$params$marker <- data.frame(marker=loc.marker$marker,
                                        loc=loc.marker$loc,
-                                       effect=as.numeric(beta[ix,1]))
+                                       estimate=as.numeric(beta[ix,1]),
+                                       SE=as.numeric(beta[ix,2]))
         mu_gL <- as.numeric(kronecker(as.matrix(geno@coeff[id,fix.eff.marker]),diag(n.loc))%*%beta[ix,1])
         vars[1,1,"fixed.marker"] <- pvar(mu=mu_gL,weights=gL.weights) 
       }
@@ -364,15 +372,17 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     rownames(beta) <- gsub("env_","",rownames(beta))
     rownames(beta) <- gsub("Trait_","",rownames(beta))
     tmp <- strsplit(rownames(beta)[ix],split=":",fixed=T)
-    out$fixed$env <- data.frame(env=sapply(tmp,"[[",1),trait=sapply(tmp,"[[",2),
-                                effect=as.numeric(beta[ix,1]))
+    out$params$env <- data.frame(env=sapply(tmp,"[[",1),
+                                 trait=sapply(tmp,"[[",2),
+                                 estimate=as.numeric(beta[ix,1]),
+                                 SE=as.numeric(beta[ix,2]))
     
     weights <- as.numeric(table(data$env[data$trait==traits[1]]))
     weights <- weights/sum(weights)
     for (i in 1:n.trait) {
        for (j in i:n.trait) {
-        mu1 <- out$fixed$env$effect[out$fixed$env$trait==traits[i]]
-        mu2 <- out$fixed$env$effect[out$fixed$env$trait==traits[j]]
+        mu1 <- out$params$env$estimate[out$params$env$trait==traits[i]]
+        mu2 <- out$params$env$estimate[out$params$env$trait==traits[j]]
         vars[i,j,"env"] <- sum(mu1*mu2*weights) - sum(mu1*weights)*sum(mu2*weights)
       }
     }
@@ -380,7 +390,9 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     if (non.add=="dom") {
       gamma <- (geno@ploidy/2 - 1)/(geno@ploidy - 1)
       ix <- grep("dom",rownames(beta),fixed=T)
-      out$fixed$heterosis <- data.frame(trait=traits,effect=as.numeric(beta[ix,1]))
+      out$params$heterosis <- data.frame(trait=traits,
+                                         estimate=as.numeric(beta[ix,1]),
+                                         SE=as.numeric(beta[ix,2]))
       
       weights <- id.weights/sum(id.weights)
       for (i in 1:n.trait) 
@@ -397,15 +409,16 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     if (n.mark > 0) {
       trait.marker <- expand.grid(trait=traits,marker=fix.eff.marker,stringsAsFactors = FALSE)
       ix <- match(apply(trait.marker,1,paste,collapse=":"),rownames(beta))
-      x <- out$fixed$marker <- data.frame(marker=trait.marker$marker,
+      x <- out$params$marker <- data.frame(marker=trait.marker$marker,
                                        trait=trait.marker$trait,
-                                       effect=as.numeric(beta[ix,1]))
+                                       estimate=as.numeric(beta[ix,1]),
+                                       SE=as.numeric(beta[ix,2]))
       weights <- id.weights/sum(id.weights)
       for (i in 1:n.trait) {
         for (j in i:n.trait) {
-          b1 <- matrix(x[x$trait==traits[i],"effect"],ncol=1)
+          b1 <- matrix(x[x$trait==traits[i],"estimate"],ncol=1)
           mu1 <- as.numeric(as.matrix(geno@coeff[id,fix.eff.marker])%*%b1)
-          b2 <- matrix(x[x$trait==traits[j],"effect"],ncol=1)
+          b2 <- matrix(x[x$trait==traits[j],"estimate"],ncol=1)
           mu2 <- as.numeric(as.matrix(geno@coeff[id,fix.eff.marker])%*%b2)
           vars[i,j,"fixed.marker"] <- sum(mu1*mu2*weights) - sum(mu1*weights)*sum(mu2*weights)
           if (non.add=="dom") {
@@ -422,6 +435,16 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
   vc <- sans$varcomp
   vc <- vc[-which(vc$bound=="F" & round(vc$component)==1L),]
   vc.names <- rownames(vc)
+  name2 <- vc.names
+  name2 <- gsub("vm(id, source = asremlG, singG = \"PSD\")","additive",name2,fixed=T)
+  name2 <- gsub("vm(id, source = asremlD)","dominance",name2,fixed=T)
+  name2 <- gsub("units!units","residual",name2,fixed=T)
+  name2 <- gsub("units","residual",name2,fixed=T)
+  name2 <- gsub("env.id","residual",name2,fixed=T)
+  name2 <- gsub("Trait!Trait!","",name2,fixed=T)
+  name2 <- gsub("Trait!Trait_","",name2,fixed=T)
+  out$params$vc <- data.frame(name=name2, 
+                              estimate=vc$component, SE=vc$std.error)
   
   Imat <- Diagonal(n=n,x=1)
   dimnames(Imat) <- list(id,id)

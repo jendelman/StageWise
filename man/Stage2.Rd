@@ -37,7 +37,7 @@ List containing
 \describe{
 \item{aic}{AIC}
 \item{vars}{variance components for \code{\link{blup_prep}}, as variable of class \code{\link{class_var}}}
-\item{fixed}{Fixed effect estimates for env and markers}
+\item{params}{Estimates and SE for fixed effects and variance components}
 \item{random}{Random effect predictions}
 \item{loadings}{scaled loadings for the FA2 multi-loc model}
 }
