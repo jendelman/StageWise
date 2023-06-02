@@ -366,7 +366,7 @@ ans2vm.1 <- Stage2(data=ans1vm$blues,
                non.add="g.resid")
 
 # Fixed effect for the marker
-ans2vm.1$fixed$marker
+ans2vm.1$params$marker
 
 # Proportion of variance
 kable(summary(ans2vm.1$vars))
