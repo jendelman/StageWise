@@ -6,7 +6,7 @@
 #' 
 #' G can be blended with the pedigree relationship matrix (A) by providing a pedigree data frame in \code{ped} and blending parameter \code{w}. The blended relationship matrix is H = (1-w)G + wA. The first three columns of \code{ped} are id, parent1, parent2. Missing parents must be coded NA. An optional fourth column in binary (0/1) format can be used to indicate which ungenotyped individuals should be included in the H matrix, but this option cannot be combined with dominance. If there is no fourth column, only genotyped individuals are included. If a vector of w values is provided, the function returns a list of \code{\link{class_geno}} objects.
 #' 
-#' If the A matrix is not used, then G is blended with the identity matrix (times the mean diagonal of G) to improve numerical conditioning for matrix inversion. The default for w is 1e-5, which is somewhat arbitrary and based on tests with the vignette dataset. 
+#' If the A matrix is not used, then G is blended with the identity matrix (times the mean diagonal of G) to improve numerical conditioning for matrix inversion. The default for w is 1e-5, which is somewhat arbitrary and based on tests with the vignette dataset. The D matrix is also blended with the identity matrix using 1e-5 for numerical conditioning.
 #' 
 #' When \code{dominance=FALSE}, non-additive effects are captured using a residual genetic effect, with zero covariance. If \code{dominance=TRUE}, a (digenic) dominance covariance matrix is used instead. 
 #' 
@@ -159,6 +159,7 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
     coeff.D[is.na(coeff.D)] <- 0
     scale.D <- 4*choose(ploidy,2)*sum(p^2*(1-p)^2)
     D <- tcrossprod(coeff.D)/scale.D
+    D <- (1-1e-5)*D + (1e-5)*mean(diag(D))*Diagonal(n=nrow(D))
     eigen.D <- eigen(D,symmetric=TRUE)
     eigen.D$vectors <- Matrix(eigen.D$vectors,dimnames=list(id,id))
     class(eigen.D) <- "list"

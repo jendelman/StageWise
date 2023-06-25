@@ -8,6 +8,8 @@
 #' 
 #' Because ASReml-R can only use relationship matrices defined in the global environment, this function creates and then removes global variables when either \code{vcov} or \code{geno} is used. By default, the workspace memory for ASReml-R is set at 500mb. If you get an error about insufficient memory, try increasing it. ASReml-R version 4.1.0.148 or later is required. 
 #' 
+#' The \code{covariates} option is only available for single trait/loc analysis.
+#' 
 #' @references Damesa et al. 2017. Agronomy Journal 109: 845-857. doi:10.2134/agronj2016.07.0395
 #' 
 #' @param data data frame of BLUEs from Stage 1 (see Details)
@@ -18,6 +20,7 @@
 #' @param workspace Memory limit for ASRreml-R variance estimation
 #' @param non.add one of the following: "none","g.resid","dom"
 #' @param max.iter maximum number of iterations for asreml
+#' @param covariates names of other covariates in \code{data}
 #' 
 #' @return List containing
 #' \describe{
@@ -38,7 +41,8 @@
 #' @export
 
 Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
-                   silent=TRUE,workspace="500mb",non.add="g.resid",max.iter=20) {
+                   silent=TRUE,workspace="500mb",non.add="g.resid",max.iter=20,
+                   covariates=NULL) {
   
   stopifnot(inherits(data,"data.frame"))
   stopifnot(requireNamespace("asreml"))
@@ -146,35 +150,48 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     } 
   }
   
-  if (is.null(geno)) {
-    tmp <- c("env","fixed.marker","additive","add x loc","dominance","heterosis","genotype","g x loc","g x env","Stage1.error","residual")
-  } else {
-    tmp <- c("env","fixed.marker","additive","add x loc","dominance","heterosis","g.resid","g x loc","g x env","Stage1.error","residual")
+  if (!is.null(covariates)) {
+    stopifnot(covariates %in% colnames(data))
+    stopifnot(sapply(data[,covariates],class) %in% c("numeric","integer"))
+    if (n.trait > 1 | n.loc > 1)
+      stop("Additional covariates only supported for single trait/location.")
   }
-  vars <- array(data=numeric(0),dim=c(n.trait,n.trait,11),dimnames=list(traits,traits,tmp))
+  
+  if (is.null(geno)) {
+    tmp <- c("env","covariates","fixed.marker","additive","add x loc","dominance","heterosis","genotype","g x loc","g x env","Stage1.error","residual")
+  } else {
+    tmp <- c("env","covariates","fixed.marker","additive","add x loc","dominance","heterosis","g.resid","g x loc","g x env","Stage1.error","residual")
+  }
+  vars <- array(data=numeric(0),dim=c(n.trait,n.trait,12),dimnames=list(traits,traits,tmp))
 
   if (n.trait==1) {
     if (n.loc==1) {
       model <- "asreml(data=data,fixed=BLUE~FIX-1,random=~RANDOM,residual=~idv(units)"
+      model <- sub("FIX",paste(c("env",covariates,fix.eff.marker,dom),collapse="+"),model,fixed=T)
     } else {
       model <- "asreml(data=data,fixed=BLUE~FIX-1,random=~RANDOM,residual=~dsum(~idv(units)|loc)"
+      tmp <- gsub("+",":loc+",paste(c("env",fix.eff.marker,dom),collapse="+"),fixed=T)
+      model <- sub("FIX",paste(tmp,"loc",sep=":"),model,fixed=T)
     }
-    if (n.mark > 0 | (non.add=="dom")) {
-      if (n.loc==1) {
-        model <- sub("FIX",paste(c("env",fix.eff.marker,dom),collapse="+"),model,fixed=T)
-      } else {
-        model <- sub("FIX",paste(c("env",paste0(c(fix.eff.marker,dom),":loc")),collapse="+"),model,fixed=T)
-      }
-    } else {
-      model <- sub("FIX","env",model,fixed=T)
-    }
+    #if (n.mark > 0 | (non.add=="dom") | !is.null(fix.eff)) {
+    #if (n.loc==1) {
+    #  model <- sub("FIX",paste(c("env",fix.eff,fix.eff.marker,dom),collapse="+"),model,fixed=T)
+    #} else {
+    #  model <- sub("FIX",paste(c("env",paste0(c(fix.eff.marker,dom),":loc")),collapse="+"),model,fixed=T)
+    #}
+    #} else {
+    #  model <- sub("FIX","env",model,fixed=T)
+    #}
   } else {
     model <- "asreml(data=data,fixed=BLUE~FIX-1,random=~RANDOM,residual=~id(env.id):us(Trait)"
-    if (n.mark > 0 | (non.add=="dom")) {
-      model <- sub("FIX",paste(paste0(c("env",fix.eff.marker,dom),":Trait"),collapse="+"),model,fixed=T)
-    } else {
-      model <- sub("FIX","env:Trait",model,fixed=T)
-    }
+    tmp <- gsub("+",":Trait+",paste(c("env",fix.eff.marker,dom),collapse="+"),fixed=T)
+    model <- sub("FIX",paste(tmp,"Trait",sep=":"),model,fixed=T)
+    
+    # if (n.mark > 0 | (non.add=="dom")) {
+    #   model <- sub("FIX",paste(paste0(c("env",fix.eff.marker,dom),":Trait"),collapse="+"),model,fixed=T)
+    # } else {
+    #   model <- sub("FIX","env:Trait",model,fixed=T)
+    # }
   }
   
   if (is.null(geno)) {
@@ -203,9 +220,9 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
       } 
       if (non.add=="dom") {
         if (n.trait==2) {
-          random.effects <- paste(random.effects,"vm(id,source=asremlD):corh(Trait)",sep="+")
+          random.effects <- paste(random.effects,"vm(id,source=asremlD,singG='PSD'):corh(Trait)",sep="+")
         } else {
-          random.effects <- paste(random.effects,"vm(id,source=asremlD):us(Trait)",sep="+")
+          random.effects <- paste(random.effects,"vm(id,source=asremlD,singG='PSD'):us(Trait)",sep="+")
         }
       }
     } else {
@@ -228,9 +245,9 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
       }
       if (non.add=="dom") {
         if (n.loc > 1) {
-          random.effects <- paste(random.effects,"vm(id,source=asremlD):corh(loc)",sep="+")
+          random.effects <- paste(random.effects,"vm(id,source=asremlD,singG='PSD'):corh(loc)",sep="+")
         } else {
-          random.effects <- paste(random.effects,"vm(id,source=asremlD)",sep="+")
+          random.effects <- paste(random.effects,"vm(id,source=asremlD,singG='PSD')",sep="+")
         }
       }
     }
@@ -336,6 +353,15 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
                                            SE=as.numeric(beta[ix,2]))
       }
     }
+    if (!is.null(covariates)) {
+      ix <- match(covariates,beta.names)
+      out$params$covariates <- data.frame(name=covariates,
+                                      estimate=as.numeric(beta[ix,1]),
+                                      SE=as.numeric(beta[ix,2]))
+      mu <- as.numeric(as.matrix(data[,covariates,drop=FALSE])%*%beta[ix,1])
+      vars[1,1,"covariates"] <- pvar(mu=mu)
+    }
+    
     if (n.mark > 0) {
       if (n.loc==1) {
         ix <- match(fix.eff.marker,beta.names)
@@ -437,7 +463,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
   vc.names <- rownames(vc)
   name2 <- vc.names
   name2 <- gsub("vm(id, source = asremlG, singG = \"PSD\")","additive",name2,fixed=T)
-  name2 <- gsub("vm(id, source = asremlD)","dominance",name2,fixed=T)
+  name2 <- gsub("vm(id, source = asremlD, singG = \"PSD\")","dominance",name2,fixed=T)
   name2 <- gsub("units!units","residual",name2,fixed=T)
   name2 <- gsub("units","residual",name2,fixed=T)
   name2 <- gsub("env.id","residual",name2,fixed=T)
@@ -493,7 +519,8 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
           model <- 2L
         }
         if (non.add=="dom") {
-          tmp <- Matrix(vc[grep("source = asremlD):loc",vc.names,fixed=T),1],ncol=1)
+          #tmp <- Matrix(vc[grep("source = asremlD):loc",vc.names,fixed=T),1],ncol=1)
+          tmp <- Matrix(vc[grep("source = asremlD",vc.names,fixed=T),1],ncol=1)
           rownames(tmp) <- locations
           geno2.vc <- coerce_dpo(tcrossprod(sqrt(tmp)))
           K <- kronecker(.GlobalEnv$asremlD,geno2.vc,make.dimnames = T)
@@ -593,8 +620,11 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
   if (n.mark==0)
     fix.eff.marker <- character(0)
   
+  if (!is.null(covariates))
+    attributes(fix.eff.marker) <- list(covariates=covariates)
+  
   if (n.trait > 1) {
-    for (i in 1:11) 
+    for (i in 1:12) 
       vars[,,i][lower.tri(vars[,,i])] <- vars[,,i][upper.tri(vars[,,i])]
   }
   

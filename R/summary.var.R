@@ -40,7 +40,7 @@ setMethod("summary",c(object="class_var"),
                 return(list(var=x[!is.na(x[,1]),],cor=round(cor.mat,3)))
               } else {
                 x <- data.frame(Variance=sigdig(vars,digits),
-                           PVE=round(c(NA,vars[-1]/sum(vars[-1],na.rm=T)),3))
+                           PVE=round(c(NA,NA,vars[-(1:2)]/sum(vars[-(1:2)],na.rm=T)),3))
                 return(x[!is.na(x[,1]),])
                 }
             }

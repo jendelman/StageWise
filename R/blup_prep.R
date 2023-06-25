@@ -303,6 +303,16 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
     X <- cbind(X,tmp)
   }
   
+  covariates <- unlist(attributes(vars@fix.eff.marker))
+  n.covar <- length(covariates)
+  if (n.covar > 0) {
+    q <- paste(covariates,collapse="+")
+    q <- paste0("~",q)
+    q <- paste0(q,"-1")
+    tmp <- sparse.model.matrix(formula(q),data,sep="__")
+    X <- cbind(X,tmp)
+  } 
+  n.fix <- ncol(X)
   m <- ncol(Z)
   n <- nrow(Z)
   var.u <- crossprod(Gmat$mat)
@@ -314,12 +324,12 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
       method <- "VINV"
     }
   }
+  
   if (method=="MME") {
     #Construct MME coefficient matrix
     tmp <- mapply(function(a,b){chol(solve(as(a+b,"dpoMatrix")))},omega.list,Rlist)
     Rinv <- bdiag(tmp)
   
-    n.fix <- ncol(X)
     RZ <- Rinv %*% Z
     RX <- Rinv %*% X
     Q <- cbind(RX, RZ)
@@ -384,6 +394,11 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
     } else {
       avg.env <- mean(fixed[1:n.env])
     }
+  }
+  
+  if (n.covar > 0) {
+    #evaluate covariates at mean value
+    avg.env <- avg.env + sum(apply(data[,covariates,drop=FALSE],2,mean)*fixed[(n.fix-n.covar+1):n.fix])
   }
   
   nlt <- max(n.loc,n.trait)

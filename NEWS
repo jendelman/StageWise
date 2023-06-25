@@ -1,3 +1,7 @@
+Changes in 1.02
+* Handles positive semi-definite D matrix
+* Additive covariates allowed in Stage2
+
 Changes in 1.01
 * Eliminated "fixed" output from Stage2, replaced with "params"
 * New function "dominance" for reporting dominance parameters 

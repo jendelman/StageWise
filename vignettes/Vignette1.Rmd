@@ -141,19 +141,24 @@ geno <- read_geno(filename=geno.file, ploidy=4, map=TRUE, min.minor.allele=5,
 
 The function `read_geno` computes genomic relationship matrices from the markers. At a minimum, the additive (G) matrix is computed. When `dominance=TRUE`, the dominance (D) matrix is also computed. These matrices and other information needed for the `Stage2` function are stored in the returned object as an S4 class. 
 
-The command `inbreeding` returns genomic inbreeding coefficients, estimated from either the diagonal elements of the G matrix or the average dominance coefficient. As shown below, the two methods are very similar and have the same population mean. The negative inbreeding coefficient indicates excess heterozygosity relative to panmictic equilibrium, which may be expected when there is inbreeding depression. 
+The command `inbreeding` returns genomic inbreeding coefficients $F$, estimated from either the diagonal elements of the G matrix or the average dominance coefficient. As shown below, the two methods are very similar and have the same population mean. The negative inbreeding coefficient indicates excess heterozygosity relative to panmictic equilibrium, which may be expected when there is inbreeding depression. 
 
 ```{r}
 x <- inbreeding(geno)
 head(x)
 apply(x,2,mean)
+apply(x,2,sd)
 
 ggplot(x,aes(x=F.G,y=F.D)) + geom_hex()
 ```
 
+The above code shows there is relatively little variation for $F$ (sd $\approx$ 0.03), which is relevant when interpreting the results of Stage 2.
+
 ### Stage 2
 
-The `Stage2` function uses the BLUEs from Stage 1 as the response variable, as well as their variance-covariance matrix to partition micro-environmental variation from GxE. It is also possible to run `Stage2` without the covariance of the BLUEs from Stage 1, e.g.,  when there are no replicated entries within environment. In this case, use `vcov=NULL`. The benefit of including the covariance information is reflected in the lower value of AIC, which is a penalized likelihood to measure goodness-of-fit.
+The `Stage2` function uses the BLUEs from Stage 1 as the response variable, as well as their variance-covariance matrix to partition micro-environmental variation from GxE. It is also possible to run `Stage2` without the covariance of the BLUEs from Stage 1, which is necessary when there are no replicated entries within environment. In this case, use `vcov=NULL`, and covariates can be included with argument `covariates`. 
+
+The benefit of accounting for Stage 1 errors when a two-stage analysis is conducted is reflected in the lower value of AIC, which is a penalized likelihood to measure goodness-of-fit. 
 
 ```{r}
 ans2a <- Stage2(data=stage1.blues, vcov=NULL)
@@ -188,6 +193,15 @@ kable(summary(ans2d$vars))
 ```
 
 The output for the dominance model includes rows for "dominance" and "heterosis"; the former is based on the variance of a random effect with zero mean, while the latter is due to the mean ([Varona et al. 2018](https://doi.org/10.3389/fgene.2018.00078)). 
+
+The PVE for heterosis depends on two quantities: (1) baseline heterosis ($b$), which is the difference between the population at panmictic equilibrium vs. fully inbred; (2) population variation for inbreeding. As shown above, the latter is rather small. The estimate for baseline heterosis can be found in the "params" output (in trait units), or its value relative to the additive standard deviation (SDa) is calculated by the function `dominance`:
+
+```{r}
+ans2d$params$heterosis
+dominance(ans2d$params)
+```
+
+The standard error of the baseline heterosis estimate is large because of the limited variation for $F$.
 
 ### Pedigree data
 

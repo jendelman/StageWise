@@ -27,7 +27,7 @@ The response variable for Stage2 is $BLUE[g_{ijk}]$, where the subscript $j$ is 
 
 $$BLUE[g_{ijk}] = E_{jk} + a_{ik} + d_{ik} - b_k F_i + gE_{ijk} + s_{ijk}$$
 
-where $E_{jk}$ is the fixed effect for environment, and $F_i$ is the genomic inbreeding coefficient, with regression coefficient $b_k$. The other effects are multivariate normal with zero mean and  $var[\boldsymbol{a}]=\mathbf{G} \otimes \boldsymbol\Sigma_a$, $var[\boldsymbol{d}]=\mathbf{D} \otimes \boldsymbol\Sigma_d$, and $var[\boldsymbol{gE}]=\mathbf{I} \otimes \boldsymbol\Sigma_{gE}$. The preceding $\boldsymbol\Sigma$ are unstructured var-cov matrices for traits. The Stage1 error term $\boldsymbol{s}$ is also multivariate normal, with var-cov matrix equal to the direct sum of the var-cov matrices of the Stage1 BLUEs for each environment.
+where $E_{jk}$ is the fixed effect for environment, $F_i$ is the genomic inbreeding coefficient, and its regression coefficient $b_k$ represents baseline heterosis, i.e., the difference between the population at panmictic equilibrium vs. fully inbred. The other effects are multivariate normal with zero mean and  $var[\boldsymbol{a}]=\mathbf{G} \otimes \boldsymbol\Sigma_a$, $var[\boldsymbol{d}]=\mathbf{D} \otimes \boldsymbol\Sigma_d$, and $var[\boldsymbol{gE}]=\mathbf{I} \otimes \boldsymbol\Sigma_{gE}$. The preceding $\boldsymbol\Sigma$ are unstructured var-cov matrices for traits. The Stage1 error term $\boldsymbol{s}$ is also multivariate normal, with var-cov matrix equal to the direct sum of the var-cov matrices of the Stage1 BLUEs for each environment.
 
 ### Potato dataset
 
