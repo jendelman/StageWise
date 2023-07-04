@@ -1,3 +1,6 @@
+Changes in 1.03
+* predict.geno allows marker effects model to be subset of geno variable
+
 Changes in 1.02
 * Handles positive semi-definite D matrix
 * Additive covariates allowed in Stage2
