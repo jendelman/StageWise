@@ -1,20 +1,24 @@
 #' Genetic gain
 #' 
-#' Genetic gain for breeding values
+#' Genetic gain calculations
 #' 
-#' Optional argument \code{restricted} is a data frame with columns "trait" and "sign", where the options for sign are "=",">","<", representing equal to zero, non-negative, and non-positive.  
+#' Either \code{merit} or \code{desired} can be used, not both. The former specifies the relative contribution of each trait to genetic merit, while the latter specifies the relative desired gain in genetic standard deviation units. All traits must be specified. Optional argument \code{restricted} is a data frame with columns "trait" and "sign", where the options for sign are "=",">","<", representing equal to zero, non-negative, and non-positive. When \code{desired} is used, the \code{restricted} argument is ignored.
+#' 
+#' The argument \code{gamma} controls the definition of genetic merit. (See notation in the journal publication.) The default is NULL, which implies breeding values. For purely additive values, use gamma = 0. For total genotypic value, use gamma = 1.
 #' 
 #' @param input either object of \code{\link{class_prep}} or quad.mat returned by this function
-#' @param traits optional, plots ellipse tradeoff
-#' @param coeff optional, index coefficients expressed in genetic standard deviation units
-#' @param restricted data frame of restricted traits see Details
+#' @param merit named vector of merit coefficients, in genetic standard deviation units
+#' @param desired named vector of desired gains, in genetic standard deviation units
+#' @param restricted data frame of restricted traits, see Details
+#' @param traits optional vector with exactly 2 trait names, to plot elliptical response
+#' @param gamma contribution of non-additive values for genetic merit
 #' @param solver name of convex solver (default is "ECOS")
 #' 
 #' @return List containing
 #' \describe{
 #' \item{quad.mat}{quadratic matrix for the ellipsoid}
 #' \item{plot}{ellipse plot}
-#' \item{table}{data frame with gain and coefficients for the traits}
+#' \item{table}{data frame with the response and index coefficients for all traits}
 #' }
 #' 
 #' @import ggplot2
@@ -22,9 +26,18 @@
 #' @import CVXR
 #' @export
 
-gain <- function(input,traits=NULL,coeff=NULL,restricted=NULL,solver="ECOS") {
+gain <- function(input, merit=NULL, desired=NULL, restricted=NULL,
+                 traits=NULL, gamma=NULL, solver="ECOS", ...) {
   
-  if (class(input)[1]=="class_prep") {
+  vararg <- list(...)
+  if ("coeff" %in% names(vararg)) {
+    merit <- vararg$coeff
+  }
+  stopifnot(is.null(merit) | is.null(desired))
+  if (!is.null(traits))
+    stopifnot(length(traits)==2)
+  
+  if (inherits(input,"class_prep")) {
     # need to compute var.bhat
     n.trait <- ncol(input@geno1.var)
     if (n.trait==1) 
@@ -53,13 +66,14 @@ gain <- function(input,traits=NULL,coeff=NULL,restricted=NULL,solver="ECOS") {
       nt <- nrow(input@var.uhat)/2
       n <- nt/n.trait
       ix <- split(1:nt,f=rep(1:n.trait,times=n))
-      if (input@model==3L) {
-        gamma <- (input@ploidy/2 - 1)/(input@ploidy - 1)
-        trait.scale <- sqrt(diag(input@geno1.var)+gamma^2*diag(input@geno2.var))
-      } else {
-        gamma <- 0
-        trait.scale <- sqrt(diag(input@geno1.var))
+      if (is.null(gamma)) {
+        if (input@model==3L) {
+          gamma <- (input@ploidy/2 - 1)/(input@ploidy - 1)  
+        } else {
+          gamma <- 0
+        }
       }
+      trait.scale <- sqrt(diag(input@geno1.var)+gamma^2*diag(input@geno2.var))
       M <- cbind(diag(n),gamma*diag(n))
       
       for (i in 1:n.trait)
@@ -82,12 +96,12 @@ gain <- function(input,traits=NULL,coeff=NULL,restricted=NULL,solver="ECOS") {
     n.trait <- length(trait.names)
   } 
   
-  if (!is.null(coeff)) {
+  if (!is.null(merit)) {
     
-    iv <- match(trait.names,names(coeff),nomatch=0)
+    iv <- match(trait.names,names(merit),nomatch=0)
     if (any(iv==0))
-      stop("Trait names in coefficients do not match input")
-    coeff <- coeff[iv]
+      stop("Trait names in merit coefficients do not match input")
+    merit <- merit[iv]
     
     x <- Variable(n.trait)
     constraints <- list(quad_form(x,quad.mat) <= 1)
@@ -99,13 +113,13 @@ gain <- function(input,traits=NULL,coeff=NULL,restricted=NULL,solver="ECOS") {
         stop("Restricted trait names do not match input")
       nr <- length(rest)
       if (nr > 0) 
-        coeff[rest] <- 0
+        merit[rest] <- 0
       
       ix <- which(restricted$sign=="=")
       nix <- length(ix)
       if (nix > 0) {
         A <- matrix(0,nrow=length(ix),ncol=n.trait)
-        A[cbind(1:nix,match(restricted$trait[ix],names(coeff)))] <- 1
+        A[cbind(1:nix,match(restricted$trait[ix],names(merit)))] <- 1
         constraints <- c(constraints,list(A%*%x==0))
       }
       
@@ -113,7 +127,7 @@ gain <- function(input,traits=NULL,coeff=NULL,restricted=NULL,solver="ECOS") {
       nix <- length(ix)
       if (nix > 0) {
         A <- matrix(0,nrow=length(ix),ncol=n.trait)
-        A[cbind(1:nix,match(restricted$trait[ix],names(coeff)))] <- 1
+        A[cbind(1:nix,match(restricted$trait[ix],names(merit)))] <- 1
         constraints <- c(constraints,list(A%*%x<=0))
       }
       
@@ -121,12 +135,12 @@ gain <- function(input,traits=NULL,coeff=NULL,restricted=NULL,solver="ECOS") {
       nix <- length(ix)
       if (nix > 0) {
         A <- matrix(0,nrow=length(ix),ncol=n.trait)
-        A[cbind(1:nix,match(restricted$trait[ix],names(coeff)))] <- 1
+        A[cbind(1:nix,match(restricted$trait[ix],names(merit)))] <- 1
         constraints <- c(constraints,list(A%*%x>=0))
       }
     } 
     
-    v <- matrix(coeff,nrow=1)
+    v <- matrix(merit,nrow=1)
     objective <- Maximize(v%*%x)
     problem <- Problem(objective,constraints)
     result <- solve(problem,solver=solver)
@@ -138,10 +152,27 @@ gain <- function(input,traits=NULL,coeff=NULL,restricted=NULL,solver="ECOS") {
     names(c.opt) <- names(x.opt) <- trait.names
     result <- data.frame(trait=trait.names,
                          response=round(x.opt,3),
-                         coeff=round(c.opt,3))
+                         index=round(c.opt,3))
+    rownames(result) <- NULL
     out <- list(quad.mat=quad.mat,table=result)
   } else {
-    out <- list(quad.mat=quad.mat)
+    if (!is.null(desired)) {
+      
+      iv <- match(trait.names,names(desired),nomatch=0)
+      if (any(iv==0))
+        stop("Trait names in desired gains do not match input")
+      desired <- desired[iv]
+      c.opt <- as.numeric(quad.mat %*% matrix(desired,ncol=1))
+      desired <- desired/sqrt(sum(desired*c.opt))
+      c.opt <- c.opt/sqrt(sum(c.opt^2))
+      result <- data.frame(trait=trait.names,
+                           response=round(desired,3),
+                           index=round(c.opt,3))
+      rownames(result) <- NULL
+      out <- list(quad.mat=quad.mat,table=result)
+    } else {
+      out <- list(quad.mat=quad.mat)
+    }
   }
   
   if (!is.null(traits)) {
@@ -155,7 +186,7 @@ gain <- function(input,traits=NULL,coeff=NULL,restricted=NULL,solver="ECOS") {
     angle <- atan(eg$vectors[2,2]/eg$vectors[1,2])
     p <- ggplot() + geom_ellipse(aes(x0=0,y0=0, a = lens[2], b=lens[1], angle = angle)) + coord_fixed() + theme_bw() + xlab(traits[1]) + ylab(traits[2]) 
     
-    if (!is.null(coeff)) {
+    if (!is.null(merit)) {
       if (all(c.opt[ix]!=0)) {
         angle2 <- atan(c.opt[ix[2]]/c.opt[ix[1]])
         if (c.opt[ix[2]] > 0 & angle2 < 0)

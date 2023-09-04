@@ -27,11 +27,11 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
   what <- toupper(what)
   stopifnot(substr(what,1,2) %in% c("AV","BV","GV","AM","DM"))
   
-  if (class(data)=="list") {
+  if (is(data,"list")) {
     stopifnot(sapply(data,class)=="class_prep")
     multi.prep <- TRUE
   } else {
-    stopifnot(class(data)=="class_prep")
+    stopifnot(is(data,"class_prep"))
     multi.prep <- FALSE
     data2 <- data
     data <- list(data)
@@ -43,7 +43,7 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
   if (data[[1]]@model==0L & (!is.null(geno) | what %in% c("AM","DM","AV","BV")))
     stop("Marker data was not used in blup_prep")
   
-  if (substr(what,1,2)=="DM" & (!(class(geno)=="class_genoD") | data[[1]]@model < 3L))
+  if (substr(what,1,2)=="DM" & (!(is(geno,"class_genoD")) | data[[1]]@model < 3L))
     stop("Dominance model is required in geno and data")
   
   gamma <- 0

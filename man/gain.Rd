@@ -4,16 +4,29 @@
 \alias{gain}
 \title{Genetic gain}
 \usage{
-gain(input, traits = NULL, coeff = NULL, restricted = NULL, solver = "ECOS")
+gain(
+  input,
+  merit = NULL,
+  desired = NULL,
+  restricted = NULL,
+  traits = NULL,
+  gamma = NULL,
+  solver = "ECOS",
+  ...
+)
 }
 \arguments{
 \item{input}{either object of \code{\link{class_prep}} or quad.mat returned by this function}
 
-\item{traits}{optional, plots ellipse tradeoff}
+\item{merit}{named vector of merit coefficients, in genetic standard deviation units}
 
-\item{coeff}{optional, index coefficients expressed in genetic standard deviation units}
+\item{desired}{named vector of desired gains, in genetic standard deviation units}
 
-\item{restricted}{data frame of restricted traits see Details}
+\item{restricted}{data frame of restricted traits, see Details}
+
+\item{traits}{optional vector with exactly 2 trait names, to plot elliptical response}
+
+\item{gamma}{contribution of non-additive values for genetic merit}
 
 \item{solver}{name of convex solver (default is "ECOS")}
 }
@@ -22,12 +35,14 @@ List containing
 \describe{
 \item{quad.mat}{quadratic matrix for the ellipsoid}
 \item{plot}{ellipse plot}
-\item{table}{data frame with gain and coefficients for the traits}
+\item{table}{data frame with the response and index coefficients for all traits}
 }
 }
 \description{
-Genetic gain for breeding values
+Genetic gain calculations
 }
 \details{
-Optional argument \code{restricted} is a data frame with columns "trait" and "sign", where the options for sign are "=",">","<", representing equal to zero, non-negative, and non-positive.
+Either \code{merit} or \code{desired} can be used, not both. The former specifies the relative contribution of each trait to genetic merit, while the latter specifies the relative desired gain in genetic standard deviation units. All traits must be specified. Optional argument \code{restricted} is a data frame with columns "trait" and "sign", where the options for sign are "=",">","<", representing equal to zero, non-negative, and non-positive. When \code{desired} is used, the \code{restricted} argument is ignored.
+
+The argument \code{gamma} controls the definition of genetic merit. (See notation in the journal publication.) The default is NULL, which implies breeding values. For purely additive values, use gamma = 0. For total genotypic value, use gamma = 1.
 }

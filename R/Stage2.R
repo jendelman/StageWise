@@ -10,6 +10,8 @@
 #' 
 #' The \code{covariates} option is only available for single trait/loc analysis.
 #' 
+#' Argument \code{pairwise} was added in package version 1.04, which specifies that multi-trait analysis is performed as multiple bivariate analyses, which often converges better. The returned object is a list of the results from the bivariate analyses, as well as "vars" for all traits, which is needed for \code{\link{blup_prep}}.
+#' 
 #' @references Damesa et al. 2017. Agronomy Journal 109: 845-857. doi:10.2134/agronj2016.07.0395
 #' 
 #' @param data data frame of BLUEs from Stage 1 (see Details)
@@ -21,6 +23,7 @@
 #' @param non.add one of the following: "none","g.resid","dom"
 #' @param max.iter maximum number of iterations for asreml
 #' @param covariates names of other covariates in \code{data}
+#' @param pairwise TRUE/FALSE should multi-trait analysis proceed pairwise
 #' 
 #' @return List containing
 #' \describe{
@@ -34,6 +37,7 @@
 #' @importFrom stats model.matrix var
 #' @importFrom methods new
 #' @importFrom rlang .data
+#' @import CVXR
 #' @import Matrix
 #' @import ggplot2
 #' @import ggrepel
@@ -42,15 +46,84 @@
 
 Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
                    silent=TRUE,workspace="500mb",non.add="g.resid",max.iter=20,
-                   covariates=NULL) {
+                   covariates=NULL,pairwise=FALSE) {
   
-  stopifnot(inherits(data,"data.frame"))
+  stopifnot(is(data,"data.frame"))
   stopifnot(requireNamespace("asreml"))
   stopifnot(non.add %in% c("none","g.resid","dom"))
   if (non.add=="dom")
-    stopifnot(class(geno)=="class_genoD")
+    stopifnot(is(geno,"class_genoD"))
   library(asreml)
   stopifnot(c("id","env","BLUE") %in% colnames(data))
+  
+  if ("trait" %in% colnames(data) & pairwise) {
+    data$trait <- as.character(data$trait)
+    traits <- unique(data$trait)
+    n.trait <- length(traits)
+    
+    if (n.trait > 2) {
+      geno1 <- matrix(0,n.trait,n.trait)
+      dimnames(geno1) <- list(traits,traits)
+      resid.vc <- B <- geno1
+      
+      if (non.add=="none") {
+        geno2 <- matrix(0,0,0)
+      } else {
+        geno2 <- geno1
+      }
+      pairs <- t(combn(traits,2))
+      npair <- nrow(pairs)
+      result <- vector("list",npair)
+      for (i in 1:npair) {
+        if (!silent)
+          print(paste(c("Pairwise:",pairs[i,]),collapse=" "))
+        
+        data2 <- data[data$trait %in% pairs[i,],]
+        if (!is.null(vcov)) {
+          n.env <- length(vcov)
+          vcov2 <- vector("list",n.env)
+          names(vcov2) <- names(vcov)
+          for (j in 1:n.env) {
+            dname <- strsplit(rownames(vcov[[j]]),split=":",fixed=T)
+            traits <- sapply(dname,"[[",2)
+            ix <- which(traits %in% pairs[i,])
+            vcov2[[j]] <- vcov[[j]][ix,ix]
+          }
+        } else {
+          vcov2 <- NULL
+        }
+        result[[i]] <- Stage2(data2,vcov2,geno,fix.eff.marker,
+            silent,workspace,non.add,max.iter,covariates,pairwise=FALSE)
+        trait.pair <- rownames(result[[i]]$vars@geno1)
+        geno1[trait.pair,trait.pair] <- geno1[trait.pair,trait.pair] + as.matrix(result[[i]]$vars@geno1)
+        B[trait.pair,trait.pair] <- B[trait.pair,trait.pair] + as.matrix(result[[i]]$vars@B)
+        resid.vc[trait.pair,trait.pair] <- resid.vc[trait.pair,trait.pair] + as.matrix(result[[i]]$vars@resid)
+        if (non.add!="none")
+          geno2[trait.pair,trait.pair] <- geno2[trait.pair,trait.pair] + as.matrix(result[[i]]$vars@geno2)
+      }
+      diag(geno1) <- diag(geno1)/(n.trait-1)
+      geno1 <- fu(geno1)
+      diag(resid.vc) <- diag(resid.vc)/(n.trait-1)
+      resid.vc <- fu(resid.vc)
+      diag(B) <- diag(B)/(n.trait-1)
+      B <- fu(B)
+      
+      if (non.add!="none") {
+        diag(geno2) <- diag(geno2)/(n.trait-1)
+        geno2 <- fu(geno2)
+      }
+      
+      return(list(pairs=result, 
+                  vars=new(Class="class_var",
+                           geno1=geno1, geno2=geno2, resid=resid.vc, B=as.matrix(B),
+                           model=result[[1]]$vars@model,
+                           diagG=mean(sapply(result,function(x){x$vars@diagG})),
+                           diagD=mean(sapply(result,function(x){x$vars@diagD})),
+                           vars=array(NA,dim=c(0,0,0)),
+                           fix.eff.marker=result[[1]]$vars@fix.eff.marker)))
+    }  
+  }
+  
   data$id <- as.character(data$id)
   data$env <- as.character(data$env)
   data$env.id <- apply(data[,c("env","id")],1,paste,collapse=":")
@@ -63,7 +136,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
   diagG <- diagD <- numeric(0)
   dom <- NULL
   if (!is.null(geno)) {
-    stopifnot(inherits(geno,"class_geno"))
+    stopifnot(is(geno,"class_geno"))
     id <- sort(intersect(data$id,rownames(geno@G)))
     n <- length(id)
     data <- data[data$id %in% id,]

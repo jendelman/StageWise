@@ -23,8 +23,8 @@
 
 blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
   
-  stopifnot(inherits(data,"data.frame"))
-  stopifnot(inherits(vars,"class_var"))
+  stopifnot(is(data,"data.frame"))
+  stopifnot(is(vars,"class_var"))
   data$id <- as.character(data$id)
   data$env <- as.character(data$env)
   if (!is.null(method)) {
@@ -33,7 +33,7 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
   }
 
   if (vars@model==3L)
-    stopifnot(class(geno)=="class_genoD")
+    stopifnot(is(geno,"class_genoD"))
   
   n.trait <- 1
   if ("trait" %in% colnames(data)) {
@@ -65,7 +65,7 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
   }
   
   if (!is.null(geno)) {
-    stopifnot(inherits(geno,"class_geno"))
+    stopifnot(is(geno,"class_geno"))
     stopifnot(length(vars@diagG)>0)
     id <- intersect(data$id,rownames(geno@G))
     data <- data[data$id %in% id,]
@@ -353,7 +353,7 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
     
     tmp <- crossprod(chol.Vinv%*%X)
     tmp2 <- try(solve(tmp),silent=TRUE)
-    if (class(tmp2)=="try-error")
+    if (is(tmp2,"try-error"))
       tmp2 <- MASS::ginv(as.matrix(tmp))
     W <- forceSymmetric(tmp2)
     fixed <- as.numeric(tcrossprod(W,X) %*% Vinv %*% data$BLUE)
@@ -362,7 +362,7 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
     tmp <- Diagonal(n=n) - chol.Vinv %*% X %*% tcrossprod(W, chol.Vinv %*% X)
     WW <- forceSymmetric(tmp)
     cholWW <- suppressWarnings(try(chol(WW),silent=TRUE))
-    if (class(cholWW)=="try-error") {
+    if (is(cholWW,"try-error")) {
       cholWW <- chol(WW + Diagonal(n=n,x=1e-6))
     }
     GZtP <- tcrossprod(var.u,Z) %*% crossprod(cholWW %*% chol.Vinv)

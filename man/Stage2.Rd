@@ -13,7 +13,8 @@ Stage2(
   workspace = "500mb",
   non.add = "g.resid",
   max.iter = 20,
-  covariates = NULL
+  covariates = NULL,
+  pairwise = FALSE
 )
 }
 \arguments{
@@ -34,6 +35,8 @@ Stage2(
 \item{max.iter}{maximum number of iterations for asreml}
 
 \item{covariates}{names of other covariates in \code{data}}
+
+\item{pairwise}{TRUE/FALSE should multi-trait analysis proceed pairwise}
 }
 \value{
 List containing
@@ -56,6 +59,8 @@ The argument \code{vcov} is used to partition the macro- and micro-environmental
 Because ASReml-R can only use relationship matrices defined in the global environment, this function creates and then removes global variables when either \code{vcov} or \code{geno} is used. By default, the workspace memory for ASReml-R is set at 500mb. If you get an error about insufficient memory, try increasing it. ASReml-R version 4.1.0.148 or later is required. 
 
 The \code{covariates} option is only available for single trait/loc analysis.
+
+Argument \code{pairwise} was added in package version 1.04, which specifies that multi-trait analysis is performed as multiple bivariate analyses, which often converges better. The returned object is a list of the results from the bivariate analyses, as well as "vars" for all traits, which is needed for \code{\link{blup_prep}}.
 }
 \references{
 Damesa et al. 2017. Agronomy Journal 109: 845-857. doi:10.2134/agronj2016.07.0395

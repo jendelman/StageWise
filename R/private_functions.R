@@ -62,9 +62,9 @@ get_x <- function(map) {
 
 coerce_dpo <- function(x) {
   x2 <- try(as(x,"dpoMatrix"),silent=TRUE)
-  if (class(x2)=="dpoMatrix") {
+  if (inherits(x2,"dpoMatrix")) {
     tmp <- try(chol(x2),silent=TRUE)
-    if (class(tmp)=="Cholesky") {
+    if (inherits(tmp,"Cholesky")) {
       return(x2)
     }
   }
@@ -79,11 +79,20 @@ coerce_dpo <- function(x) {
     x3 <- tcrossprod(K)
     dimnames(x3) <- dimnames(x)
     tmp <- chol(x3)
-    if (class(tmp)=="Cholesky") {
+    if (inherits(tmp,"Cholesky")) {
       return(x3)
     }
     thresh <- thresh*10
   }
+}
+
+fu <- function(x) {
+  n.trait <- nrow(x)
+  V <- Variable(n.trait,n.trait,PSD=TRUE)
+  solved <- solve(Problem(Minimize(norm(V-x,type="F"))),solver="SCS")
+  V1 <- solved$getValue(V)
+  dimnames(V1) <- dimnames(x)
+  coerce_dpo(V1)
 }
 
 f.cov.trait <- function(vc,traits,us) {

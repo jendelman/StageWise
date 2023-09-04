@@ -1,3 +1,10 @@
+Changes in 1.04
+* Added desired gains index option
+* Changed name of argument "coeff" to "merit" in gain function
+* Fixed error for multi-trait + multi-expt/env option in Stage1
+* Pairwise option for multiple traits in Stage2
+* Updated Vignette3
+
 Changes in 1.03
 * predict.geno allows marker effects model to be subset of geno variable
 

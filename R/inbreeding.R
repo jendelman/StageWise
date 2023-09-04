@@ -14,7 +14,7 @@ inbreeding <- function(geno) {
   stopifnot(inherits(geno,"class_geno"))
   
   x <- data.frame(F.G=(diag(geno@G)-1)/(geno@ploidy-1))
-  if (class(geno)=="class_genoD") 
+  if (inherits(geno,"class_genoD"))
     x$F.D <- geno@Fg
   
   rownames(x) <- rownames(geno@G)

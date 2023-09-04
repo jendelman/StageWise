@@ -19,18 +19,28 @@ setMethod("summary",c(object="class_var"),
           definition=function(object,digits=3){
             
             n.trait <- ncol(object@resid)
-            vars <- apply(object@vars,3,diag)
+            if (dim(object@vars)[1]==0) {
+              pvar <- FALSE
+            } else {
+              pvar <- TRUE
+            }
+            if (pvar)
+              vars <- apply(object@vars,3,diag)
 
             if (n.trait > 1) {
               cor.mat <- cov_to_cor(object@geno1)
-              vars <- t(vars)
-              prop.var <- t(t(vars[-1,])/apply(vars[-1,],2,sum,na.rm=T))
-              prop.var <- round(prop.var[!is.na(prop.var[,1]),],3)
+              if (pvar) {
+                vars <- t(vars)
+                prop.var <- t(t(vars[-1,])/apply(vars[-1,],2,sum,na.rm=T))
+                prop.var <- round(prop.var[!is.na(prop.var[,1]),],3)
               
-              vars <- apply(vars[!is.na(vars[,1]),],2,sigdig,digits=digits)
-              return(list(var=data.frame(vars),
+                vars <- apply(vars[!is.na(vars[,1]),],2,sigdig,digits=digits)
+                return(list(var=data.frame(vars),
                           PVE=data.frame(prop.var),
                           cor.mat=round(cor.mat,3)))
+              } else {
+                return(round(cor.mat,3))
+              }
             } else {
               if (nrow(object@geno1) > 1) {
                 #multiple locations

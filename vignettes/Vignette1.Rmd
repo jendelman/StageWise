@@ -174,13 +174,11 @@ Several other pieces of information are in the list output from `Stage2`. The va
 
 The above Stage 2 analysis did not include the marker data. To partition the genotype effects into additive and non-additive effects, the output from `read_geno` is included in the function call. StageWise has two ways of modeling non-additive effects. The argument non.add="g.resid" leads to a genetic residual, with independent and identically distributed (iid) effects. When non.add="dom" (which requires that `read_geno` was run with dominance=TRUE), the covariance of the non-additive effects follows the D matrix. To omit non-additive effects, use non.add="none". The AIC can be used to assess which model is better.
 
-The following example also shows the `silent=FALSE` option (default is TRUE), which shows the convergence progress from ASReml-R.
-
 ```{r}
 ans2c <- Stage2(data=stage1.blues,vcov=stage1.vcov,geno=geno,
-                silent=FALSE, non.add="g.resid")
+                non.add="g.resid")
 ans2d <- Stage2(data=stage1.blues,vcov=stage1.vcov,geno=geno,
-                silent=FALSE, non.add="dom")
+                non.add="dom")
 
 data.frame(non.add=c("g.resid","dom"),AIC=c(ans2c$aic,ans2d$aic))
 ```

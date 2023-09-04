@@ -56,5 +56,5 @@ Argument \code{workspace} is a vector of length two containing the workspace and
 
 For multiple traits, only "asreml" is supported, and only the BLUE model is run, so the returned object does not contain H2. 
 
-If the input file has a column "expt", this indicates multiple experiments within environment, which may be needed when using spatial analyses. Each experiment is first analyzed separately, and then the BLUEs from all experiments in one env are jointly analyzed to compute a single BLUE per env. The estimation errors from each experiment are propagated into the multi-expt model.
+If the input file has a column "expt", this allows for the use of separate spatial models for multiple experiments within an environment (only for single trait): each experiment is first analyzed separately, and then the BLUEs from all experiments per env are jointly analyzed to compute a single BLUE per env. The estimation errors from each experiment are propagated into the multi-expt model using ASReml-R. The situation is different with multi-trait analysis, as all experiments are analyzed jointly per env, with a fixed effect for expt but a common residual model. Any additional cofactors (e.g., block) that are nested within expt need to be explicitly nested!
 }
