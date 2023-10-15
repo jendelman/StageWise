@@ -1,3 +1,6 @@
+Changes in 1.05
+* Added function remove_spatialtrend
+
 Changes in 1.04
 * Added desired gains index option
 * Changed name of argument "coeff" to "merit" in gain function
