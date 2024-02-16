@@ -25,6 +25,7 @@
 #' @param spline vector of variable names for 2D spline with SpATS
 #' @param silent TRUE/FALSE, whether to suppress REML output
 #' @param workspace memory limits for ASRreml-R
+#' @param max.iter maximum number of iterations for ASRreml-R
 #' 
 #' @return List containing
 #' \describe{
@@ -45,7 +46,7 @@
 #' @export
 
 Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
-                   spline=NULL,silent=TRUE,workspace=c("500mb","500mb")) {
+                   spline=NULL,silent=TRUE,workspace=c("500mb","500mb"),max.iter=30) {
   
   data <- read.csv(file=filename,check.names=F)
   solver <- toupper(solver)
@@ -56,7 +57,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   
   stopifnot(requireNamespace("asreml"))
   library(asreml)
-  asreml::asreml.options(maxit=30,workspace=workspace[1],pworkspace=workspace[2],trace=FALSE)
+  asreml::asreml.options(maxit=max.iter,workspace=workspace[1],pworkspace=workspace[2],trace=FALSE)
   
   if (solver=="SPATS") {
     if (n.trait > 1) {

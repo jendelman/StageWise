@@ -403,6 +403,10 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     beta.names <- rownames(beta)
     beta.names <- gsub("env_","",beta.names)
     ix <- match(levels(data$env),beta.names)
+    if (any(is.na(ix))) {
+      beta.names <- sapply(strsplit(beta.names,split=":",fixed=T),"[[",1)
+      ix <- match(levels(data$env),beta.names)
+    }
     out$params$env <- data.frame(env=levels(data$env),
                                  estimate=as.numeric(beta[ix,1]),
                                  SE=as.numeric(beta[ix,2]))

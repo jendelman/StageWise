@@ -1,3 +1,7 @@
+Changes in 1.06
+* Duplicate values removed from pheno2.csv, updated Vignette2
+* max.iter option in Stage1
+
 Changes in 1.05
 * Added function remove_spatialtrend
 
