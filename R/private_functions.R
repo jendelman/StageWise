@@ -64,7 +64,7 @@ coerce_dpo <- function(x) {
   x2 <- try(as(x,"dpoMatrix"),silent=TRUE)
   if (inherits(x2,"dpoMatrix")) {
     tmp <- try(chol(x2),silent=TRUE)
-    if (inherits(tmp,"Cholesky")) {
+    if (inherits(tmp,"Cholesky")|inherits(tmp,"dtrMatrix")) {
       return(x2)
     }
   }
@@ -79,7 +79,7 @@ coerce_dpo <- function(x) {
     x3 <- tcrossprod(K)
     dimnames(x3) <- dimnames(x)
     tmp <- chol(x3)
-    if (inherits(tmp,"Cholesky")) {
+    if (inherits(tmp,"Cholesky")|inherits(tmp,"dtrMatrix")) {
       return(x3)
     }
     thresh <- thresh*10

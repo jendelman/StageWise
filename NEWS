@@ -1,3 +1,6 @@
+Changes in 1.07
+* coerce_dpo updated to account for changes to the Matrix package
+
 Changes in 1.06
 * Duplicate values removed from pheno2.csv, updated Vignette2
 * max.iter option in Stage1
