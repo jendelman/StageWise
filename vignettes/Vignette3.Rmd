@@ -87,7 +87,7 @@ gain1 <- gain(input=prep1, merit=merit.coeff,
 gain1$plot
 ```
 
-The dashed red line shows the direction of the index vector, while the blue line segment is the projection of the point on the ellipsoid that maximizes genetic merit.
+The dashed red line shows the direction of the merit vector, while the blue line segment is the projection of the point on the ellipsoid that maximizes genetic merit.
 
 Because our maturity trait scale ranges from 1 = early to 9 = late, the positive response implies selection for later maturity, which is undesirable. The "restricted" argument in the `gain` command can be used to restrict the response for particular traits while maximizing genetic merit for other traits. The form of the argument is a data frame with two columns: "trait" and "sign". The "sign" column can have one of three symbols: "=", "<", ">", which indicate whether the response is $= 0$, $\leq 0$, or $\geq 0$, respectively. In this case, we want the maturity response to be less than or equal to zero:
 
