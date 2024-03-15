@@ -6,6 +6,8 @@
 #' 
 #' The argument \code{gamma} controls the definition of genetic merit. (See notation in the journal publication.) The default is NULL, which implies breeding values. For purely additive values, use gamma = 0. For total genotypic value, use gamma = 1.
 #' 
+#' Note that this function assumes a selection index of BLUPs, not phenotypes. 
+#' 
 #' @param input either object of \code{\link{class_prep}} or quad.mat returned by this function
 #' @param merit named vector of merit coefficients, in genetic standard deviation units
 #' @param desired named vector of desired gains, in genetic standard deviation units

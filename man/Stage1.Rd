@@ -11,7 +11,8 @@ Stage1(
   solver = "asreml",
   spline = NULL,
   silent = TRUE,
-  workspace = c("500mb", "500mb")
+  workspace = c("500mb", "500mb"),
+  max.iter = 30
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ Stage1(
 \item{silent}{TRUE/FALSE, whether to suppress REML output}
 
 \item{workspace}{memory limits for ASRreml-R}
+
+\item{max.iter}{maximum number of iterations for ASRreml-R}
 }
 \value{
 List containing
