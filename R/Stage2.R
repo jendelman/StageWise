@@ -246,25 +246,11 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
       tmp <- gsub("+",":loc+",paste(c("env",fix.eff.marker,dom),collapse="+"),fixed=T)
       model <- sub("FIX",paste(tmp,"loc",sep=":"),model,fixed=T)
     }
-    #if (n.mark > 0 | (non.add=="dom") | !is.null(fix.eff)) {
-    #if (n.loc==1) {
-    #  model <- sub("FIX",paste(c("env",fix.eff,fix.eff.marker,dom),collapse="+"),model,fixed=T)
-    #} else {
-    #  model <- sub("FIX",paste(c("env",paste0(c(fix.eff.marker,dom),":loc")),collapse="+"),model,fixed=T)
-    #}
-    #} else {
-    #  model <- sub("FIX","env",model,fixed=T)
-    #}
   } else {
     model <- "asreml(data=data,fixed=BLUE~FIX-1,random=~RANDOM,residual=~id(env.id):us(Trait)"
     tmp <- gsub("+",":Trait+",paste(c("env",fix.eff.marker,dom),collapse="+"),fixed=T)
     model <- sub("FIX",paste(tmp,"Trait",sep=":"),model,fixed=T)
     
-    # if (n.mark > 0 | (non.add=="dom")) {
-    #   model <- sub("FIX",paste(paste0(c("env",fix.eff.marker,dom),":Trait"),collapse="+"),model,fixed=T)
-    # } else {
-    #   model <- sub("FIX","env:Trait",model,fixed=T)
-    # }
   }
   
   if (is.null(geno)) {

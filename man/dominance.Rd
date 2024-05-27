@@ -4,12 +4,16 @@
 \alias{dominance}
 \title{Report dominance parameters}
 \usage{
-dominance(params, digits = 2)
+dominance(params, digits = 2, index.coeff = NULL, gamma = 0)
 }
 \arguments{
 \item{params}{list returned by \code{\link{Stage2}}}
 
 \item{digits}{number of digits for rounding}
+
+\item{index.coeff}{merit index coefficients}
+
+\item{gamma}{contribution of non-additive values for genetic merit}
 }
 \value{
 data frame with estimates and SE
@@ -18,7 +22,7 @@ data frame with estimates and SE
 Report dominance parameters
 }
 \details{
-The dominance variance (Vd) and baseline heterosis (b) are quantified relative to additive variance (Va) and std. dev. (SDa), respectively. The estimate and SE of the ratios are calculated based on the delta method (Rice 2006, p. 162-166). Only implemented for single trait/location models.
+The dominance variance (Vd) and baseline heterosis (b) are quantified relative to additive variance (Va) and std. dev. (SDa), respectively. For single traits, the estimate and SE of the ratios are calculated based on the delta method (Rice 2007, p. 162-166). For a multi-trait model, the result is just the ratio of the estimates, with \code{index.coeff} specifying the coefficients of the standardized true values (see also \code{\link{blup}}) and \code{gamma} specifying the relative weight for non-additive to additive genetic merit (see also \code{\link{gain}}).
 }
 \references{
 Rice JA (2007) Mathematical Statistics and Data Analysis, 3rd ed. Duxbury, Pacific Grove.

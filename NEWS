@@ -1,3 +1,6 @@
+Changes in 1.08
+* summary.var and dominance functions now work for multi-trait
+
 Changes in 1.07
 * coerce_dpo updated to account for changes to the Matrix package
 

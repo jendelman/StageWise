@@ -7,6 +7,10 @@
 \item{object}{object of \code{\link{class_var}}}
 
 \item{digits}{number of digits for rounding}
+
+\item{index.coeff}{merit index coefficients}
+
+\item{gamma}{contribution of non-additive values for genetic merit}
 }
 \value{
 List output that varies depending on the situation (see Details)
@@ -15,5 +19,7 @@ List output that varies depending on the situation (see Details)
 Displays variances and correlations
 }
 \details{
-For a single trait, the 'var' output is a data frame with two columns of information for the various effects: the first is the variance and the second is the proportion of variance explained (PVE), excluding the environment effect. For multiple locations or traits, the 'cor' output is the correlation matrix for additive effects (does not include fixed effect markers). For multiple traits, the variance and PVE results are returned as separate data frames.
+For a single trait, the 'var' output is a data frame with two columns of information for the various effects: the first is the variance and the second is the proportion of variance explained (PVE), excluding the environment effect. For multiple locations or traits, the 'cor' output is the correlation matrix for additive effects (does not include fixed effect markers). For multiple traits, the variance and PVE results are returned as separate data frames, unless \code{index.coeff} is used to create an index. 
+
+The \code{index.coeff} are the coefficients of the standardized true values (see also \code{\link{blup}}). The argument \code{gamma} is the relative weight for non-additive to additive genetic merit (see also \code{\link{gain}}).
 }
