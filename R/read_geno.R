@@ -23,18 +23,19 @@
 #' @return Variable of class \code{\link{class_geno}}.
 #' 
 #' @export
-#' @importFrom utils read.csv capture.output
+#' @importFrom utils capture.output
 #' @import Matrix
 #' @importFrom AGHmatrix Amatrix
+#' @importFrom data.table fread
 
 read_geno <- function(filename, ploidy, map, min.minor.allele=5, 
                       w=1e-5, ped=NULL, dominance=FALSE) {
   if (any(w < 1e-5))
     stop("Blending parameter should not be smaller than 1e-5")
   
-  data <- read.csv(file = filename,check.names=F)
+  data <- fread(file = filename, check.names=F, sep=",", header=T)
   if (map) {
-    map <- data[,1:3]
+    map <- data.frame(data[,1:3])
     colnames(map) <- c("marker","chrom","position")
     geno <- as.matrix(data[,-(1:3)])
   } else {
@@ -43,12 +44,15 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
                       position=numeric(0))
     geno <- as.matrix(data[,-1])
   }
+  rownames(geno) <- as.character(data$V1)
   m <- nrow(geno)
+  id <- colnames(geno)
+  
+  #check for recoding -1,0,1 to 0,1,2
   if ((min(geno[1:min(m,1000),],na.rm=T)==-1) & (ploidy==2)) {
     geno <- geno + 1
   }
-  rownames(geno) <- data[,1]
-  id <- colnames(geno)
+  
   p <- apply(geno,1,mean,na.rm=T)/ploidy
   n.minor <- apply(geno,1,function(z){
     p <- mean(z,na.rm=T)/ploidy
