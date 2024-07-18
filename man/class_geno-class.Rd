@@ -11,13 +11,13 @@ S4 class for marker genotype data
 \section{Slots}{
 
 \describe{
-\item{\code{ploidy}}{ploidy}
+\item{\code{ploidy}}{If mixed ploidy, then a vector equal to pop size; otherwise a single integer}
 
 \item{\code{map}}{Marker map positions}
 
 \item{\code{coeff}}{Coefficients of the marker effects (dim: indiv x marker)}
 
-\item{\code{scale}}{Scaling factor between markers and indiv}
+\item{\code{scale}}{Scaling factor between markers and indiv, vector of length equal to pop size}
 
 \item{\code{G}}{Additive relationship matrix (from markers and potentially also pedigree)}
 

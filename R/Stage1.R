@@ -30,7 +30,7 @@
 #' @return List containing
 #' \describe{
 #' \item{blues}{data frame of BLUEs}
-#' \item{vcov}{list of variance-covariance matrices for the BLUEs, one per experiment (env)}
+#' \item{vcov}{list of variance-covariance matrices for the BLUEs, one per env}
 #' \item{fit}{data frame with broad-sense H2 (plot basis) and/or AIC}
 #' \item{resid}{For single trait, list of diagnostic plots and data frame of residuals. For multi-trait, list of resid var-cov matrices.}
 #' }
@@ -312,55 +312,64 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
     blue.out$env <- data$env[match(blue.out$expt,data$expt)]
   
     nee <- sapply(expt.in.env,length)
-    iu <- which(nee==1)
-    if (length(iu) > 0) {
-      tmp <- names(vcov)[iu]
-      names(vcov)[iu] <- blue.out$env[match(tmp,blue.out$expt)]
-    }
+    #iu <- which(nee==1)
+    #if (length(iu) > 0) {
+    #  tmp <- names(vcov)[iu]
+    #  names(vcov)[iu] <- blue.out$env[match(tmp,blue.out$expt)]
+    #}
   
-    for (j in which(nee > 1)) {
-      omega.list <- vcov[expt.in.env[[j]]]
-      vcov2 <- mapply(FUN=function(x,y){
-        tmp <- paste(y,rownames(x),sep=":")
-        dimnames(x) <- list(tmp,tmp)
-        return(x)},x=omega.list,y=as.list(expt.in.env[[j]]))
+    vcov.env <- vector("list",length(nee))
+    names(vcov.env) <- names(nee)
+    iu <- which(nee==1)
+    if (length(iu) > 0)
+      vcov.env[names(iu)] <- vcov[unlist(expt.in.env[iu])]
     
-      .GlobalEnv$asremlOmega <- direct_sum(lapply(vcov2,solve))
-      dname <- lapply(vcov2,rownames)
-      dimnames(.GlobalEnv$asremlOmega) <- list(unlist(dname),unlist(dname))
-      attr(.GlobalEnv$asremlOmega,"INVERSE") <- TRUE
+    iu <- which(nee > 1)
+    if (length(iu) > 0)
+      for (j in iu) {
+        omega.list <- vcov[expt.in.env[[j]]]
+        vcov2 <- mapply(FUN=function(x,y){
+          tmp <- paste(y,rownames(x),sep=":")
+          dimnames(x) <- list(tmp,tmp)
+          return(x)},x=omega.list,y=as.list(expt.in.env[[j]]))
     
-      ix <- which(blue.out$env==envs[j])
-      data2 <- blue.out[ix,]
-      data2$expt.id <- factor(paste(data2$expt,data2$id,sep=":"))
-      data2$id <- factor(data2$id)
-      data2$expt <- factor(data2$expt)
-      start.table <- asreml::asreml(data=data2,fixed=BLUE~expt-1+id,
-                            random=~vm(expt.id,source=asremlOmega),
-                            residual=~idv(units),start.values=TRUE)$vparameters.table
-      k <- grep("Omega",start.table$Component,fixed=T)
-      start.table$Value[k] <- 1
-      start.table$Constraint[k] <- "F"
-      ans3 <- asreml::asreml(data=data2,fixed=BLUE~expt-1+id,
-                     random=~vm(expt.id,source=asremlOmega),
-                     residual=~idv(units),G.param=start.table)
+        .GlobalEnv$asremlOmega <- direct_sum(lapply(vcov2,solve))
+        dname <- lapply(vcov2,rownames)
+        dimnames(.GlobalEnv$asremlOmega) <- list(unlist(dname),unlist(dname))
+        attr(.GlobalEnv$asremlOmega,"INVERSE") <- TRUE
       
-      predans3 <- asreml::predict.asreml(ans3,classify="id",vcov = TRUE)
-      blue3 <- data.frame(expt=NA,predans3$pvals[,c("id","predicted.value")],env=envs[j])
-      colnames(blue3) <- c("expt","id","BLUE","env")
-      vcov3 <- predans3$vcov
-      dimnames(vcov3) <- list(blue3$id,blue3$id)
-      vcov2 <- vcov[-match(expt.in.env[[j]],names(vcov))]
-      vcov <- c(vcov2,vcov3)
-      names(vcov) <- c(names(vcov2),envs[j])
-      blue.out <- rbind(blue.out[-ix,],blue3)
-      rm("asremlOmega",envir = .GlobalEnv)
-    }
+        ix <- which(blue.out$env==envs[j])
+        data2 <- blue.out[ix,]
+        data2$expt.id <- factor(paste(data2$expt,data2$id,sep=":"))
+        data2$id <- factor(data2$id)
+        data2$expt <- factor(data2$expt)
+        start.table <- asreml::asreml(data=data2,fixed=BLUE~expt-1+id,
+                              random=~vm(expt.id,source=asremlOmega),
+                              residual=~idv(units),start.values=TRUE)$vparameters.table
+        k <- grep("Omega",start.table$Component,fixed=T)
+        start.table$Value[k] <- 1
+        start.table$Constraint[k] <- "F"
+        ans3 <- asreml::asreml(data=data2,fixed=BLUE~expt-1+id,
+                       random=~vm(expt.id,source=asremlOmega),
+                       residual=~idv(units),G.param=start.table)
+        
+        predans3 <- asreml::predict.asreml(ans3,classify="id",vcov = TRUE)
+        blue3 <- data.frame(expt=NA,predans3$pvals[,c("id","predicted.value")],env=envs[j])
+        colnames(blue3) <- c("expt","id","BLUE","env")
+        vcov3 <- predans3$vcov
+        dimnames(vcov3) <- list(blue3$id,blue3$id)
+        #vcov2 <- vcov[-match(expt.in.env[[j]],names(vcov))]
+        #vcov <- c(vcov2,vcov3)
+        #names(vcov) <- c(names(vcov2),envs[j])
+        vcov.env[[names(iu)[j]]] <- vcov3
+        blue.out <- rbind(blue.out[-ix,],blue3)
+        rm("asremlOmega",envir = .GlobalEnv)
+      }
   }
   
   if (n.trait > 1) {
-    vcov <- vector("list",n.env)
-    names(vcov) <- envs
+    vcov.env <- vector("list",n.env)
+    names(vcov.env) <- envs
     
     expt.in.env <- lapply(split(data$expt,factor(data$env,levels=envs)),unique)
     nexpt.per.env <- sapply(expt.in.env,length)
@@ -404,10 +413,10 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
         predans <- asreml::predict.asreml(ans,classify="id:trait",vcov = TRUE)
         tmp <- predans$pvals[,c("id","trait","predicted.value")]
         colnames(tmp) <- c("id","trait","BLUE")
-        vcov[[j]] <- predans$vcov
+        vcov.env[[j]] <- predans$vcov
         tmp$id <- as.character(tmp$id)
         id.trait <- apply(tmp[,1:2],1,paste,collapse=":")
-        dimnames(vcov[[j]]) <- list(id.trait,id.trait)
+        dimnames(vcov.env[[j]]) <- list(id.trait,id.trait)
         blue.out <- rbind(blue.out,data.frame(env=envs[j],tmp))
       }
     }
@@ -428,13 +437,13 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
       stat_boxplot(outlier.color="red") + theme_bw() + theme(axis.text.x=element_text(angle=90,vjust=0.5))
     p2 <- ggplot(data=blup.resid,aes(sample=.data$resid)) + stat_qq() + stat_qq_line() + facet_wrap(~expt) + theme_bw() + xlab("Expected") + ylab("Observed")
     if (solver=="ASREML")
-      return(list(blues=blue.out,vcov=vcov,fit=fit,
+      return(list(blues=blue.out,vcov=vcov.env,fit=fit,
                   resid=list(boxplot=p1,qqplot=p2,table=blup.resid)))
     if (solver=="SPATS")
-      return(list(blues=blue.out,vcov=vcov,fit=fit,
+      return(list(blues=blue.out,vcov=vcov.env,fit=fit,
                   resid=list(boxplot=p1,qqplot=p2,spatial=spatial.plot,table=blup.resid)))
   } else {
     #Multi-trait
-    return(list(blues=blue.out,vcov=vcov,fit=fit,resid=resid.vc))
+    return(list(blues=blue.out,vcov=vcov.env,fit=fit,resid=resid.vc))
   }
 }

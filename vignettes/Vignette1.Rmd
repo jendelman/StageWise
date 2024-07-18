@@ -135,7 +135,7 @@ geno.file <- system.file("vignette_data", "geno1.csv", package = "StageWise")
 geno <- read.csv(geno.file,check.names=F)
 geno[1:4,1:6]
 
-geno <- read_geno(filename=geno.file, ploidy=4, map=TRUE, min.minor.allele=5, 
+geno <- read_geno(filename=geno.file, ploidy=4L, map=TRUE, min.minor.allele=5, 
                   dominance=T)
 ``` 
 

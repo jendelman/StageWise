@@ -106,7 +106,8 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
       diag(resid.vc) <- diag(resid.vc)/(n.trait-1)
       resid.vc <- fu(resid.vc)
       diag(B) <- diag(B)/(n.trait-1)
-      B <- fu(B)
+      if (max(abs(diag(B))) > .Machine$double.eps*10)
+        B <- fu(B)
       
       if (non.add!="none") {
         diag(geno2) <- diag(geno2)/(n.trait-1)
@@ -138,6 +139,9 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
   if (!is.null(geno)) {
     stopifnot(is(geno,"class_geno"))
     id <- sort(intersect(data$id,rownames(geno@G)))
+    if (length(geno@ploidy) > 1)
+      geno@ploidy <- geno@ploidy[id]
+    
     n <- length(id)
     data <- data[data$id %in% id,]
     id.weights <- table(factor(data$id,levels=id))
@@ -150,7 +154,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
       meanD <- as.numeric(pvar(V=.GlobalEnv$asremlD,weights=id.weights))
 
       dom.covariate <- as.numeric(geno@coeff.D[id,] %*% matrix(1,nrow=ncol(geno@coeff.D),ncol=1))
-      dom.covariate <- dom.covariate/(geno@scale*(geno@ploidy-1))
+      dom.covariate <- dom.covariate/(geno@scale[id]*(geno@ploidy-1))
       names(dom.covariate) <- id
       data$dom <- dom.covariate[data$id]
   
@@ -184,7 +188,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
   data$env.id <- factor(data$env.id,levels=env.id)
   
   out <- vector("list",4)
-  names(out) <- c("aic","vars","fixed","random")
+  names(out) <- c("aic","vars","params","random")
   n.loc <- 1
   n.trait <- 1
   
@@ -243,8 +247,9 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
       model <- sub("FIX",paste(c("env",covariates,fix.eff.marker,dom),collapse="+"),model,fixed=T)
     } else {
       model <- "asreml(data=data,fixed=BLUE~FIX-1,random=~RANDOM,residual=~dsum(~idv(units)|loc)"
-      tmp <- gsub("+",":loc+",paste(c("env",fix.eff.marker,dom),collapse="+"),fixed=T)
-      model <- sub("FIX",paste(tmp,"loc",sep=":"),model,fixed=T)
+      tmp <- gsub("+",":loc+",paste(c(fix.eff.marker,dom,"env"),collapse="+"),fixed=T)
+      #model <- sub("FIX",paste(tmp,"loc",sep=":"),model,fixed=T)
+      model <- sub("FIX",tmp,model,fixed=T)
     }
   } else {
     model <- "asreml(data=data,fixed=BLUE~FIX-1,random=~RANDOM,residual=~id(env.id):us(Trait)"
@@ -477,12 +482,11 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     }
 
     if (non.add=="dom") {
-      gamma <- (geno@ploidy/2 - 1)/(geno@ploidy - 1)
       ix <- grep("dom",rownames(beta),fixed=T)
       out$params$heterosis <- data.frame(trait=traits,
                                          estimate=as.numeric(beta[ix,1]),
                                          SE=as.numeric(beta[ix,2]))
-      
+      gamma <- mean((geno@ploidy/2 - 1)/(geno@ploidy - 1))
       weights <- id.weights/sum(id.weights)
       for (i in 1:n.trait) 
         for (j in i:n.trait) {

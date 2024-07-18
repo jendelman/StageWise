@@ -46,12 +46,18 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
   if (substr(what,1,2)=="DM" & (!(is(geno,"class_genoD")) | data[[1]]@model < 3L))
     stop("Dominance model is required in geno and data")
   
+  n.id <- length(data[[1]]@id)
   gamma <- 0
   if (!is.null(geno)) {
     if (substr(what,1,2)=="GV")  
       gamma <- 1
     if (substr(what,1,2)=="BV" & data[[1]]@model==3L)
       gamma <- (geno@ploidy/2 - 1)/(geno@ploidy - 1)
+    
+    if (length(gamma) > 1) {
+      tmp <- tapply(gamma,attr(geno@ploidy,"pop"),mean)
+      gamma <- sum(tmp[names(index.coeff)]*index.coeff)/sum(index.coeff)
+    }
   }
   
   if (data[[1]]@model < 2L) {
@@ -60,8 +66,6 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
     index.scale <- sqrt(unlist(sapply(data,function(z){diag(as.matrix(z@geno1.var))})) + 
                           gamma^2*unlist(sapply(data,function(z){diag(as.matrix(z@geno2.var))})))
   } 
-
-  n.id <- length(data[[1]]@id)
   
   if (!multi.prep) {
     data <- data2
@@ -176,12 +180,12 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
   
   if (what=="AM") {
     G <- kron(geno@eigen.G,1)
-    M <- kronecker(crossprod(geno@coeff,crossprod(G$inv)),matrix(index.coeff,nrow=1))/geno@scale
+    M <- kronecker(crossprod((geno@coeff/geno@scale),crossprod(G$inv)),matrix(index.coeff,nrow=1))
     effect <- as.numeric(M %*% matrix(data@random[1:n.random],ncol=1))
     V <- data@var.uhat[1:n.random,1:n.random] #used for GWAS
   } else {
     D <- kron(geno@eigen.D,1)
-    M <- kronecker(crossprod(geno@coeff.D,crossprod(D$inv)),matrix(index.coeff,nrow=1))/geno@scale.D
+    M <- kronecker(crossprod((geno@coeff.D/geno@scale.D),crossprod(D$inv)),matrix(index.coeff,nrow=1))
     dhat <- -kronecker(matrix(geno@Fg[data@id],ncol=1),matrix(data@heterosis,ncol=1)) + 
       matrix(data@random[n.random + 1:n.random],ncol=1)
     effect <- as.numeric(M %*% dhat)

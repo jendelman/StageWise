@@ -1,3 +1,7 @@
+Changes in 1.10
+* Added support for multi-population/multi-ploidy analysis
+* Fixed error in Stage1 related to multiple experiments per env
+
 Changes in 1.09
 * changed read.csv to fread in read_geno
 

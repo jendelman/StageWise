@@ -2,7 +2,7 @@
 #'
 #' Report dominance parameters
 #' 
-#' The dominance variance (Vd) and baseline heterosis (b) are quantified relative to additive variance (Va) and std. dev. (SDa), respectively. For single traits, the estimate and SE of the ratios are calculated based on the delta method (Rice 2007, p. 162-166). For a multi-trait model, the result is just the ratio of the estimates, with \code{index.coeff} specifying the coefficients of the standardized true values (see also \code{\link{blup}}) and \code{gamma} specifying the relative weight for non-additive to additive genetic merit (see also \code{\link{gain}}). 
+#' The dominance variance (Vd) and baseline heterosis (b) are quantified relative to additive variance (Va) and std. dev. (SDa), respectively. For single traits, the estimate and SE of the ratios are calculated based on the delta method (Rice 2007, p. 162-166). For a multi-trait/loc model, the result is just the ratio of the estimates, with \code{index.coeff} specifying the coefficients of the standardized true values (see also \code{\link{blup}}) and \code{gamma} specifying the relative weight for non-additive to additive genetic merit (see also \code{\link{gain}}). 
 #' 
 #' @param params list returned by \code{\link{Stage2}}
 #' @param digits number of digits for rounding
@@ -20,22 +20,26 @@ dominance <- function(params, digits=2, index.coeff=NULL, gamma=0) {
 
   id <- grep("dominance",params$vc$name,fixed=T)
   ia <- grep("additive",params$vc$name,fixed=T)
+  vc <- params$vc[,-1]
+  rownames(vc) <- params$vc$name
 
-  n.trait <- nrow(params$heterosis)
-  if (n.trait > 1) {
+  nhet <- nrow(params$heterosis) 
+  if (nhet > 1) {
     stopifnot(!is.null(index.coeff))
-    traits <- params$heterosis$trait
-    Vd <- Va <- matrix(0,nrow=n.trait,ncol=n.trait,dimnames=list(traits,traits))
-    
-    tmp <- strsplit(params$vc$name[ia],split=":")  
-    ix <- cbind(sapply(tmp,"[[",2),sapply(tmp,"[[",3))
-    Va[ix] <- params$vc$estimate[ia]
-    Va[upper.tri(Va)] <- Va[lower.tri(Va)]
-    
-    tmp <- strsplit(params$vc$name[id],split=":")  
-    ix <- cbind(sapply(tmp,"[[",2),sapply(tmp,"[[",3))
-    Vd[ix] <- params$vc$estimate[id]
-    Vd[upper.tri(Vd)] <- Vd[lower.tri(Vd)]
+    if (colnames(params$heterosis)[1]=="trait") {
+      traits <- params$heterosis$trait
+      #Vd <- Va <- matrix(0,nrow=nhet,ncol=nhet,dimnames=list(traits,traits))
+      Va <- f.cov.trait(vc[ia,],traits,us=(nhet>2))
+      Vd <- f.cov.trait(vc[id,],traits,us=(nhet>2))
+    } else {
+      #multi-location
+      traits <- params$heterosis$loc
+      add <- f.cov.loc(vc[ia,], traits)
+      Va <- add$cov.mat
+      tmp <- matrix(vc[id,1],ncol=1)
+      rownames(tmp) <- traits
+      Vd <- tcrossprod(sqrt(tmp))
+    }
     
     stopifnot(sort(names(index.coeff))==sort(traits))
     index.coeff <- index.coeff[match(traits,names(index.coeff))]

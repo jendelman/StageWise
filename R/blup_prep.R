@@ -4,13 +4,13 @@
 #' 
 #' The \code{method} argument can be used to control how the linear system is solved. "MME" leads to inversion of the MME coefficient matrix, while "Vinv" leads to inversion of the overall var-cov matrix for the response vector. If NULL, the software uses whichever method involves inverting the smaller matrix. If the number of random effects (m) is less than the number of BLUEs (n), "MME" is used.
 #' 
-#' For the multi-location model, if all of the environments for a location are masked, the average of the other locations is used when computed average fixed effects.
+#' For the multi-location model, if all of the environments for a location are masked, the average of the other locations is used when computing average fixed effects.
 #' 
 #' @param data data frame of BLUEs from Stage 1 
 #' @param vcov list of variance-covariance matrices for the BLUEs
 #' @param geno object of \code{\link{class_geno}} from \code{\link{read_geno}}
 #' @param vars object of \code{\link{class_var}} from \code{\link{Stage2}}
-#' @param mask (optional) data frame with possible columns "id","env","trait"
+#' @param mask (optional) data frame with possible columns "id","env","loc","trait"
 #' @param method (optional) "MME", "Vinv", NULL (defaut). see Details
 #' 
 #' @return Object of \code{\link{class_prep}}
@@ -50,7 +50,7 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
   data <- data[!is.na(data$BLUE),]
   
   if (!is.null(mask)) {
-    tmp <- intersect(colnames(mask),c("id","env","trait"))
+    tmp <- intersect(colnames(mask),c("id","env","trait","loc"))
     stopifnot(length(tmp)>0)
     if (length(tmp) > 1) {
       tmp2 <- apply(mask[,tmp],1,paste,collapse=":")
@@ -189,10 +189,10 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
             Gmat2 <- kron(eigen.A=geno@eigen.D, B=vars@geno2)
           
             #add to X matrix
-            dom.covariate <- Z %*% kronecker(geno@coeff.D %*% matrix(1,nrow=ncol(geno@coeff.D),ncol=1),
-                                                      diag(n.loc))
+            dom.covariate <- Z %*% kronecker((geno@coeff.D/(geno@scale*(ploidy-1))) %*% 
+                                               matrix(1,nrow=ncol(geno@coeff.D),ncol=1),diag(n.loc))
             colnames(dom.covariate) <- paste("heterosis",locations,sep=":")
-            X <- cbind(X,dom.covariate/(geno@scale*(ploidy-1)))
+            X <- cbind(X,dom.covariate)
           } else {
             Gmat2 <- kron(eigen.A=eigen.I, B=vars@geno2)
           }
@@ -213,8 +213,9 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
           Gmat1 <- kron(eigen.A = geno@eigen.G, B=vars@geno1)
           if (vars@model==3L) {
             Gmat2 <- kron(eigen.A=geno@eigen.D, B=vars@geno2)
-            dom.covariate <- as.numeric(Z %*% geno@coeff.D %*% matrix(1,nrow=ncol(geno@coeff.D),ncol=1))
-            X <- cbind(X,heterosis=dom.covariate/(geno@scale*(ploidy-1)))
+            dom.covariate <- as.numeric(Z %*% (geno@coeff.D/(geno@scale*(ploidy-1))) %*% 
+                                          matrix(1,nrow=ncol(geno@coeff.D),ncol=1))
+            X <- cbind(X,heterosis=dom.covariate)
           } else {
             Gmat2 <- kron(eigen.A=eigen.I, B=vars@geno2)
           }
@@ -254,10 +255,10 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
           Gmat2 <- kron(eigen.A=geno@eigen.D, B=vars@geno2)
         
           #add to X matrix
-          dom.covariate <- Z %*% kronecker(geno@coeff.D %*% matrix(1,nrow=ncol(geno@coeff.D),ncol=1),
-                                         diag(n.trait))
+          dom.covariate <- Z %*% kronecker((geno@coeff.D/(geno@scale*(ploidy-1))) %*%
+                                             matrix(1,nrow=ncol(geno@coeff.D),ncol=1),diag(n.trait))
           colnames(dom.covariate) <- paste("heterosis",traits,sep=":")
-          X <- cbind(X,dom.covariate/(geno@scale*(ploidy-1)))
+          X <- cbind(X,dom.covariate)
         } else {
           Gmat2 <- kron(eigen.A=eigen.I, B=vars@geno2)
         }

@@ -11,7 +11,8 @@ read_geno(
   min.minor.allele = 5,
   w = 1e-05,
   ped = NULL,
-  dominance = FALSE
+  dominance = FALSE,
+  pop.file = NULL
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ read_geno(
 \item{ped}{optional, pedigree data frame with 3 or 4 columns (see Details)}
 
 \item{dominance}{TRUE/FALSE whether to include dominance covariance (see Details)}
+
+\item{pop.file}{CSV file defining populations}
 }
 \value{
 Variable of class \code{\link{class_geno}}.
@@ -45,4 +48,6 @@ If the A matrix is not used, then G is blended with the identity matrix (times t
 When \code{dominance=FALSE}, non-additive effects are captured using a residual genetic effect, with zero covariance. If \code{dominance=TRUE}, a (digenic) dominance covariance matrix is used instead. 
 
 The argument \code{min.minor.allele} specifies the minimum number of individuals that must contain the minor allele. Markers that do not meet this threshold are discarded.
+
+Optional argument \code{pop.file} gives the name of a CSV file with two columns: id,pop. If the populations have different ploidy, this is indicated using a named vector for \code{ploidy}.
 }

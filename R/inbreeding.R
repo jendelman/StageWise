@@ -16,7 +16,12 @@ inbreeding <- function(geno) {
   x <- data.frame(F.G=(diag(geno@G)-1)/(geno@ploidy-1))
   if (inherits(geno,"class_genoD"))
     x$F.D <- geno@Fg
-  
+
+  pops <- attr(geno@scale,"pop")
+  np <- length(unique(pops))
+  if (np > 1) {
+    x$pop <- pops
+  }
   rownames(x) <- rownames(geno@G)
   return(x)
 }
