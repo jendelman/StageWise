@@ -4,8 +4,6 @@
 #' @slot geno2 second genetic effect
 #' @slot model 0=no markers, 1=add, 2=add+g.resid, 3=add+dom
 #' @slot resid residual
-#' @slot diagG average diagonal element of the G matrix
-#' @slot diagD average diagonal element of the D matrix
 #' @slot vars variances for reporting
 #' @slot B var-cov matrix of fixed effects for gain
 #' @slot fix.eff.marker names of fixed effect markers
@@ -17,8 +15,6 @@ class_var <- setClass("class_var",slots=c(geno1="Matrix",
                                           geno2="Matrix",
                                           model="integer",
                                           resid="Matrix",
-                                          diagG="numeric",
-                                          diagD="numeric",
                                           vars="array",
                                           B="matrix",
                                           fix.eff.marker="character"))

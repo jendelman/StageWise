@@ -68,7 +68,9 @@ prep1 <- blup_prep(ans1$blues, vcov=ans1$vcov, geno=geno,
                    vars=ans2$vars)
 ```
 
-For multi-trait analyses, the `blup` command was designed to predict total genetic merit, not individual traits, so the user must supply index coefficients. The `gain` command allows breeders to compare the expected response for each trait under different indices. The argument "merit" specifies the contribution of each standardized trait for total genetic merit. For example, if genetic gains for fry color and yield are equally valuable, and maturity is ignored, the code is
+For multi-trait analyses, the `blup` command was designed to predict total genetic merit, not individual traits, so the user must supply index coefficients. 
+
+The `gain` command allows breeders to compare the expected response for each trait under different indices. The argument "merit" specifies the contribution of each standardized trait for total genetic merit. For example, if genetic gains for fry color and yield are equally valuable, and maturity is ignored, the code is
 
 ```{r}
 merit.coeff=c("total.yield"=1, "vine.maturity"=0, "fry.color"=1)
@@ -121,6 +123,12 @@ index.coeff <- gain3$table$index
 names(index.coeff) <- gain3$table$trait
 GEBV <- blup(prep1, geno, what="BV", index.coeff=index.coeff)
 head(GEBV)
+```
+
+As explained in Vignette 1, the `dominance` function expresses the inbreeding depression and dominance variance estimates relative to the additive SD and variance estimates, respectively. This also works for multi-trait models once the index coefficients are specified. To be consistent with the above `gain` calculation, gamma=1/3 is needed for tetraploid breeding values:
+
+```{r}
+dominance(ans2$params, index.coeff=index.coeff, gamma=1/3)
 ```
 
 One last comment: groups of unrelated traits can be analyzed independently through `blup_prep`, and the outputs from this command can be combined as a list in `blup` to make the predictions. This assumes zero correlation between traits in the different groups and requires the same genetic model to have been used.

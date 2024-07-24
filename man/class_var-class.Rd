@@ -19,10 +19,6 @@ S4 class for variances
 
 \item{\code{resid}}{residual}
 
-\item{\code{diagG}}{average diagonal element of the G matrix}
-
-\item{\code{diagD}}{average diagonal element of the D matrix}
-
 \item{\code{vars}}{variances for reporting}
 
 \item{\code{B}}{var-cov matrix of fixed effects for gain}

@@ -118,8 +118,8 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
                   vars=new(Class="class_var",
                            geno1=geno1, geno2=geno2, resid=resid.vc, B=as.matrix(B),
                            model=result[[1]]$vars@model,
-                           diagG=mean(sapply(result,function(x){x$vars@diagG})),
-                           diagD=mean(sapply(result,function(x){x$vars@diagD})),
+                           #diagG=mean(sapply(result,function(x){x$vars@diagG})),
+                           #diagD=mean(sapply(result,function(x){x$vars@diagD})),
                            vars=array(NA,dim=c(0,0,0)),
                            fix.eff.marker=result[[1]]$vars@fix.eff.marker)))
     }  
@@ -134,7 +134,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     data <- data[!(data$env.id %in% data$env.id[missing]),]
   }
   
-  diagG <- diagD <- numeric(0)
+  #diagG <- diagD <- numeric(0)
   dom <- NULL
   if (!is.null(geno)) {
     stopifnot(is(geno,"class_geno"))
@@ -147,7 +147,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     id.weights <- table(factor(data$id,levels=id))
     .GlobalEnv$asremlG <- geno@G[id,id]
     meanG <- as.numeric(pvar(V=.GlobalEnv$asremlG,weights=id.weights))
-    diagG <- mean(diag(.GlobalEnv$asremlG))
+    #diagG <- mean(diag(.GlobalEnv$asremlG))
 
     if (non.add=="dom") {
       .GlobalEnv$asremlD <- geno@D[id,id]
@@ -158,7 +158,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
       names(dom.covariate) <- id
       data$dom <- dom.covariate[data$id]
   
-      diagD <- mean(diag(.GlobalEnv$asremlD))
+      #diagD <- mean(diag(.GlobalEnv$asremlD))
       dom <- "dom"
     } 
   } else {
@@ -696,8 +696,8 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
   }
   
   out$vars <- new(Class="class_var",geno1=geno1.vc,geno2=geno2.vc,model=model,
-                  resid=resid.vc,diagG=diagG,diagD=diagD,
-                  vars=vars,B=B,fix.eff.marker=fix.eff.marker)
+                  resid=resid.vc,vars=vars,
+                  B=B,fix.eff.marker=fix.eff.marker)
   
   #random effects
   if (n.trait==1) {
@@ -783,12 +783,18 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     }
   }
   
-  if (!is.null(geno))
+  if (!is.null(geno)) {
+    out$params$scale <- list(add=as.numeric(pvar(V=.GlobalEnv$asremlG)))
     rm("asremlG",envir = .GlobalEnv)
+  }
   if (!is.null(vcov))
     rm("asremlOmega",envir = .GlobalEnv)
-  if (non.add=="dom")
+  if (non.add=="dom") {
+    out$params$scale <- c(out$params$scale,
+                          list(dom=as.numeric(pvar(V=.GlobalEnv$asremlD)),
+                             heterosis=as.numeric(pvar(mu=dom.covariate))))
     rm("asremlD",envir = .GlobalEnv)
+  }
   
   return(out)
 }

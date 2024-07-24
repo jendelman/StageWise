@@ -1,3 +1,6 @@
+Changes in 1.11
+* dominance function is now scaled to population, not just var component
+
 Changes in 1.10
 * Added support for multi-population/multi-ploidy analysis
 * Fixed error in Stage1 related to multiple experiments per env

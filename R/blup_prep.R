@@ -32,6 +32,8 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
     stopifnot(method %in% c("MME","VINV"))
   }
 
+  if (vars@model > 0)
+    stopifnot(inherits(geno,"class_geno"))
   if (vars@model==3L)
     stopifnot(is(geno,"class_genoD"))
   
@@ -43,9 +45,9 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
     stopifnot(n.trait > 1)
   } 
   
-  if (length(vars@diagG)>0) {
-    stopifnot(!is.null(geno))
-  }
+  #if (length(vars@diagG)>0) {
+  #  stopifnot(!is.null(geno))
+  #}
   
   data <- data[!is.na(data$BLUE),]
   
@@ -65,8 +67,9 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
   }
   
   if (!is.null(geno)) {
-    stopifnot(is(geno,"class_geno"))
-    stopifnot(length(vars@diagG)>0)
+    stopifnot(inherits(geno,"class_geno"))
+    #stopifnot(length(vars@diagG)>0)
+    stopifnot(vars@model > 0)
     id <- intersect(data$id,rownames(geno@G))
     data <- data[data$id %in% id,]
     id <- rownames(geno@G)
