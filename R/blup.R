@@ -181,14 +181,17 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
   if (what=="AM") {
     G <- kron(geno@eigen.G,1)
     M <- kronecker(crossprod((geno@coeff/geno@scale),crossprod(G$inv)),matrix(index.coeff,nrow=1))
-    effect <- as.numeric(M %*% matrix(data@random[1:n.random],ncol=1))
+    effect.ran <- as.numeric(M %*% matrix(data@random[1:n.random],ncol=1))
+    effect <- effect.ran
     V <- data@var.uhat[1:n.random,1:n.random] #used for GWAS
   } else {
     D <- kron(geno@eigen.D,1)
     M <- kronecker(crossprod((geno@coeff.D/geno@scale.D),crossprod(D$inv)),matrix(index.coeff,nrow=1))
-    dhat <- -kronecker(matrix(geno@Fg[data@id],ncol=1),matrix(data@heterosis,ncol=1)) + 
-      matrix(data@random[n.random + 1:n.random],ncol=1)
-    effect <- as.numeric(M %*% dhat)
+    
+    dhat.fix <- -kronecker(matrix(geno@Fg[data@id],ncol=1),matrix(data@heterosis,ncol=1))
+    dhat.ran <- matrix(data@random[n.random + 1:n.random],ncol=1)
+    effect.ran <- as.numeric(M %*% dhat.ran)
+    effect <- effect.ran + as.numeric(M %*% dhat.fix)
     V <- data@var.uhat[n.random+1:n.random,n.random+1:n.random] #used for GWAS
   }
   
@@ -203,13 +206,13 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
 
     if (gwas.ncore == 1) {
       se <- apply(M,1,f.se,V=V)
-      std.effect <- out$effect/se
+      std.effect <- effect.ran/se
     } else {
       cl <- makeCluster(gwas.ncore)
       clusterExport(cl=cl,varlist=NULL)
       se <- parRapply(cl=cl,x=M,f.se,V=V)
       stopCluster(cl)
-      std.effect <- out$effect/sapply(se,as.numeric)
+      std.effect <- effect.ran/sapply(se,as.numeric)
     } 
     out$score <- -log10(pnorm(q=abs(std.effect),lower.tail=FALSE)*2)
   }

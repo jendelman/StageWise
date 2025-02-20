@@ -1,3 +1,6 @@
+Changes in 1.12
+* GWAS "DM" option modified so that now only the random effect is standardized. The effect itself still includes the fixed (heterosis) portion.
+
 Changes in 1.11
 * dominance function is now scaled to population, not just var component
 
