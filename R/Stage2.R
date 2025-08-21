@@ -213,7 +213,10 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     
     traits <- ""  #NULL
     if ("loc" %in% colnames(data)) {
-      data$loc <- factor(as.character(data$loc))
+      data$loc <- as.character(data$loc)
+      env.loc <- data$loc[match(envs,as.character(data$env))]
+      env.loc.list <- split(envs,env.loc)
+      data$loc <- factor(data$loc)
       data <- data[order(data$loc),]
       locations <- levels(data$loc)
       n.loc <- length(locations)
@@ -239,7 +242,11 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
   } else {
     tmp <- c("env","covariates","fixed.marker","additive","add x loc","dominance","heterosis","g.resid","g x loc","g x env","Stage1.error","residual")
   }
-  vars <- array(data=numeric(0),dim=c(n.trait,n.trait,12),dimnames=list(traits,traits,tmp))
+  if (n.loc==1) {
+    vars <- array(data=numeric(0),dim=c(n.trait,n.trait,12),dimnames=list(traits,traits,tmp))
+  } else {
+    vars <- array(data=numeric(0),dim=c(n.loc,n.loc,12),dimnames=list(locations,locations,tmp))
+  }
 
   if (n.trait==1) {
     if (n.loc==1) {
@@ -343,13 +350,22 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     dimnames(.GlobalEnv$asremlOmega) <- list(unlist(dname),unlist(dname))
     attr(.GlobalEnv$asremlOmega,"INVERSE") <- TRUE
     
-    Omega <- bdiag(omega.list)
-    ix <- split(1:(n.gE*n.trait),rep(1:n.trait,times=n.gE))
-    for (i in 1:n.trait) 
-      for (j in i:n.trait) {
-        Omega_ij <- Omega[ix[[i]],ix[[j]]]
-        vars[i,j,"Stage1.error"] <- mean(diag(Omega_ij)) - mean(Omega_ij)
+    if (n.loc==1) {
+      Omega <- bdiag(omega.list)
+      ix <- split(1:(n.gE*n.trait),rep(1:n.trait,times=n.gE))
+      for (i in 1:n.trait) 
+        for (j in i:n.trait) {
+          Omega_ij <- Omega[ix[[i]],ix[[j]]]
+          vars[i,j,"Stage1.error"] <- mean(diag(Omega_ij)) - mean(Omega_ij)
+        }
+    } else {
+      Omega <- bdiag(omega.list)
+      vars[1,2,"Stage1.error"] <- mean(diag(Omega)) - mean(Omega)
+      for (i in 1:n.loc) {
+        Omega <- bdiag(omega.list[env.loc==locations[i]])
+        vars[i,i,"Stage1.error"] <- mean(diag(Omega)) - mean(Omega)
       }
+    }
   }
 
   asreml::asreml.options(workspace=workspace,maxit=max.iter,trace=!silent)
@@ -401,7 +417,24 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     out$params$env <- data.frame(env=levels(data$env),
                                  estimate=as.numeric(beta[ix,1]),
                                  SE=as.numeric(beta[ix,2]))
-    vars[1,1,"env"] <- pvar(mu=out$params$env$estimate,weights=as.numeric(table(data$env)))
+    if (n.loc==1) {
+      tab <- table(data$env)
+      tab <- tab[match(out$params$env$env,names(tab))]
+      vars[1,1,"env"] <- pvar(mu=out$params$env$estimate,
+                              weights=as.numeric(tab))
+    } else {
+      tab <- table(data$env)
+      tab <- tab[match(out$params$env$env,names(tab))]
+      vars[1,2,"env"] <- pvar(mu=out$params$env$estimate,
+                              weights=as.numeric(tab))
+      for (i in 1:n.loc) {
+        ix <- which(out$params$env$env %in% env.loc.list[[i]])
+        tab <- table(data$env[data$loc==locations[i]])
+        tab <- tab[match(out$params$env$env[ix],names(tab))]
+        vars[i,i,"env"] <- pvar(mu=out$params$env$estimate[ix],
+                                weights=as.numeric(tab))
+      }
+    }
   
     if (non.add=="dom") {
       ix <- grep("dom",beta.names,fixed=T)
@@ -415,7 +448,10 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
         beta.names[ix] <- gsub(":","",beta.names[ix])
         ix <- ix[match(locations,beta.names[ix])]
         mu <- as.numeric(kronecker(matrix(dom.covariate,ncol=1),beta[ix,1]))
-        vars[1,1,"heterosis"] <- pvar(mu=mu,weights=gL.weights)
+        vars[1,2,"heterosis"] <- pvar(mu=mu,weights=gL.weights)
+        for (i in 1:n.loc) {
+          vars[i,i,"heterosis"] <- pvar(mu=dom.covariate*beta[ix[i],1],weights=id.weights)
+        }
         out$params$heterosis <- data.frame(loc=locations,
                                            estimate=as.numeric(beta[ix,1]),
                                            SE=as.numeric(beta[ix,2]))
@@ -455,7 +491,11 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
                                        estimate=as.numeric(beta[ix,1]),
                                        SE=as.numeric(beta[ix,2]))
         mu_gL <- as.numeric(kronecker(as.matrix(geno@coeff[id,fix.eff.marker]),diag(n.loc))%*%beta[ix,1])
-        vars[1,1,"fixed.marker"] <- pvar(mu=mu_gL,weights=gL.weights) 
+        vars[1,2,"fixed.marker"] <- pvar(mu=mu_gL,weights=gL.weights) 
+        for (i in 1:n.loc) {
+          mu <- as.numeric(as.matrix(geno@coeff[id,fix.eff.marker])%*%beta[ix[i],1])
+          vars[i,i,"heterosis"] <- pvar(mu=mu,weights=id.weights)
+        }
       }
     }
   } else {
@@ -548,9 +588,15 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
     if (n.loc > 1) {
       rownames(resid.vc) <- locations
       if (!is.null(vcov)) {
-        vars[1,1,"g x env"] <- pvar(V=diag(as.numeric(resid.vc)),weights=loc.weights)
+        vars[1,2,"g x env"] <- pvar(V=diag(as.numeric(resid.vc)),weights=loc.weights)
+        for (i in 1:n.loc) {
+          vars[i,i,"g x env"] <- as.numeric(resid.vc[i,1])*(1 - 1/loc.weights[i])
+        }
       } else {
-        vars[1,1,"residual"] <- pvar(V=diag(as.numeric(resid.vc)),weights=loc.weights)
+        vars[1,2,"residual"] <- pvar(V=diag(as.numeric(resid.vc)),weights=loc.weights)
+        for (i in 1:n.loc) {
+          vars[i,i,"residual"] <- as.numeric(resid.vc[i,1])*(1 - 1/loc.weights[i])
+        }
       }
       
       if (is.null(geno)) {
@@ -563,18 +609,25 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
         geno1.vc <- cov.ans$cov.mat
         geno2.vc <- Matrix(NA,nrow=0,ncol=0)
         model <- 0L
-        vars[1,1,"genotype"] <- mean(geno1.vc[upper.tri(geno1.vc,diag=FALSE)])*(1 - 1/n)
+        vars[1,2,"genotype"] <- mean(geno1.vc[upper.tri(geno1.vc,diag=FALSE)])*(1 - 1/n)
+        for (i in 1:n.loc) {
+          vars[i,i,"genotype"] <- geno1.vc[i,i]*(1-1/gL.weights[i])
+        }
         
         K <- kronecker(Imat,geno1.vc,make.dimnames = T)
-        vars[1,1,"g x loc"] <- pvar(V=K,weights=gL.weights) - vars[1,1,"genotype"]
+        vars[1,2,"g x loc"] <- pvar(V=K,weights=gL.weights) - vars[1,2,"genotype"]
         
       } else {
         cov.ans <- f.cov.loc(vc[grep("source = asremlG",vc.names,fixed=T),],locations)
         geno1.vc <- cov.ans$cov.mat
         geno2.vc <- Matrix(NA,nrow=0,ncol=0)
-        vars[1,1,"additive"] <- mean(geno1.vc[upper.tri(geno1.vc,diag=FALSE)]) * meanG
+        vars[1,2,"additive"] <- mean(geno1.vc[upper.tri(geno1.vc,diag=FALSE)]) * meanG
+        for (i in 1:n.loc) {
+          vars[i,i,"additive"] <- geno1.vc[i,i]*meanG
+        }
+        
         K <- kronecker(.GlobalEnv$asremlG,geno1.vc,make.dimnames = T)
-        vars[1,1,"add x loc"] <- pvar(V=K,weights=gL.weights) - vars[1,1,"additive"]
+        vars[1,2,"add x loc"] <- pvar(V=K,weights=gL.weights) - vars[1,2,"additive"]
         model <- 1L
         
         if (non.add=="g.resid") {
@@ -582,7 +635,10 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
           rownames(tmp) <- locations
           geno2.vc <- coerce_dpo(tcrossprod(sqrt(tmp)))
           K <- kronecker(Imat,geno2.vc,make.dimnames = T)
-          vars[1,1,"g.resid"] <- pvar(V=K,weights=gL.weights)
+          vars[1,2,"g.resid"] <- pvar(V=K,weights=gL.weights)
+          for (i in 1:n.loc) {
+            vars[i,i,"g.resid"] <- geno2.vc[i,i]*(1-1/gL.weights[i])
+          }
           model <- 2L
         }
         if (non.add=="dom") {
@@ -590,8 +646,12 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
           tmp <- Matrix(vc[grep("source = asremlD",vc.names,fixed=T),1],ncol=1)
           rownames(tmp) <- locations
           geno2.vc <- coerce_dpo(tcrossprod(sqrt(tmp)))
-          K <- kronecker(.GlobalEnv$asremlD,geno2.vc,make.dimnames = T)
-          vars[1,1,"dominance"] <- pvar(V=K,weights=gL.weights)
+          #K <- kronecker(.GlobalEnv$asremlD,geno2.vc,make.dimnames = T)
+          #vars[1,2,"dominance"] <- pvar(V=K,weights=gL.weights)
+          vars[1,2,"dominance"] <- mean(geno2.vc[upper.tri(geno2.vc,diag=FALSE)]) * meanD
+          for (i in 1:n.loc) {
+            vars[i,i,"dominance"] <- geno2.vc[i,i]*meanD
+          }
           model <- 3L
         }
         

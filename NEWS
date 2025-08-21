@@ -1,3 +1,7 @@
+Changes in 1.13
+* fixed error in the routine for multiple expt per env
+* summary.var has new option for separate.loc
+
 Changes in 1.12
 * GWAS "DM" option modified so that now only the random effect is standardized. The effect itself still includes the fixed (heterosis) portion.
 

@@ -8,7 +8,7 @@
 #' 
 #' Argument \code{solver} specifies which software to use for REML. Current options are "asreml" and "spats". For "spats", the argument \code{spline} must be a vector of length two, with the names of the x and y variables (respectively) for the 2D spline.
 #' 
-#' The heritability and residuals in the output are based on a random effects model for id.
+#' The heritability and residuals in the output are based on a random effects model for id. When asreml is used, the plot-based h2 is reported. When spats is used, it is entry-mean h2.
 #' 
 #' Missing response values are omitted for single-trait analysis but retained for multi-trait analysis (unless both traits are missing), to allow for prediction in Stage 2. 
 #' 
@@ -31,7 +31,7 @@
 #' \describe{
 #' \item{blues}{data frame of BLUEs}
 #' \item{vcov}{list of variance-covariance matrices for the BLUEs, one per env}
-#' \item{fit}{data frame with broad-sense H2 (plot basis) and/or AIC}
+#' \item{fit}{data frame with broad-sense H2 and/or AIC}
 #' \item{resid}{For single trait, list of diagnostic plots and data frame of residuals. For multi-trait, list of resid var-cov matrices.}
 #' }
 #' 
@@ -46,7 +46,8 @@
 #' @export
 
 Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
-                   spline=NULL,silent=TRUE,workspace=c("500mb","500mb"),max.iter=30) {
+                   spline=NULL,silent=TRUE,workspace=c("500mb","500mb"),
+                   max.iter=30) {
   
   data <- read.csv(file=filename,check.names=F)
   solver <- toupper(solver)
@@ -361,7 +362,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
         #vcov2 <- vcov[-match(expt.in.env[[j]],names(vcov))]
         #vcov <- c(vcov2,vcov3)
         #names(vcov) <- c(names(vcov2),envs[j])
-        vcov.env[[names(iu)[j]]] <- vcov3
+        vcov.env[[names(iu)[match(j,iu)]]] <- vcov3
         blue.out <- rbind(blue.out[-ix,],blue3)
         rm("asremlOmega",envir = .GlobalEnv)
       }

@@ -37,7 +37,7 @@ List containing
 \describe{
 \item{blues}{data frame of BLUEs}
 \item{vcov}{list of variance-covariance matrices for the BLUEs, one per env}
-\item{fit}{data frame with broad-sense H2 (plot basis) and/or AIC}
+\item{fit}{data frame with broad-sense H2 and/or AIC}
 \item{resid}{For single trait, list of diagnostic plots and data frame of residuals. For multi-trait, list of resid var-cov matrices.}
 }
 }
@@ -51,7 +51,7 @@ Argument \code{effects} is used to specify other i.i.d. effects besides genotype
 
 Argument \code{solver} specifies which software to use for REML. Current options are "asreml" and "spats". For "spats", the argument \code{spline} must be a vector of length two, with the names of the x and y variables (respectively) for the 2D spline.
 
-The heritability and residuals in the output are based on a random effects model for id.
+The heritability and residuals in the output are based on a random effects model for id. When asreml is used, the plot-based h2 is reported. When spats is used, it is entry-mean h2.
 
 Missing response values are omitted for single-trait analysis but retained for multi-trait analysis (unless both traits are missing), to allow for prediction in Stage 2. 
 

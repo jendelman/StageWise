@@ -14,7 +14,7 @@ dominance(params, index.coeff = NULL, gamma = 0)
 \item{gamma}{contribution of non-additive values for genetic merit}
 }
 \value{
-data frame with estimates and SE
+data frame with estimates
 }
 \description{
 Report dominance parameters
