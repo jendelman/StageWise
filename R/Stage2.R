@@ -222,6 +222,8 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
       n.loc <- length(locations)
       stopifnot(n.loc > 1)
       loc.weights <- table(data$loc)
+      id.per.loc <- sapply(split(data$id,data$loc),
+                           function(x){length(unique(x))})
       data$gL <- paste(as.character(data$id),as.character(data$loc),sep=":")
       tmp <- expand.grid(loc=locations,id=id)
       gL <- apply(tmp[,c("id","loc")],1,paste,collapse=":")
@@ -611,7 +613,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
         model <- 0L
         vars[1,2,"genotype"] <- mean(geno1.vc[upper.tri(geno1.vc,diag=FALSE)])*(1 - 1/n)
         for (i in 1:n.loc) {
-          vars[i,i,"genotype"] <- geno1.vc[i,i]*(1-1/gL.weights[i])
+          vars[i,i,"genotype"] <- geno1.vc[i,i]*(1-1/id.per.loc[i])
         }
         
         K <- kronecker(Imat,geno1.vc,make.dimnames = T)
@@ -637,7 +639,7 @@ Stage2 <- function(data,vcov=NULL,geno=NULL,fix.eff.marker=NULL,
           K <- kronecker(Imat,geno2.vc,make.dimnames = T)
           vars[1,2,"g.resid"] <- pvar(V=K,weights=gL.weights)
           for (i in 1:n.loc) {
-            vars[i,i,"g.resid"] <- geno2.vc[i,i]*(1-1/gL.weights[i])
+            vars[i,i,"g.resid"] <- geno2.vc[i,i]*(1-1/id.per.loc[i])
           }
           model <- 2L
         }
