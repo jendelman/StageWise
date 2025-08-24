@@ -54,7 +54,7 @@ Argument \code{effects} is used to specify other i.i.d. effects besides genotype
 
 Argument \code{solver} specifies which software to use for REML. Current options are "asreml" and "spats". For "spats", the argument \code{spline} must be a vector of length two, with the names of the x and y variables (respectively) for the 2D spline.
 
-The heritability and residuals in the output are based on a random effects model for id. As of v1.13, separate values for plot and entry-mean H2 in the broad-sense are calculated. With asreml, plot-H2 is from the variance components, while entry-H2 is the average reliability from \code{\link{blup}}. SpATS reports a "generalized" H2, which is equivalent to average reliability.
+The heritability and residuals in the output are based on a random effects model for id. As of v1.13, separate values for plot and entry-mean H2 in the broad-sense are calculated. With asreml, plot-H2 is from the variance components, while entry-H2 is based on the generalized H2 of Oakey et al. (2006), utilizing \code{\link{blup.prep}}. SpATS reports only the generalized H2.
 
 Missing response values are omitted for single-trait analysis but retained for multi-trait analysis (unless both traits are missing), to allow for prediction in Stage 2. 
 
