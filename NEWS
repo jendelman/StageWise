@@ -1,6 +1,8 @@
 Changes in 1.13
 * fixed error in the routine for multiple expt per env
 * summary.var has new option for separate.loc
+* Stage1 argument env allows to analyze only subset of environments
+* Stage1 returns both plot and entry H2 for asreml
 
 Changes in 1.12
 * GWAS "DM" option modified so that now only the random effect is standardized. The effect itself still includes the fixed (heterosis) portion.

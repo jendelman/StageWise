@@ -8,7 +8,7 @@
 #' 
 #' Argument \code{solver} specifies which software to use for REML. Current options are "asreml" and "spats". For "spats", the argument \code{spline} must be a vector of length two, with the names of the x and y variables (respectively) for the 2D spline.
 #' 
-#' The heritability and residuals in the output are based on a random effects model for id. When asreml is used, the plot-based h2 is reported. When spats is used, it is entry-mean h2.
+#' The heritability and residuals in the output are based on a random effects model for id. As of v1.13, separate values for plot and entry-mean H2 in the broad-sense are calculated. With asreml, plot-H2 is from the variance components, while entry-H2 is the average reliability from \code{\link{blup}}. SpATS reports a "generalized" H2, which is equivalent to average reliability.
 #' 
 #' Missing response values are omitted for single-trait analysis but retained for multi-trait analysis (unless both traits are missing), to allow for prediction in Stage 2. 
 #' 
@@ -18,6 +18,8 @@
 #' 
 #' If the input file has a column "expt", this allows for the use of separate spatial models for multiple experiments within an environment (only for single trait): each experiment is first analyzed separately, and then the BLUEs from all experiments per env are jointly analyzed to compute a single BLUE per env. The estimation errors from each experiment are propagated into the multi-expt model using ASReml-R. The situation is different with multi-trait analysis, as all experiments are analyzed jointly per env, with a fixed effect for expt but a common residual model. Any additional cofactors (e.g., block) that are nested within expt need to be explicitly nested! 
 #' 
+#' Argument \code{env} can be used to limit the analysis to only certain environments in the input file. This is useful when different models are needed in different env.
+#' 
 #' @param filename Name of CSV file
 #' @param traits trait names (see Details)
 #' @param effects data frame specifying other effects in the model (see Details)
@@ -26,6 +28,7 @@
 #' @param silent TRUE/FALSE, whether to suppress REML output
 #' @param workspace memory limits for ASRreml-R
 #' @param max.iter maximum number of iterations for ASRreml-R
+#' @param env character vector of environments to analyze (default is all)
 #' 
 #' @return List containing
 #' \describe{
@@ -47,7 +50,7 @@
 
 Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
                    spline=NULL,silent=TRUE,workspace=c("500mb","500mb"),
-                   max.iter=30) {
+                   max.iter=30,env=NULL) {
   
   data <- read.csv(file=filename,check.names=F)
   solver <- toupper(solver)
@@ -88,6 +91,9 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   data$env <- as.character(data$env)
   data$expt <- as.character(data$expt)
   data$id <- as.character(data$id)
+  if (!is.null(env)) {
+    data <- data[data$env %in% env,]
+  }
   expt.og <- unique(data$expt)
   
   iz <- apply(as.matrix(data[,traits]),1,function(z){!all(is.na(z))})
@@ -210,7 +216,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   
   fit <- fit[match(expts,fit$expt),]
   if (n.trait==1) {
-    fit$H2 <- as.numeric(NA)
+    fit$H2.entry <- fit$H2.plot <- as.numeric(NA)
     if (solver=="ASREML") 
       fit$AIC <- as.numeric(NA)
   } else {
@@ -263,10 +269,10 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
         vc <- summary(ans)$varcomp
         Vg <- vc[match("id",rownames(vc)),1]
         Ve <- vc[match("units!units",rownames(vc)),1]
-        fit$H2[j] <- round(Vg/(Vg+Ve),2)
+        fit$H2.plot[j] <- round(Vg/(Vg+Ve),3)
       }
       if (solver=="SPATS") {
-        fit$H2[j] <- round(as.numeric(getHeritability(ans)),2)
+        fit$H2.entry[j] <- round(as.numeric(getHeritability(ans)),3)
         x.coord <- ans$data[,ans$terms$spatial$terms.formula$x.coord]
         y.coord <- ans$data[,ans$terms$spatial$terms.formula$y.coord]
         fit.spatial.trend <- obtain.spatialtrend(ans)
@@ -300,9 +306,25 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
           tmp2 <- Matrix(spam::as.dgCMatrix.spam(attr(predans,"vcov")))
           vcov[[j]] <- as(forceSymmetric(tmp2),"packedMatrix")
         }
+        
         tmp$id <- as.character(tmp$id)
         dimnames(vcov[[j]]) <- list(tmp$id,tmp$id)
         blue.out <- rbind(blue.out,data.frame(expt=expts[j],tmp))
+        
+        if (solver=="ASREML") {
+          vars <- new(Class="class_var",
+                   geno1=Matrix(Vg),
+                   geno2=Matrix(matrix(0,0,0)),
+                   resid=Matrix(0),
+                   B=matrix(0,0,0),
+                   model=0L,
+                   vars=array(NA,dim=c(0,0,0)),
+                   fix.eff.marker=character(0))
+           prep <- blup_prep(data=data.frame(env=expts[j],tmp),
+                            vcov=vcov[j],vars=vars)
+           gv <- blup(prep,what="GV")
+           fit$H2.entry[j] <- round(mean(gv$r2),3)
+        }
       }
     }
   

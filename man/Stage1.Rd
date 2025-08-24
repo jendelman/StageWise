@@ -12,7 +12,8 @@ Stage1(
   spline = NULL,
   silent = TRUE,
   workspace = c("500mb", "500mb"),
-  max.iter = 30
+  max.iter = 30,
+  env = NULL
 )
 }
 \arguments{
@@ -31,6 +32,8 @@ Stage1(
 \item{workspace}{memory limits for ASRreml-R}
 
 \item{max.iter}{maximum number of iterations for ASRreml-R}
+
+\item{env}{character vector of environments to analyze (default is all)}
 }
 \value{
 List containing
@@ -51,7 +54,7 @@ Argument \code{effects} is used to specify other i.i.d. effects besides genotype
 
 Argument \code{solver} specifies which software to use for REML. Current options are "asreml" and "spats". For "spats", the argument \code{spline} must be a vector of length two, with the names of the x and y variables (respectively) for the 2D spline.
 
-The heritability and residuals in the output are based on a random effects model for id. When asreml is used, the plot-based h2 is reported. When spats is used, it is entry-mean h2.
+The heritability and residuals in the output are based on a random effects model for id. As of v1.13, separate values for plot and entry-mean H2 in the broad-sense are calculated. With asreml, plot-H2 is from the variance components, while entry-H2 is the average reliability from \code{\link{blup}}. SpATS reports a "generalized" H2, which is equivalent to average reliability.
 
 Missing response values are omitted for single-trait analysis but retained for multi-trait analysis (unless both traits are missing), to allow for prediction in Stage 2. 
 
@@ -59,5 +62,7 @@ Argument \code{workspace} is a vector of length two containing the workspace and
 
 For multiple traits, only "asreml" is supported, and only the BLUE model is run, so the returned object does not contain H2. 
 
-If the input file has a column "expt", this allows for the use of separate spatial models for multiple experiments within an environment (only for single trait): each experiment is first analyzed separately, and then the BLUEs from all experiments per env are jointly analyzed to compute a single BLUE per env. The estimation errors from each experiment are propagated into the multi-expt model using ASReml-R. The situation is different with multi-trait analysis, as all experiments are analyzed jointly per env, with a fixed effect for expt but a common residual model. Any additional cofactors (e.g., block) that are nested within expt need to be explicitly nested!
+If the input file has a column "expt", this allows for the use of separate spatial models for multiple experiments within an environment (only for single trait): each experiment is first analyzed separately, and then the BLUEs from all experiments per env are jointly analyzed to compute a single BLUE per env. The estimation errors from each experiment are propagated into the multi-expt model using ASReml-R. The situation is different with multi-trait analysis, as all experiments are analyzed jointly per env, with a fixed effect for expt but a common residual model. Any additional cofactors (e.g., block) that are nested within expt need to be explicitly nested! 
+
+Argument \code{env} can be used to limit the analysis to only certain environments in the input file. This is useful when different models are needed in different env.
 }

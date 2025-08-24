@@ -90,10 +90,9 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
     #stopifnot(nrow(vars@meanOmega) > 0)
     data$env <- factor(data$env,levels=names(vcov))
     omega.list <- mapply(FUN=function(Q,ix){
-                          ix2 <- match(ix,rownames(Q))
-                          as(Q[ix2,ix2,drop=FALSE],"dpoMatrix")
-                        },Q=vcov,ix=split(tmp,data$env))
-    #names(omega.list) <- names(vcov)
+                        ix2 <- match(ix,rownames(Q))
+                        as(Q[ix2,ix2,drop=FALSE],"dpoMatrix")
+                      },Q=vcov,ix=split(tmp,data$env))
   } else {
     data$env <- factor(data$env)
     omega.list <- lapply(split(tmp,data$env),function(rnames){
