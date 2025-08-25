@@ -322,9 +322,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
                    fix.eff.marker=character(0))
            prep <- blup_prep(data=data.frame(env=expts[j],tmp),
                             vcov=vcov[j],vars=vars)
-           eg <- eigen(prep@var.uhat/Vg)
-           #gv <- blup(prep,what="GV")
-           fit$H2.entry[j] <- round(mean(eg$values),3)
+           fit$H2.entry[j] <- round(mean(diag(prep@var.uhat)/Vg),3)
         }
       }
     }
