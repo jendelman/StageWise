@@ -1,3 +1,6 @@
+Changes in 1.14
+* Stage1 returns residuals from the BLUE and BLUP models as separate columns
+
 Changes in 1.13
 * fixed error in the routine for multiple expt per env
 * summary.var has new option for separate.loc

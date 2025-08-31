@@ -8,7 +8,9 @@
 #' 
 #' Argument \code{solver} specifies which software to use for REML. Current options are "asreml" and "spats". For "spats", the argument \code{spline} must be a vector of length two, with the names of the x and y variables (respectively) for the 2D spline.
 #' 
-#' The heritability and residuals in the output are based on a random effects model for id. As of v1.13, separate values for plot and entry-mean H2 in the broad-sense are calculated. With asreml, plot-H2 is from the variance components, while entry-H2 is based on the generalized H2 of Oakey et al. (2006), utilizing \code{\link{blup.prep}}. SpATS reports only the generalized H2.
+#' As of v1.13, separate values for plot and entry-mean H2 in the broad-sense are calculated, based on the model with genotype as a random effect. With asreml, plot-H2 is from the variance components, while entry-H2 is based on the generalized H2 of Oakey et al. (2006), utilizing \code{\link{blup.prep}}. SpATS reports only the generalized H2.
+#' 
+#' As of v1.14, residuals from both the BLUE and BLUP models are reported.
 #' 
 #' Missing response values are omitted for single-trait analysis but retained for multi-trait analysis (unless both traits are missing), to allow for prediction in Stage 2. 
 #' 
@@ -206,8 +208,6 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
     }
   }
   
-  resid.blup <- NULL
-  
   if ("loc" %in% colnames(data)) {
     fit <- data[!duplicated(data$expt),c("loc","env","expt")]
   } else {
@@ -226,7 +226,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
     fit <- fit[,-match("expt",colnames(fit))]
 
   blue.out <- NULL
-  blup.resid <- NULL
+  resid.table <- NULL
   resid.vc <- vector("list",n.expt)
   names(resid.vc) <- expts
   if (solver=="SPATS") {
@@ -262,9 +262,10 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
         cat("BLUP model failed to converge.\n")
         next
       }
-      residuals <- resid(ans)
-      blup.resid <- rbind(blup.resid,
-                          data.frame(id=as.character(data1$id),expt=expts[j],resid=residuals))
+      blup.residuals <- resid(ans)
+      #blup.resid <- rbind(blup.resid,
+      #                    data.frame(id=as.character(data1$id),expt=expts[j],resid=residuals))
+
       if (solver=="ASREML") {
         vc <- summary(ans)$varcomp
         Vg <- vc[match("id",rownames(vc)),1]
@@ -276,7 +277,7 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
         x.coord <- ans$data[,ans$terms$spatial$terms.formula$x.coord]
         y.coord <- ans$data[,ans$terms$spatial$terms.formula$y.coord]
         fit.spatial.trend <- obtain.spatialtrend(ans)
-        p1.data <- data.frame(x=x.coord,y=y.coord,z=residuals)
+        p1.data <- data.frame(x=x.coord,y=y.coord,z=blup.residuals)
         p1 <- ggplot(p1.data,aes(x=.data$x,y=.data$y,fill=.data$z)) + geom_tile() + scale_fill_viridis_c(name="") + xlab(spline[1]) + ylab(spline[2]) + ggtitle("Residuals")
         p2.data <-data.frame(expand.grid(x=fit.spatial.trend$col.p, y=fit.spatial.trend$row.p), z=as.numeric(t(fit.spatial.trend$fit)))
         p2 <- ggplot(p2.data,aes(x=.data$x,y=.data$y,fill=.data$z)) + geom_tile() + scale_fill_viridis_c(name="") + xlab(spline[1]) + theme(axis.text.y = element_blank(),axis.ticks.y=element_blank(),axis.title.y=element_blank()) + ggtitle("Spatial Trend")
@@ -290,6 +291,11 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
         cat("BLUE model failed to converge.\n")
       } else {
         asreml::asreml.options(trace=FALSE)
+        blue.residuals <- resid(ans)
+        resid.table <- rbind(resid.table,
+                            data.frame(id=as.character(data1$id),expt=expts[j],
+                                       blup.resid=blup.residuals,
+                                       blue.resid=blue.residuals))
       
         if (solver=="ASREML") {
           predans <- asreml::predict.asreml(ans,classify="id",vcov = TRUE)
@@ -455,15 +461,15 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   }
   
   if (n.trait==1) {
-    p1 <- ggplot(data=blup.resid,aes(y=.data$resid,x=.data$expt)) + ylab("Residual") + xlab("") +
+    p1 <- ggplot(data=resid.table,aes(y=.data$blup.resid,x=.data$expt)) + ylab("Residual") + xlab("") +
       stat_boxplot(outlier.color="red") + theme_bw() + theme(axis.text.x=element_text(angle=90,vjust=0.5))
-    p2 <- ggplot(data=blup.resid,aes(sample=.data$resid)) + stat_qq() + stat_qq_line() + facet_wrap(~expt) + theme_bw() + xlab("Expected") + ylab("Observed")
+    p2 <- ggplot(data=resid.table,aes(sample=.data$blup.resid)) + stat_qq() + stat_qq_line() + facet_wrap(~expt) + theme_bw() + xlab("Expected") + ylab("Observed")
     if (solver=="ASREML")
       return(list(blues=blue.out,vcov=vcov.env,fit=fit,
-                  resid=list(boxplot=p1,qqplot=p2,table=blup.resid)))
+                  resid=list(boxplot=p1,qqplot=p2,table=resid.table)))
     if (solver=="SPATS")
       return(list(blues=blue.out,vcov=vcov.env,fit=fit,
-                  resid=list(boxplot=p1,qqplot=p2,spatial=spatial.plot,table=blup.resid)))
+                  resid=list(boxplot=p1,qqplot=p2,spatial=spatial.plot,table=resid.table)))
   } else {
     #Multi-trait
     return(list(blues=blue.out,vcov=vcov.env,fit=fit,resid=resid.vc))
