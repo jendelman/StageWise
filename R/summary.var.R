@@ -45,12 +45,13 @@ setMethod("summary",c(object="class_var"),
               trait.scale <- sqrt(diag(object@geno1)+gamma^2*diag(object@geno2))
               index.coeff <- index.coeff/trait.scale
             }
-            #if (dim(object@vars)[1]==0) {
-            #  pvar <- FALSE
-            #} else {
-            #  pvar <- TRUE
-            #}
-            pvar <- TRUE
+            if (dim(object@vars)[1]==0) {
+              #pairwise trait method
+              pvar <- FALSE
+            } else {
+              pvar <- TRUE
+            }
+            
             if (pvar) {
               if (is.null(index.coeff)) {
                 if (n.loc==1 | (n.loc > 1 & separate.loc)) {

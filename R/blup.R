@@ -180,7 +180,10 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
   
   if (what=="AM") {
     G <- kron(geno@eigen.G,1)
-    M <- kronecker(crossprod((geno@coeff/geno@scale),crossprod(G$inv)),matrix(index.coeff,nrow=1))
+    id <- rownames(geno@eigen.G$vectors)
+    Ginv <- crossprod(G$inv)
+    dimnames(Ginv) <- list(id,id)
+    M <- kronecker(crossprod(geno@coeff/geno@scale,Ginv[rownames(geno@coeff),]),matrix(index.coeff,nrow=1))
     effect.ran <- as.numeric(M %*% matrix(data@random[1:n.random],ncol=1))
     effect <- effect.ran
     V <- data@var.uhat[1:n.random,1:n.random] #used for GWAS

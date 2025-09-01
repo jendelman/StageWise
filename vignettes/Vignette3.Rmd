@@ -11,7 +11,7 @@ vignette: >
 library(knitr)
 opts_chunk$set(echo = TRUE,message=FALSE,warning=FALSE,comment="##",
                       fig.width=4,fig.height=4,dpi=150)
-opts_knit$set(root.dir="~/Box Sync/Endelman/Software/StageWise")
+opts_knit$set(root.dir="~/Box/Endelman/Software/StageWise")
 load("~/Software/StageWise/data/wheat.rda")
 ```
 

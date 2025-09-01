@@ -11,7 +11,7 @@ vignette: >
 library(knitr)
 opts_chunk$set(echo = TRUE,message=FALSE,warning=FALSE,comment="##",
                       fig.width=4,fig.height=4,dpi=150)
-opts_knit$set(root.dir="~/Box Sync/Endelman/Software/StageWise")
+opts_knit$set(root.dir="~/Box/Endelman/Software/StageWise")
 ```
 
 ### Preface
@@ -77,7 +77,7 @@ ans1a <- Stage1(filename=pheno1a.file,traits="total.yield",
                 effects=effects,solver="asreml")
 ```
 
-The `Stage1` function returns a list with several results. List element "blue" is a data frame of the individual BLUEs per environment. Element "fit" contains the broad-sense heritability on a plot basis (H2) and the AIC.
+The `Stage1` function returns a list with several results. List element "blue" is a data frame of the individual BLUEs per environment. Element "fit" contains the AIC and broad-sense heritability (H2), with H2 reported per plot (i.e., Vg/(Vg+Ve)) and entry-mean (i.e., generalized H2; Oakey et al. 2006). 
 
 ```{r}
 head(ans1a$blues)
@@ -111,13 +111,15 @@ compare <- merge(model1$blues,model2$blues,by=c("id","env"))
 ggplot(data=compare,aes(x=BLUE.x,y=BLUE.y)) + geom_point() + xlab("i.i.d. Random Effects") + ylab("2D Spline") + theme_bw() + geom_abline(intercept=0,slope=1) + coord_cartesian(xlim=c(25,90),ylim=c(25,90)) + ggtitle("2020 Yield BLUEs (Mg/ha)")
 ```
 
+With SpATS, only the generalized (entry-mean) heritability is calculated. 
+
 The above figure shows that the BLUEs are similar with the two different models. A figure showing the 2D spline and spatial distribution of residuals is also returned when SpATS is used:
 
 ```{r}
 model2$resid$spatial$advanced
 ```
 
-Before proceeding to Stage 2, the BLUEs and variance-covariance matrices from the 2015-19 analysis and 2020 analysis need to be combined. (If other software is used for Stage 1, it can be incorporated in a similar manner.) The model with i.i.d. row and column effects is selected based on the higher estimate for H2.
+Before proceeding to Stage 2, the BLUEs and variance-covariance matrices from the 2015-19 analysis and 2020 analysis need to be combined. (If other software is used for Stage 1, it can be incorporated in a similar manner.) 
 
 ```{r}
 stage1.blues <- rbind(ans1a$blues,model1$blues)
