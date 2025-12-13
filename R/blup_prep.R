@@ -11,7 +11,7 @@
 #' @param geno object of \code{\link{class_geno}} from \code{\link{read_geno}}
 #' @param vars object of \code{\link{class_var}} from \code{\link{Stage2}}
 #' @param mask (optional) data frame with possible columns "id","env","loc","trait"
-#' @param method (optional) "MME", "Vinv", NULL (defaut). see Details
+#' @param method (optional) "MME", "Vinv", NULL (default). see Details
 #' 
 #' @return Object of \code{\link{class_prep}}
 #' 

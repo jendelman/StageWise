@@ -4,7 +4,7 @@
 #' 
 #' When \code{map=TRUE}, first three columns of the file are marker, chrom, position. When \code{map=FALSE}, the first column is marker. Subsequent columns contain the allele dosage for individuals/clones, coded 0,1,2,...ploidy (fractional values are allowed). The input file for diploids can also be coded using {-1,0,1} (fractional values allowed). Additive coefficients are computed by subtracting the population mean from each marker, and the additive (genomic) relationship matrix is computed as G = tcrossprod(coeff)/scale. The scale parameter ensures the mean of the diagonal elements of G equals 1 under panmictic equilibrium. Missing genotype data is replaced with the population mean. 
 #' 
-#' G can be blended with the pedigree relationship matrix (A) by providing a pedigree data frame in \code{ped} and blending parameter \code{w}. The blended relationship matrix is H = (1-w)G + wA. The first three columns of \code{ped} are id, parent1, parent2. Missing parents must be coded NA. An optional fourth column in binary (0/1) format can be used to indicate which ungenotyped individuals should be included in the H matrix, but this option cannot be combined with dominance. If there is no fourth column, only genotyped individuals are included. If a vector of w values is provided, the function returns a list of \code{\link{class_geno}} objects.
+#' G can be blended with the pedigree relationship matrix (A) by providing a pedigree data frame in \code{ped} and blending parameter \code{w}. The blended relationship matrix is H = (1-w)G + wA. The first three columns of \code{ped} are id, parent1, parent2. Missing parents must be coded NA. An optional fourth column in binary (0/1) format can be used to indicate which individuals should be included in the H matrix, but this option cannot be combined with dominance. If there is no fourth column, only genotyped individuals are included. If a vector of w values is provided, the function returns a list of \code{\link{class_geno}} objects. 
 #' 
 #' If the A matrix is not used, then G is blended with the identity matrix (times the mean diagonal of G) to improve numerical conditioning for matrix inversion. The default for w is 1e-5, which is somewhat arbitrary and based on tests with the vignette dataset. The D matrix is also blended with the identity matrix using 1e-5 for numerical conditioning.
 #' 
@@ -160,6 +160,10 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
         stop("Dominance cannot be used with ungenotyped individuals.")
       
       colnames(ped) <- c("id","parent1","parent2","H")
+      
+      id3 <- ped$id[which(ped$H==1)]
+      n3 <- length(id3)
+      cat(sub("X",n3,"Individuals in the H matrix: X\n"))
     } else {
       colnames(ped) <- c("id","parent1","parent2")
     }
@@ -178,7 +182,8 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
     colnames(A) <- ped$id
     
     if (ncol(ped)==4) {
-      id2 <- setdiff(ped$id[ped$H==1],id)
+      id2 <- setdiff(id3,id)
+      iv <- match(id3,c(id,id2))
     } else {
       id2 <- character(0)
     }
@@ -189,6 +194,7 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
     if (n2 > 0) {
       A.inv <- solve(A)
       A11.inv <- solve(A11)
+      coeff <- coeff[intersect(id,id3),]
     }
     
     for (i in 1:nw) {
@@ -197,11 +203,11 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
       if (n2==0) {
         H[[i]] <- Gw
       } else {
-        Hinv[[i]] <- as(bdiag(solve(Gw)-A11.inv,Matrix(0,nrow=n2,ncol=n2)) + A.inv,"symmetricMatrix")
+        tmp <- as(bdiag(solve(Gw)-A11.inv,Matrix(0,nrow=n2,ncol=n2)) + A.inv,"symmetricMatrix")
+        Hinv[[i]] <- tmp[iv,iv]
       }
     }
-    
-    id <- c(id,id2)
+    #id <- c(id,id2)
   }
   
   if (n.ploidy > 1) {
@@ -221,7 +227,7 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
     } else {
       eigen.G <- eigen(Hinv[[i]],symmetric=TRUE)
       eigen.G$values <- 1/eigen.G$values
-      eigen.G$vectors <- Matrix(eigen.G$vectors,dimnames=list(id,id))
+      eigen.G$vectors <- Matrix(eigen.G$vectors,dimnames=list(id3,id3))
       H[[i]] <- tcrossprod(eigen.G$vectors%*%Diagonal(n=nrow(Hinv[[i]]),x=sqrt(eigen.G$values)))
     }
     class(eigen.G) <- "list"

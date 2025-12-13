@@ -17,7 +17,7 @@ blup_prep(data, vcov = NULL, geno = NULL, vars, mask = NULL, method = NULL)
 
 \item{mask}{(optional) data frame with possible columns "id","env","loc","trait"}
 
-\item{method}{(optional) "MME", "Vinv", NULL (defaut). see Details}
+\item{method}{(optional) "MME", "Vinv", NULL (default). see Details}
 }
 \value{
 Object of \code{\link{class_prep}}
