@@ -195,6 +195,7 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
       A.inv <- solve(A)
       A11.inv <- solve(A11)
       coeff <- coeff[intersect(id,id3),]
+      scale.param <- scale.param[intersect(id,id3)]
     }
     
     for (i in 1:nw) {
