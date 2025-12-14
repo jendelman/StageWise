@@ -8,7 +8,7 @@
 #' 
 #' Argument \code{solver} specifies which software to use for REML. Current options are "asreml" and "spats". For "spats", the argument \code{spline} must be a vector of length two, with the names of the x and y variables (respectively) for the 2D spline.
 #' 
-#' As of v1.13, separate values for plot and entry-mean H2 in the broad-sense are calculated, based on the model with genotype as a random effect. With asreml, plot-H2 is from the variance components, while entry-H2 is based on the generalized H2 of Oakey et al. (2006), utilizing \code{\link{blup.prep}}. SpATS reports only the generalized H2.
+#' As of v1.13, separate values for plot and entry-mean H2 in the broad-sense are calculated, based on the model with genotype as a random effect. With asreml, plot-H2 is from the variance components, while entry-H2 is based on the generalized H2 of Oakey et al. (2006), utilizing \code{\link{blup_prep}}. SpATS reports only the generalized H2.
 #' 
 #' As of v1.14, residuals from both the BLUE and BLUP models are reported.
 #' 
