@@ -159,7 +159,6 @@ gain <- function(input, merit=NULL, desired=NULL, restricted=NULL,
     out <- list(quad.mat=quad.mat,table=result)
   } else {
     if (!is.null(desired)) {
-      
       iv <- match(trait.names,names(desired),nomatch=0)
       if (any(iv==0))
         stop("Trait names in desired gains do not match input")
@@ -188,9 +187,6 @@ gain <- function(input, merit=NULL, desired=NULL, restricted=NULL,
     angle <- atan(eg$vectors[2,2]/eg$vectors[1,2])
     p <- ggplot() + geom_ellipse(aes(x0=0,y0=0, a = lens[2], b=lens[1], angle = angle)) + coord_fixed() + theme_bw() + xlab(traits[1]) + ylab(traits[2]) 
     
-    if (!is.null(desired)|!is.null(merit))
-      p <- p + geom_segment(aes(x=0,y=0,xend=x.opt[ix[1]],yend=x.opt[ix[2]]),col="blue") + geom_point(aes(x=x.opt[ix[1]],y=x.opt[ix[2]]),col="blue")
-    
     if (!is.null(merit)) {
       if (all(c.opt[ix]!=0)) {
         angle2 <- atan(c.opt[ix[2]]/c.opt[ix[1]])
@@ -205,6 +201,9 @@ gain <- function(input, merit=NULL, desired=NULL, restricted=NULL,
         p <- p + geom_segment(aes(x=0,y=0,xend=0,yend=1),linetype=2,col="red")   
         
       }
+    }
+    if (!is.null(merit)) {
+      p <- p + geom_segment(aes(x=0,y=0,xend=x.opt[ix[1]],yend=x.opt[ix[2]]),col="blue") + geom_point(aes(x=x.opt[ix[1]],y=x.opt[ix[2]]),col="blue")
     }
     out <- c(out,list(plot=p))
   }
