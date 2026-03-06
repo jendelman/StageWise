@@ -2,23 +2,28 @@
 #' 
 #' Genetic gain calculations
 #' 
+#' The standardized genetic response vector, x, is constrained to an ellipsoid with equation \eqn{x'Qx = i^2}{x'Qx=i^2}, where i is selection intensity. The matrix of the quadratic form \eqn{Q=U'U}{Q=U'U}, where \eqn{U=R\Gamma^{-1}H}{U=R Gamma^-1 H}; R is the upper triangular cholesky factor of P = variance-covariance matrix of the selection values (e.g., BLUPs or phenotypes); \eqn{\Gamma}{Gamma} = covariance between the genetic and selection values; H = diagonal matrix of the genetic standard deviations. For multi-trait BLUPs, \eqn{\Gamma=P}{Gamma=P}, while under phenotypic selection, \eqn{\Gamma}{Gamma} is the genetic variance-covariance matrix.
+#' 
+#' The first argument \code{input} can be a list of three matrices (P,Gamma,H) or a variable of class \code{\link{class_prep}}, in which case the matrices are computed internally. 
+#'
 #' Either \code{merit} or \code{desired} can be used, not both. The former specifies the relative contribution of each trait to genetic merit, while the latter specifies the relative desired gain in genetic standard deviation units. All traits must be specified. Optional argument \code{restricted} is a data frame with columns "trait" and "sign", where the options for sign are "=",">","<", representing equal to zero, non-negative, and non-positive. When \code{desired} is used, the \code{restricted} argument is ignored.
 #' 
 #' The argument \code{gamma} controls the definition of genetic merit. (See notation in the journal publication.) The default is NULL, which implies breeding values. For purely additive values, use gamma = 0. For total genotypic value, use gamma = 1.
 #' 
-#' Note that this function assumes a selection index of BLUPs, not phenotypes. 
+#' In the figure, the red dot is the intersection of the merit or desired gain vector with the ellipsoid, which is also the response under the desired gains index. The optimal merit response is shown with a blue dot.
 #' 
-#' @param input either object of \code{\link{class_prep}} or quad.mat returned by this function
+#' @param input variable of \code{\link{class_prep}} or list of three matrices (see Details)
 #' @param merit named vector of merit coefficients, in genetic standard deviation units
 #' @param desired named vector of desired gains, in genetic standard deviation units
 #' @param restricted data frame of restricted traits, see Details
 #' @param traits optional vector with exactly 2 trait names, to plot elliptical response
 #' @param gamma contribution of non-additive values for genetic merit
+#' @param intensity selection intensity (default = 1)
 #' @param solver name of convex solver (default is "ECOS")
 #' 
 #' @return List containing
 #' \describe{
-#' \item{quad.mat}{quadratic matrix for the ellipsoid}
+#' \item{matrices}{for input \code{\link{class_prep}}, a list with P,Gamma,H}
 #' \item{plot}{ellipse plot}
 #' \item{table}{data frame with the response and index coefficients for all traits}
 #' }
@@ -29,7 +34,7 @@
 #' @export
 
 gain <- function(input, merit=NULL, desired=NULL, restricted=NULL,
-                 traits=NULL, gamma=NULL, solver="ECOS", ...) {
+                 traits=NULL, gamma=NULL, intensity=1, solver="ECOS", ...) {
   
   vararg <- list(...)
   if ("coeff" %in% names(vararg)) {
@@ -89,24 +94,30 @@ gain <- function(input, merit=NULL, desired=NULL, restricted=NULL,
       trait.names <- colnames(input@geno1.var)
     }
     
-    D <- diag(trait.scale)
-    quad.mat <- D%*%solve(B)%*%D
-    dimnames(quad.mat) <- list(trait.names,trait.names)
+    H <- diag(trait.scale)
+    dimnames(H) <- dimnames(B) <- list(trait.names,trait.names)
+    P <- Gamma <- B
   } else {
-    quad.mat <- input
-    trait.names <- rownames(quad.mat)
+    stopifnot(inherits(input,"list") & length(input)==3)
+    P <- input[[1]]
+    trait.names <- rownames(P)
+    Gamma <- input[[2]][trait.names,trait.names]
+    H <- input[[3]][trait.names,trait.names]
     n.trait <- length(trait.names)
   } 
+  Ginv <- solve(Gamma)
+  U <- chol(P) %*% Ginv %*% H
+  quad.mat <- crossprod(U)
+  dimnames(quad.mat) <- list(trait.names,trait.names)
   
   if (!is.null(merit)) {
-    
     iv <- match(trait.names,names(merit),nomatch=0)
     if (any(iv==0))
       stop("Trait names in merit coefficients do not match input")
     merit <- merit[iv]
     
     x <- Variable(n.trait)
-    constraints <- list(quad_form(x,quad.mat) <= 1)
+    constraints <- list(quad_form(x,quad.mat) <= intensity^2)
     
     if (!is.null(restricted)) {
       stopifnot(colnames(restricted)==c("trait","sign"))
@@ -149,61 +160,51 @@ gain <- function(input, merit=NULL, desired=NULL, restricted=NULL,
     if (result$status!="optimal")
       stop("Convex solver failed")
     x.opt <- as.numeric(result$getValue(x))
-    c.opt <- as.numeric(quad.mat %*% x.opt)
+  } 
+  if (!is.null(desired)) {
+    iv <- match(trait.names,names(desired),nomatch=0)
+    if (any(iv==0))
+      stop("Trait names in desired gains do not match input")
+    desired <- desired[iv]
+    x.opt <- desired*intensity/sqrt(as.numeric(crossprod(desired, quad.mat%*%desired)))
+  } 
+  if (inherits(input,"class_prep")) {
+    out <- list(matrices=list(P=P,Gamma=Gamma,H=H))
+  } else {
+    out <- list()
+  }
+  if (!is.null(desired)|!is.null(merit)) {
+    c.opt <- crossprod(Ginv,H%*%x.opt)/intensity
     c.opt <- c.opt/sqrt(sum(c.opt^2))
-    names(c.opt) <- names(x.opt) <- trait.names
     result <- data.frame(trait=trait.names,
                          response=round(x.opt,3),
-                         index=round(c.opt,3))
+                         index.coeff=round(c.opt,3))
     rownames(result) <- NULL
-    out <- list(quad.mat=quad.mat,table=result)
-  } else {
-    if (!is.null(desired)) {
-      iv <- match(trait.names,names(desired),nomatch=0)
-      if (any(iv==0))
-        stop("Trait names in desired gains do not match input")
-      desired <- desired[iv]
-      c.opt <- as.numeric(quad.mat %*% matrix(desired,ncol=1))
-      desired <- desired/sqrt(sum(desired*c.opt))
-      c.opt <- c.opt/sqrt(sum(c.opt^2))
-      result <- data.frame(trait=trait.names,
-                           response=round(desired,3),
-                           index=round(c.opt,3))
-      rownames(result) <- NULL
-      out <- list(quad.mat=quad.mat,table=result)
-    } else {
-      out <- list(quad.mat=quad.mat)
-    }
-  }
-  
+    out <- c(out,list(table=result))
+  } 
+
   if (!is.null(traits)) {
     #plot ellipse
-    ix <- match(traits,rownames(quad.mat),nomatch=0)
+    ix <- match(traits,trait.names,nomatch=0)
     if (any(ix==0))
       stop("Trait names not found")
     
     eg <- eigen(quad.mat[ix,ix])
-    lens <- 1/sqrt(eg$values)
+    lens <- intensity/sqrt(eg$values)
     angle <- atan(eg$vectors[2,2]/eg$vectors[1,2])
-    p <- ggplot() + geom_ellipse(aes(x0=0,y0=0, a = lens[2], b=lens[1], angle = angle)) + coord_fixed() + theme_bw() + xlab(traits[1]) + ylab(traits[2]) 
+    p <- ggplot() + geom_ellipse(aes(x0=0,y0=0, a = lens[2], b=lens[1], angle = angle)) + 
+      coord_fixed() + theme_bw() + xlab(traits[1]) + ylab(traits[2]) 
     
-    if (!is.null(merit)) {
-      if (all(c.opt[ix]!=0)) {
-        angle2 <- atan(c.opt[ix[2]]/c.opt[ix[1]])
-        if (c.opt[ix[2]] > 0 & angle2 < 0)
-          angle2 <- pi + angle2
-        x <- matrix(c(cos(angle2),sin(angle2)),ncol=1)
-        r <- 1/as.numeric(sqrt(t(x) %*% quad.mat[ix,ix] %*% x))
-        p <- p + geom_spoke(aes(x=0,y=0,angle=angle2,radius=r),col="red",lty=2)
-      } else {
-        
-        #to do
-        p <- p + geom_segment(aes(x=0,y=0,xend=0,yend=1),linetype=2,col="red")   
-        
-      }
+    if (!is.null(desired)) {
+      p <- p + geom_segment(aes(x=0,y=0,xend=x.opt[ix[1]],yend=x.opt[ix[2]]),col="red",lty=2) + 
+          geom_point(aes(x=x.opt[ix[1]],y=x.opt[ix[2]]),col="red")
     }
     if (!is.null(merit)) {
-      p <- p + geom_segment(aes(x=0,y=0,xend=x.opt[ix[1]],yend=x.opt[ix[2]]),col="blue") + geom_point(aes(x=x.opt[ix[1]],y=x.opt[ix[2]]),col="blue")
+      x2 <- merit*intensity/sqrt(as.numeric(crossprod(merit, quad.mat%*%merit)))
+      p <- p + geom_segment(aes(x=0,y=0,xend=x2[ix[1]],yend=x2[ix[2]]),col="red",lty=2) + 
+        geom_point(aes(x=x2[ix[1]],y=x2[ix[2]]),col="red")
+      p <- p + geom_segment(aes(x=0,y=0,xend=x.opt[ix[1]],yend=x.opt[ix[2]]),col="blue") + 
+        geom_point(aes(x=x.opt[ix[1]],y=x.opt[ix[2]]),col="blue")
     }
     out <- c(out,list(plot=p))
   }

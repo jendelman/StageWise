@@ -11,12 +11,13 @@ gain(
   restricted = NULL,
   traits = NULL,
   gamma = NULL,
+  intensity = 1,
   solver = "ECOS",
   ...
 )
 }
 \arguments{
-\item{input}{either object of \code{\link{class_prep}} or quad.mat returned by this function}
+\item{input}{variable of \code{\link{class_prep}} or list of three matrices (see Details)}
 
 \item{merit}{named vector of merit coefficients, in genetic standard deviation units}
 
@@ -28,12 +29,14 @@ gain(
 
 \item{gamma}{contribution of non-additive values for genetic merit}
 
+\item{intensity}{selection intensity (default = 1)}
+
 \item{solver}{name of convex solver (default is "ECOS")}
 }
 \value{
 List containing
 \describe{
-\item{quad.mat}{quadratic matrix for the ellipsoid}
+\item{matrices}{for input \code{\link{class_prep}}, a list with P,Gamma,H}
 \item{plot}{ellipse plot}
 \item{table}{data frame with the response and index coefficients for all traits}
 }
@@ -42,9 +45,13 @@ List containing
 Genetic gain calculations
 }
 \details{
+The standardized genetic response vector, x, is constrained to an ellipsoid with equation \eqn{x'Qx = i^2}{x'Qx=i^2}, where i is selection intensity. The matrix of the quadratic form \eqn{Q=U'U}{Q=U'U}, where \eqn{U=R\Gamma^{-1}H}{U=R Gamma^-1 H}; R is the upper triangular cholesky factor of P = variance-covariance matrix of the selection values (e.g., BLUPs or phenotypes); \eqn{\Gamma}{Gamma} = covariance between the genetic and selection values; H = diagonal matrix of the genetic standard deviations. For multi-trait BLUPs, \eqn{\Gamma=P}{Gamma=P}, while under phenotypic selection, \eqn{\Gamma}{Gamma} is the genetic variance-covariance matrix.
+
+The first argument \code{input} can be a list of three matrices (P,Gamma,H) or a variable of class \code{\link{class_prep}}, in which case the matrices are computed internally. 
+
 Either \code{merit} or \code{desired} can be used, not both. The former specifies the relative contribution of each trait to genetic merit, while the latter specifies the relative desired gain in genetic standard deviation units. All traits must be specified. Optional argument \code{restricted} is a data frame with columns "trait" and "sign", where the options for sign are "=",">","<", representing equal to zero, non-negative, and non-positive. When \code{desired} is used, the \code{restricted} argument is ignored.
 
 The argument \code{gamma} controls the definition of genetic merit. (See notation in the journal publication.) The default is NULL, which implies breeding values. For purely additive values, use gamma = 0. For total genotypic value, use gamma = 1.
 
-Note that this function assumes a selection index of BLUPs, not phenotypes.
+In the figure, the red dot is the intersection of the merit or desired gain vector with the ellipsoid, which is also the response under the desired gains index. The optimal merit response is shown with a blue dot.
 }

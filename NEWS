@@ -1,5 +1,8 @@
+Changes in 1.16
+* Revised gain function to work for phenotypic and BLUP selection
+
 Changes in 1.15
-* In read_geno, fourth column of ped now fully controls individuals in H matrix
+* In read_geno, fourth column of ped now fully controls individuals in H matrix 
 
 Changes in 1.14
 * Stage1 returns residuals from the BLUE and BLUP models as separate columns
