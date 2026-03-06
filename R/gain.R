@@ -12,13 +12,14 @@
 #' 
 #' In the figure, the red dot is the intersection of the merit or desired gain vector with the ellipsoid, which is also the response under the desired gains index. The optimal merit response is shown with a blue dot.
 #' 
+#' In the function output, response values are in units of \eqn{i \sigma_g}{i sigma_g}, so multiplying by i gives the response for different intensities.
+#' 
 #' @param input variable of \code{\link{class_prep}} or list of three matrices (see Details)
 #' @param merit named vector of merit coefficients, in genetic standard deviation units
 #' @param desired named vector of desired gains, in genetic standard deviation units
 #' @param restricted data frame of restricted traits, see Details
 #' @param traits optional vector with exactly 2 trait names, to plot elliptical response
 #' @param gamma contribution of non-additive values for genetic merit
-#' @param intensity selection intensity (default = 1)
 #' @param solver name of convex solver (default is "ECOS")
 #' 
 #' @return List containing
@@ -34,8 +35,9 @@
 #' @export
 
 gain <- function(input, merit=NULL, desired=NULL, restricted=NULL,
-                 traits=NULL, gamma=NULL, intensity=1, solver="ECOS", ...) {
+                 traits=NULL, gamma=NULL, solver="ECOS", ...) {
   
+  intensity <- 1
   vararg <- list(...)
   if ("coeff" %in% names(vararg)) {
     merit <- vararg$coeff

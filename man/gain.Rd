@@ -11,7 +11,6 @@ gain(
   restricted = NULL,
   traits = NULL,
   gamma = NULL,
-  intensity = 1,
   solver = "ECOS",
   ...
 )
@@ -28,8 +27,6 @@ gain(
 \item{traits}{optional vector with exactly 2 trait names, to plot elliptical response}
 
 \item{gamma}{contribution of non-additive values for genetic merit}
-
-\item{intensity}{selection intensity (default = 1)}
 
 \item{solver}{name of convex solver (default is "ECOS")}
 }
@@ -54,4 +51,6 @@ Either \code{merit} or \code{desired} can be used, not both. The former specifie
 The argument \code{gamma} controls the definition of genetic merit. (See notation in the journal publication.) The default is NULL, which implies breeding values. For purely additive values, use gamma = 0. For total genotypic value, use gamma = 1.
 
 In the figure, the red dot is the intersection of the merit or desired gain vector with the ellipsoid, which is also the response under the desired gains index. The optimal merit response is shown with a blue dot.
+
+In the function output, response values are in units of \eqn{i \sigma_g}{i sigma_g}, so multiplying by i gives the response for different intensities.
 }
