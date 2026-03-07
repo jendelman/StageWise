@@ -19,6 +19,10 @@ S4 class to prepare for blup
 
 \item{\code{var.uhat}}{variance of BLUPs}
 
+\item{\code{var.bhat}}{variance of BLUEs}
+
+\item{\code{cov.buhat}}{covariance between BLUEs and BLUPs}
+
 \item{\code{avg.env}}{average fixed effect of the environments}
 
 \item{\code{heterosis}}{regression coefficients for inbreeding}

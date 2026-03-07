@@ -3,7 +3,9 @@
 #' Report dominance parameters
 #' 
 #' The dominance variance (Vd) and baseline heterosis (b) are quantified relative to additive variance (Va) and std. dev. (SDa), respectively. As of v1.11, the variances are scaled to the population (previously, it was just the variance components). For a multi-trait/loc model, \code{index.coeff} specifies the coefficients of the standardized true values (see also \code{\link{blup}}), with \code{gamma} indicating the relative weight of non-additive to additive genetic merit for the standardization (see also \code{\link{gain}}). 
-#' 
+#'
+#' This function is based on an index of the form \eqn{I=b'BLUP[g]}{I=b'BLUP[g]}. For merit function \eqn{M=a'H^{-1}g}{M=a'(H^-1)g}, where H is a diagonal matrix of genetic std dev, the index coefficients under BLUP are \eqn{b=H^{-1}a}{b=(H^-1)a}. If \code{index.coeff} = c, internally the function uses \eqn{b=H^{-1}c}{b=(H^-1)c}. In other words, the argument should be scaled like \eqn{a}{a}.
+#'  
 #' @param params list returned by \code{\link{Stage2}}
 #' @param index.coeff merit index coefficients
 #' @param gamma contribution of non-additive values for genetic merit

@@ -13,7 +13,7 @@ blup(data, geno = NULL, what, index.coeff = NULL, gwas.ncore = 0L)
 
 \item{what}{One of the following: AV, BV, GV, AM, DM. See Details.}
 
-\item{index.coeff}{named vector of index coefficients for the locations or traits}
+\item{index.coeff}{named vector of index coefficients, on the standardized scale (see Details)}
 
 \item{gwas.ncore}{Integer indicating number of cores to use for GWAS (default is 0 for no GWAS).}
 }
@@ -24,7 +24,9 @@ Data frame of BLUPs
 BLUP
 }
 \details{
-The argument \code{what} takes 5 possible values: "AV" (additive value), "BV" (breeding value), "GV" (genotypic value), "AM" (additive marker effect), and "DM" (dominance marker effect). "Values" refer to predictions for individuals, as opposed to markers. Predicted values include the average fixed effect of the environments, whereas predicted marker effects do not. Argument \code{index.coeff} is a named vector (matching the names of the locations or traits), and the values are interpreted for standardized traits. 
+The argument \code{what} takes 5 possible values: "AV" (additive value), "BV" (breeding value), "GV" (genotypic value), "AM" (additive marker effect), and "DM" (dominance marker effect). "Values" refer to predictions for individuals, as opposed to markers. Predicted values include the average fixed effect of the environments, whereas predicted marker effects do not. 
+
+Argument \code{index.coeff} is a named vector (matching the names of the locations or traits), and the values are interpreted for standardized traits. This function is based on an index of the form \eqn{I=b'BLUP[g]}{I=b'BLUP[g]}. For merit function \eqn{M=a'H^{-1}g}{M=a'(H^-1)g}, where H is a diagonal matrix of genetic std dev, the index coefficients under BLUP are \eqn{b=H^{-1}a}{b=(H^-1)a}. If \code{index.coeff} = c, internally the function uses \eqn{b=H^{-1}c}{b=(H^-1)c}. In other words, the argument should be scaled like \eqn{a}{a}.
 
 When multiple objects of \code{\link{class_prep}} are used for \code{data}, they must be based on the same marker data and genetic model. Also, reliabilities are not computed.
 }

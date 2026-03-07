@@ -1,5 +1,6 @@
 Changes in 1.16
-* Revised gain function to work for phenotypic and BLUP selection
+* Revised gain function to work for phenotypic and BLUP selection. See details.
+* Changed reliability calculation in blup to include contribution of fixed effects for markers and heterosis. This required two additional slots in class blup_prep. 
 
 Changes in 1.15
 * In read_geno, fourth column of ped now fully controls individuals in H matrix 

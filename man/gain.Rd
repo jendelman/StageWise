@@ -11,12 +11,13 @@ gain(
   restricted = NULL,
   traits = NULL,
   gamma = NULL,
+  scale.coeff = NULL,
   solver = "ECOS",
   ...
 )
 }
 \arguments{
-\item{input}{variable of \code{\link{class_prep}} or list of three matrices (see Details)}
+\item{input}{variable of \code{\link{class_prep}} or list of matrices P,T,H (see Details)}
 
 \item{merit}{named vector of merit coefficients, in genetic standard deviation units}
 
@@ -28,12 +29,14 @@ gain(
 
 \item{gamma}{contribution of non-additive values for genetic merit}
 
+\item{scale.coeff}{should index coeff be scaled by genetic sd (see Details)}
+
 \item{solver}{name of convex solver (default is "ECOS")}
 }
 \value{
 List containing
 \describe{
-\item{matrices}{for input \code{\link{class_prep}}, a list with P,Gamma,H}
+\item{matrices}{for input \code{\link{class_prep}}, a list with P,T,H}
 \item{plot}{ellipse plot}
 \item{table}{data frame with the response and index coefficients for all traits}
 }
@@ -42,9 +45,9 @@ List containing
 Genetic gain calculations
 }
 \details{
-The standardized genetic response vector, x, is constrained to an ellipsoid with equation \eqn{x'Qx = i^2}{x'Qx=i^2}, where i is selection intensity. The matrix of the quadratic form \eqn{Q=U'U}{Q=U'U}, where \eqn{U=R\Gamma^{-1}H}{U=R Gamma^-1 H}; R is the upper triangular cholesky factor of P = variance-covariance matrix of the selection values (e.g., BLUPs or phenotypes); \eqn{\Gamma}{Gamma} = covariance between the genetic and selection values; H = diagonal matrix of the genetic standard deviations. For multi-trait BLUPs, \eqn{\Gamma=P}{Gamma=P}, while under phenotypic selection, \eqn{\Gamma}{Gamma} is the genetic variance-covariance matrix.
+The standardized genetic response vector, \eqn{x=H^{-1}g}{x=H^-1 g}, is constrained to an ellipsoid with equation \eqn{x'Qx = i^2}{x'Qx=i^2}, where i is selection intensity and H is a diagonal matrix of genetic standard deviations. The matrix of the quadratic form \eqn{Q=U'U}{Q=U'U}, where \eqn{U=RT^{-1}H}{U=R(T^-1)H}; R is the upper triangular cholesky factor of P = variance-covariance matrix of the selection values (e.g., BLUPs or phenotypes); and T = covariance between the genetic and selection values. For multi-trait BLUPs T=P, while under phenotypic selection T is the genetic variance-covariance matrix.
 
-The first argument \code{input} can be a list of three matrices (P,Gamma,H) or a variable of class \code{\link{class_prep}}, in which case the matrices are computed internally. 
+The first argument \code{input} can be a list of three matrices (P,T,H) or a variable of class \code{\link{class_prep}}, in which case the matrices are computed internally. 
 
 Either \code{merit} or \code{desired} can be used, not both. The former specifies the relative contribution of each trait to genetic merit, while the latter specifies the relative desired gain in genetic standard deviation units. All traits must be specified. Optional argument \code{restricted} is a data frame with columns "trait" and "sign", where the options for sign are "=",">","<", representing equal to zero, non-negative, and non-positive. When \code{desired} is used, the \code{restricted} argument is ignored.
 
@@ -53,4 +56,6 @@ The argument \code{gamma} controls the definition of genetic merit. (See notatio
 In the figure, the red dot is the intersection of the merit or desired gain vector with the ellipsoid, which is also the response under the desired gains index. The optimal merit response is shown with a blue dot.
 
 In the function output, response values are in units of \eqn{i \sigma_g}{i sigma_g}, so multiplying by i gives the response for different intensities.
+
+This function was originally designed to complement \code{\link{blup}}, which is based on an index of the form \eqn{I=b'BLUP[g]}{I=b'BLUP[g]}. For merit function \eqn{M=a'H^{-1}g}{M=a'(H^-1)g}, the index coefficients under BLUP are \eqn{b=H^{-1}a}{b=(H^-1)a}. If \eqn{c}{c} is the vector of coefficients passed to \code{\link{blup}}, internally the function uses \eqn{b=H^{-1}c}{b=(H^-1)c}. In other words, the argument should be scaled like \eqn{a}{a}. To return index coefficients on this scale, use \code{scale.coeff}=TRUE. To return the unscaled coefficients, use \code{scale.coeff}=FALSE. The default value, NULL, will use TRUE when the input is of class \code{\link{class_prep}} and FALSE when the input is a list of three matrices.
 }

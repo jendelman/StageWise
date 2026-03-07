@@ -345,6 +345,9 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
     random.ix <- (n.fix+1):length(soln)
     random <- as.numeric(soln[random.ix])
     var.uhat <- var.u - MME.inv[random.ix,random.ix]
+    var.bhat <- MME.inv[(1:n.fix),(1:n.fix)]
+    dimnames(var.bhat) <- list(names(fixed),names(fixed))
+    cov.buhat <- -MME.inv[(1:n.fix),random.ix]
     
   } else {
     #invert V
@@ -358,19 +361,23 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
     tmp2 <- try(solve(tmp),silent=TRUE)
     if (is(tmp2,"try-error"))
       tmp2 <- MASS::ginv(as.matrix(tmp))
-    W <- forceSymmetric(tmp2)
-    fixed <- as.numeric(tcrossprod(W,X) %*% Vinv %*% data$BLUE)
+    var.bhat <- forceSymmetric(tmp2)
+    fixed <- as.numeric(tcrossprod(var.bhat,X) %*% Vinv %*% data$BLUE)
     names(fixed) <- colnames(X)
+    dimnames(var.bhat) <- list(names(fixed),names(fixed))
     
-    tmp <- Diagonal(n=n) - chol.Vinv %*% X %*% tcrossprod(W, chol.Vinv %*% X)
+    W <- tcrossprod(var.bhat, chol.Vinv %*% X)
+    tmp <- Diagonal(n=n) - chol.Vinv %*% X %*% W
     WW <- forceSymmetric(tmp)
     cholWW <- suppressWarnings(try(chol(WW),silent=TRUE))
     if (is(cholWW,"try-error")) {
       cholWW <- chol(WW + Diagonal(n=n,x=1e-6))
     }
-    GZtP <- tcrossprod(var.u,Z) %*% crossprod(cholWW %*% chol.Vinv)
+    Zvar.u <- Z %*% var.u
+    GZtP <- crossprod(Zvar.u, crossprod(cholWW %*% chol.Vinv))
     random <- as.numeric(GZtP %*% data$BLUE)
-    var.uhat <- GZtP %*% tcrossprod(Z,var.u)
+    var.uhat <- GZtP %*% Zvar.u
+    cov.buhat <- W %*% chol.Vinv %*% Zvar.u
   }
   
   fixed.marker <- numeric(0)
@@ -420,6 +427,7 @@ blup_prep <- function(data,vcov=NULL,geno=NULL,vars,mask=NULL,method=NULL) {
   }
   
   new(Class="class_prep",id=id,ploidy=ploidy,var.u=var.u,var.uhat=var.uhat,
+      var.bhat=var.bhat, cov.buhat=cov.buhat,
       avg.env=avg.env,heterosis=heterosis,fixed.marker=fixed.marker,B=vars@B,
       random=random, geno1.var=vars@geno1, geno2.var=vars@geno2, 
       model=vars@model)

@@ -2,14 +2,16 @@
 #' 
 #' BLUP
 #' 
-#' The argument \code{what} takes 5 possible values: "AV" (additive value), "BV" (breeding value), "GV" (genotypic value), "AM" (additive marker effect), and "DM" (dominance marker effect). "Values" refer to predictions for individuals, as opposed to markers. Predicted values include the average fixed effect of the environments, whereas predicted marker effects do not. Argument \code{index.coeff} is a named vector (matching the names of the locations or traits), and the values are interpreted for standardized traits. 
+#' The argument \code{what} takes 5 possible values: "AV" (additive value), "BV" (breeding value), "GV" (genotypic value), "AM" (additive marker effect), and "DM" (dominance marker effect). "Values" refer to predictions for individuals, as opposed to markers. Predicted values include the average fixed effect of the environments, whereas predicted marker effects do not. 
+#' 
+#' Argument \code{index.coeff} is a named vector (matching the names of the locations or traits), and the values are interpreted for standardized traits. This function is based on an index of the form \eqn{I=b'BLUP[g]}{I=b'BLUP[g]}. For merit function \eqn{M=a'H^{-1}g}{M=a'(H^-1)g}, where H is a diagonal matrix of genetic std dev, the index coefficients under BLUP are \eqn{b=H^{-1}a}{b=(H^-1)a}. If \code{index.coeff} = c, internally the function uses \eqn{b=H^{-1}c}{b=(H^-1)c}. In other words, the argument should be scaled like \eqn{a}{a}.
 #' 
 #' When multiple objects of \code{\link{class_prep}} are used for \code{data}, they must be based on the same marker data and genetic model. Also, reliabilities are not computed.
 #' 
 #' @param data one object, or list of objects, of \code{\link{class_prep}} from \code{\link{blup_prep}}
 #' @param geno object of \code{\link{class_geno}} from \code{\link{read_geno}}
 #' @param what One of the following: AV, BV, GV, AM, DM. See Details.
-#' @param index.coeff named vector of index coefficients for the locations or traits
+#' @param index.coeff named vector of index coefficients, on the standardized scale (see Details)
 #' @param gwas.ncore Integer indicating number of cores to use for GWAS (default is 0 for no GWAS). 
 #' 
 #' @return Data frame of BLUPs
@@ -81,7 +83,6 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
     names(index.scale) <- unlist(sapply(data,function(z){rownames(z@geno1.var)}))
   }
   
-  
   nlt <- length(index.scale) #number of loc/traits
   
   if (nlt > 1) {
@@ -138,6 +139,10 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
     fix.value <- data@avg.env*index.coeff
   }
   
+  M <- kronecker(Diagonal(n=n.id),Matrix(index.coeff,nrow=1))
+  if (data@model > 1L) 
+    M <- cbind(M,gamma*M)
+  
   n.mark <- length(data@fixed.marker)/nlt
   if (n.mark > 0) {
     if (nlt > 1) {
@@ -146,26 +151,51 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
       fixed.markers <- names(data@fixed.marker)
     }
     beta <- matrix(data@fixed.marker,ncol=1)
-    tmp <- kronecker(geno@coeff[,fixed.markers,drop=FALSE],matrix(index.coeff,nrow=1)) %*% beta
-    fix.value <- fix.value + as.numeric(tmp)
+    rownames(beta) <- fixed.markers
+    L <- kronecker(geno@coeff[data@id,fixed.markers,drop=FALSE],
+                   matrix(index.coeff,nrow=1))
+  } else {
+    L <- NULL
   }
   
   if (length(data@heterosis) > 0 & what %in% c("BV","GV")) {
-    fix.value <- fix.value + gamma * (-geno@Fg[data@id]) * sum(index.coeff*data@heterosis)
+    L2 <- kronecker(matrix(gamma*(-geno@Fg[data@id]),ncol=1),
+                    matrix(index.coeff,nrow=1))
+    beta2 <- matrix(data@heterosis,ncol=1)
+    rownames(beta2) <- names(data@heterosis)
+    #fix.value <- fix.value + gamma*(-geno@Fg[data@id])*sum(index.coeff*data@heterosis)
+    if (is.null(L)) {
+      L <- L2
+      beta <- beta2
+    } else {
+      L <- cbind(L,L2)
+      beta <- rbind(beta,beta2)
+    }
   }
   
   if (what %in% c("AV","BV","GV")) {
     if (gwas.ncore > 0)
       stop("GWAS option requires either AM or DM for 'what' ")
+
+    if (!is.null(L)) {
+      fix.value <- fix.value + as.numeric(L %*% beta)
+      numer <-  diag(L%*%tcrossprod(data@cov.buhat[rownames(beta),],M))
+      denom <- diag(L%*%tcrossprod(data@var.bhat[rownames(beta),rownames(beta)],L))
+    } else {
+      numer <- denom <- numeric(n.id)
+    } 
     
-    M <- kronecker(Diagonal(n=n.id),Matrix(index.coeff,nrow=1))
-    if (data@model > 1L) 
-      M <- cbind(M,gamma*M)
+    out <- data.frame(id=data@id,
+                      value=as.numeric(M%*%Matrix(data@random,ncol=1)) + fix.value)
+
+    tmp <- diag(M%*% tcrossprod(data@var.uhat,M))
+    numer <- numer + tmp
+    denom <- denom + tmp
     
-    out <- data.frame(id=data@id,value=as.numeric(M%*%Matrix(data@random,ncol=1)) + fix.value)
-    numer <- diag(M%*% tcrossprod(data@var.uhat,M))
-    denom <- diag(M%*% tcrossprod(data@var.u,M))
-    out$r2 <- numer/denom
+    #numer <- diag(M%*% tcrossprod(data@var.uhat,M))
+    #denom <- diag(M%*% tcrossprod(data@var.u,M))
+    tmp2 <- diag(M%*% tcrossprod(data@var.u,M))
+    out$r2 <- numer^2/(denom*tmp2)
     attr(out,"what") <- what
     rownames(out) <- NULL
     return(out)
@@ -183,7 +213,8 @@ blup <- function(data, geno=NULL, what, index.coeff=NULL, gwas.ncore=0L) {
     id <- rownames(geno@eigen.G$vectors)
     Ginv <- crossprod(G$inv)
     dimnames(Ginv) <- list(id,id)
-    M <- kronecker(crossprod(geno@coeff/geno@scale,Ginv[rownames(geno@coeff),]),matrix(index.coeff,nrow=1))
+    M <- kronecker(crossprod(geno@coeff/geno@scale,Ginv[rownames(geno@coeff),]),
+                   matrix(index.coeff,nrow=1))
     effect.ran <- as.numeric(M %*% matrix(data@random[1:n.random],ncol=1))
     effect <- effect.ran
     V <- data@var.uhat[1:n.random,1:n.random] #used for GWAS

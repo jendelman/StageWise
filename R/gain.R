@@ -2,9 +2,9 @@
 #' 
 #' Genetic gain calculations
 #' 
-#' The standardized genetic response vector, x, is constrained to an ellipsoid with equation \eqn{x'Qx = i^2}{x'Qx=i^2}, where i is selection intensity. The matrix of the quadratic form \eqn{Q=U'U}{Q=U'U}, where \eqn{U=R\Gamma^{-1}H}{U=R Gamma^-1 H}; R is the upper triangular cholesky factor of P = variance-covariance matrix of the selection values (e.g., BLUPs or phenotypes); \eqn{\Gamma}{Gamma} = covariance between the genetic and selection values; H = diagonal matrix of the genetic standard deviations. For multi-trait BLUPs, \eqn{\Gamma=P}{Gamma=P}, while under phenotypic selection, \eqn{\Gamma}{Gamma} is the genetic variance-covariance matrix.
+#' The standardized genetic response vector, \eqn{x=H^{-1}g}{x=H^-1 g}, is constrained to an ellipsoid with equation \eqn{x'Qx = i^2}{x'Qx=i^2}, where i is selection intensity and H is a diagonal matrix of genetic standard deviations. The matrix of the quadratic form \eqn{Q=U'U}{Q=U'U}, where \eqn{U=RT^{-1}H}{U=R(T^-1)H}; R is the upper triangular cholesky factor of P = variance-covariance matrix of the selection values (e.g., BLUPs or phenotypes); and T = covariance between the genetic and selection values. For multi-trait BLUPs T=P, while under phenotypic selection T is the genetic variance-covariance matrix.
 #' 
-#' The first argument \code{input} can be a list of three matrices (P,Gamma,H) or a variable of class \code{\link{class_prep}}, in which case the matrices are computed internally. 
+#' The first argument \code{input} can be a list of three matrices (P,T,H) or a variable of class \code{\link{class_prep}}, in which case the matrices are computed internally. 
 #'
 #' Either \code{merit} or \code{desired} can be used, not both. The former specifies the relative contribution of each trait to genetic merit, while the latter specifies the relative desired gain in genetic standard deviation units. All traits must be specified. Optional argument \code{restricted} is a data frame with columns "trait" and "sign", where the options for sign are "=",">","<", representing equal to zero, non-negative, and non-positive. When \code{desired} is used, the \code{restricted} argument is ignored.
 #' 
@@ -14,17 +14,20 @@
 #' 
 #' In the function output, response values are in units of \eqn{i \sigma_g}{i sigma_g}, so multiplying by i gives the response for different intensities.
 #' 
-#' @param input variable of \code{\link{class_prep}} or list of three matrices (see Details)
+#' This function was originally designed to complement \code{\link{blup}}, which is based on an index of the form \eqn{I=b'BLUP[g]}{I=b'BLUP[g]}. For merit function \eqn{M=a'H^{-1}g}{M=a'(H^-1)g}, the index coefficients under BLUP are \eqn{b=H^{-1}a}{b=(H^-1)a}. If \eqn{c}{c} is the vector of coefficients passed to \code{\link{blup}}, internally the function uses \eqn{b=H^{-1}c}{b=(H^-1)c}. In other words, the argument should be scaled like \eqn{a}{a}. To return index coefficients on this scale, use \code{scale.coeff}=TRUE. To return the unscaled coefficients, use \code{scale.coeff}=FALSE. The default value, NULL, will use TRUE when the input is of class \code{\link{class_prep}} and FALSE when the input is a list of three matrices.
+#' 
+#' @param input variable of \code{\link{class_prep}} or list of matrices P,T,H (see Details)
 #' @param merit named vector of merit coefficients, in genetic standard deviation units
 #' @param desired named vector of desired gains, in genetic standard deviation units
 #' @param restricted data frame of restricted traits, see Details
 #' @param traits optional vector with exactly 2 trait names, to plot elliptical response
 #' @param gamma contribution of non-additive values for genetic merit
+#' @param scale.coeff should index coeff be scaled by genetic sd (see Details)
 #' @param solver name of convex solver (default is "ECOS")
 #' 
 #' @return List containing
 #' \describe{
-#' \item{matrices}{for input \code{\link{class_prep}}, a list with P,Gamma,H}
+#' \item{matrices}{for input \code{\link{class_prep}}, a list with P,T,H}
 #' \item{plot}{ellipse plot}
 #' \item{table}{data frame with the response and index coefficients for all traits}
 #' }
@@ -35,7 +38,7 @@
 #' @export
 
 gain <- function(input, merit=NULL, desired=NULL, restricted=NULL,
-                 traits=NULL, gamma=NULL, solver="ECOS", ...) {
+                 traits=NULL, gamma=NULL, scale.coeff=NULL, solver="ECOS", ...) {
   
   intensity <- 1
   vararg <- list(...)
@@ -98,16 +101,16 @@ gain <- function(input, merit=NULL, desired=NULL, restricted=NULL,
     
     H <- diag(trait.scale)
     dimnames(H) <- dimnames(B) <- list(trait.names,trait.names)
-    P <- Gamma <- B
+    P <- Tmat <- B
   } else {
     stopifnot(inherits(input,"list") & length(input)==3)
     P <- input[[1]]
     trait.names <- rownames(P)
-    Gamma <- input[[2]][trait.names,trait.names]
+    Tmat <- input[[2]][trait.names,trait.names]
     H <- input[[3]][trait.names,trait.names]
     n.trait <- length(trait.names)
   } 
-  Ginv <- solve(Gamma)
+  Ginv <- solve(Tmat)
   U <- chol(P) %*% Ginv %*% H
   quad.mat <- crossprod(U)
   dimnames(quad.mat) <- list(trait.names,trait.names)
@@ -171,12 +174,18 @@ gain <- function(input, merit=NULL, desired=NULL, restricted=NULL,
     x.opt <- desired*intensity/sqrt(as.numeric(crossprod(desired, quad.mat%*%desired)))
   } 
   if (inherits(input,"class_prep")) {
-    out <- list(matrices=list(P=P,Gamma=Gamma,H=H))
+    out <- list(matrices=list(P=P,T=Tmat,H=H))
+    if (is.null(scale.coeff))
+      scale.coeff <- TRUE
   } else {
     out <- list()
+    if (is.null(scale.coeff))
+      scale.coeff <- FALSE
   }
   if (!is.null(desired)|!is.null(merit)) {
     c.opt <- crossprod(Ginv,H%*%x.opt)/intensity
+    if (scale.coeff)
+      c.opt <- c.opt*diag(H)
     c.opt <- c.opt/sqrt(sum(c.opt^2))
     result <- data.frame(trait=trait.names,
                          response=round(x.opt,3),

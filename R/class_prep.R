@@ -4,6 +4,8 @@
 #' @slot ploidy ploidy
 #' @slot var.u variance of random effects
 #' @slot var.uhat variance of BLUPs
+#' @slot var.bhat variance of BLUEs
+#' @slot cov.buhat covariance between BLUEs and BLUPs
 #' @slot avg.env average fixed effect of the environments
 #' @slot heterosis regression coefficients for inbreeding
 #' @slot fixed.marker fixed marker effects
@@ -17,6 +19,7 @@
 #' @import Matrix
 #' @export
 class_prep <- setClass("class_prep",slots=c(id="character",ploidy="integer",var.u="Matrix",
-                                            var.uhat="Matrix",avg.env="numeric",heterosis="numeric",
+                                            var.uhat="Matrix",var.bhat="Matrix",cov.buhat="Matrix",
+                                            avg.env="numeric",heterosis="numeric",
                                             fixed.marker="numeric",B="matrix",random="numeric",
                                             geno1.var="Matrix",geno2.var="Matrix",model="integer"))
