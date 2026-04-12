@@ -28,7 +28,7 @@
 #' @export
 #' @importFrom utils capture.output
 #' @import Matrix
-#' @importFrom AGHmatrix Amatrix
+#' @importFrom polyBreedR A_mat
 #' @importFrom data.table fread
 
 read_geno <- function(filename, ploidy, map, min.minor.allele=5, 
@@ -160,8 +160,7 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
         stop("Dominance cannot be used with ungenotyped individuals.")
       
       colnames(ped) <- c("id","parent1","parent2","H")
-      
-      id3 <- ped$id[which(ped$H==1)]
+      id3 <- union(id,ped$id[which(ped$H==1)])
       n3 <- length(id3)
       cat(sub("X",n3,"Individuals in the H matrix: X\n"))
     } else {
@@ -174,21 +173,23 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
       stop("Some genotyped individuals are not in the pedigree file.")
     }
     
-    ped2 <- data.frame(id=1:nrow(ped),
-                       parent1=match(ped$parent1,ped$id,nomatch=0),
-                       parent2=match(ped$parent2,ped$id,nomatch=0))
-    invisible(capture.output(A <- as(Amatrix(ped2,ploidy=ploidy[1]),"symmetricMatrix")))
-    rownames(A) <- ped$id
-    colnames(A) <- ped$id
+    #ped2 <- data.frame(id=1:nrow(ped),
+    #                   parent1=match(ped$parent1,ped$id,nomatch=0),
+    #                   parent2=match(ped$parent2,ped$id,nomatch=0))
+    #invisible(capture.output(A <- as(Amatrix(ped2,
+    #                                         ploidy=ploidy[1]),
+    #                                 "symmetricMatrix")))
+    #use polyBreedR function because it checks founders are present
+    A <- A_mat(ped[,1:3],ploidy=ploidy[1])[id3,id3]
     
     if (ncol(ped)==4) {
-      id2 <- setdiff(id3,id)
+      id2 <- setdiff(id3,id) #no marker data
       iv <- match(id3,c(id,id2))
     } else {
       id2 <- character(0)
     }
     n2 <- length(id2)
-    A <- A[c(id,id2),c(id,id2)]
+    A <- as(A[c(id,id2),c(id,id2)],"symmetricMatrix")
     A11 <- A[id,id]
     
     if (n2 > 0) {

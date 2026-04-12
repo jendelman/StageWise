@@ -462,7 +462,8 @@ Stage1 <- function(filename,traits,effects=NULL,solver="asreml",
   
   if (n.trait==1) {
     p1 <- ggplot(data=resid.table,aes(y=.data$blup.resid,x=.data$expt)) + ylab("Residual") + xlab("") +
-      stat_boxplot(outlier.color="red") + theme_bw() + theme(axis.text.x=element_text(angle=90,vjust=0.5))
+      geom_boxplot(outlier.colour = "red", outlier.shape = 1) +
+      theme_bw() + theme(axis.text.x=element_text(angle=90,vjust=0.5))
     p2 <- ggplot(data=resid.table,aes(sample=.data$blup.resid)) + stat_qq() + stat_qq_line() + facet_wrap(~expt) + theme_bw() + xlab("Expected") + ylab("Observed")
     if (solver=="ASREML")
       return(list(blues=blue.out,vcov=vcov.env,fit=fit,

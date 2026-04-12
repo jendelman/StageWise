@@ -37,7 +37,6 @@
 #' @importFrom stats model.matrix var
 #' @importFrom methods new
 #' @importFrom rlang .data
-#' @import CVXR
 #' @import Matrix
 #' @import ggplot2
 #' @import ggrepel

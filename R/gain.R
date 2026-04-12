@@ -34,7 +34,7 @@
 #' 
 #' @import ggplot2
 #' @importFrom ggforce geom_ellipse
-#' @import CVXR
+#' @importFrom CVXR Variable quad_form Maximize 
 #' @export
 
 gain <- function(input, merit=NULL, desired=NULL, restricted=NULL,
