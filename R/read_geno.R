@@ -4,8 +4,10 @@
 #' 
 #' When \code{map=TRUE}, first three columns of the file are marker, chrom, position. When \code{map=FALSE}, the first column is marker. Subsequent columns contain the allele dosage for individuals/clones, coded 0,1,2,...ploidy (fractional values are allowed). The input file for diploids can also be coded using {-1,0,1} (fractional values allowed). Additive coefficients are computed by subtracting the population mean from each marker, and the additive (genomic) relationship matrix is computed as G = tcrossprod(coeff)/scale. The scale parameter ensures the mean of the diagonal elements of G equals 1 under panmictic equilibrium. Missing genotype data is replaced with the population mean. 
 #' 
-#' G can be blended with the pedigree relationship matrix (A) by providing a pedigree data frame in \code{ped} and blending parameter \code{w}. The blended relationship matrix is H = (1-w)G + wA. The first three columns of \code{ped} are id, parent1, parent2. Missing parents must be coded NA. An optional fourth column in binary (0/1) format can be used to indicate which individuals should be included in the H matrix, but this option cannot be combined with dominance. If there is no fourth column, only genotyped individuals are included. If a vector of w values is provided, the function returns a list of \code{\link{class_geno}} objects. 
+#' Arguments \code{ped} and \code{w} can be used to blend the genomic G and pedigree A relationship matrices: Gw = (1-w)G + wA. The first three columns of \code{ped} are id, parent1, parent2. Missing parents must be coded NA. If a vector of w values is provided, the function returns a list of \code{\link{class_geno}} objects.
 #' 
+#' To include ungenotyped individuals in an H matrix, a fourth column is required in the pedigree data frame, which is an indicator variable (0/1) for which individuals to include. At present, this option cannot be combined with dominance. 
+#'  
 #' If the A matrix is not used, then G is blended with the identity matrix (times the mean diagonal of G) to improve numerical conditioning for matrix inversion. The default for w is 1e-5, which is somewhat arbitrary and based on tests with the vignette dataset. The D matrix is also blended with the identity matrix using 1e-5 for numerical conditioning.
 #' 
 #' When \code{dominance=FALSE}, non-additive effects are captured using a residual genetic effect, with zero covariance. If \code{dominance=TRUE}, a (digenic) dominance covariance matrix is used instead. 
@@ -100,15 +102,6 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
   pmat[,flip] <- 1-pmat[,flip]
   n.minor <- apply(pmat,2,function(z){sum(z > 0.1,na.rm=T)})
   
-  # n.minor <- apply(geno,1,function(z){
-  #   p <- mean(z,na.rm=T)/ploidy
-  #   tab <- table(factor(round(z),levels=0:ploidy))
-  #   if (p > 0.5) {
-  #     sum(tab) - tab[ploidy+1]
-  #   } else {
-  #     sum(tab) - tab[1]
-  #   }
-  # })
   ix <- which(n.minor >= min.minor.allele)
   m <- length(ix)
   stopifnot(m > 0)
@@ -119,8 +112,6 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
   n <- ncol(geno)
   cat(sub("X",n,"Number of genotypes = X\n"))
   
-  #p <- apply(geno,1,mean,na.rm=T)/ploidy
-  #p <- p[ix]
   if (nrow(map)>0)
     map <- map[ix,]
   
@@ -138,9 +129,6 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
   }
   coeff[which(is.na(coeff))] <- 0
   coeff <- Matrix(coeff)
-  
-  #scale <- ploidy*sum(p*(1-p))
-  #G <- tcrossprod(coeff)/scale
   G <- tcrossprod(coeff/sqrt(scale.param))
   
   nw <- length(w)
@@ -151,52 +139,47 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
     for (i in 1:nw) {
       H[[i]] <- (1-w[i])*G + w[i]*mean(diag(G))*Diagonal(n=nrow(G))
     }
+    
   } else {
     if (n.ploidy > 1)
       stop("Pedigree option not available for mixed ploidy")
     
-    if (ncol(ped)==4) {
-      if (dominance)
-        stop("Dominance cannot be used with ungenotyped individuals.")
-      
-      colnames(ped) <- c("id","parent1","parent2","H")
-      id3 <- union(id,ped$id[which(ped$H==1)])
-      n3 <- length(id3)
-      cat(sub("X",n3,"Individuals in the H matrix: X\n"))
-    } else {
-      colnames(ped) <- c("id","parent1","parent2")
-    }
+    if (!all(id %in% ped$id)) 
+      stop("Some genotyped individuals are not in the pedigree file.")
+    
     for (i in 1:3) {
       ped[,i] <- as.character(ped[,i])
     }
-    if (!all(id %in% ped$id)) {
-      stop("Some genotyped individuals are not in the pedigree file.")
-    }
-    
-    #ped2 <- data.frame(id=1:nrow(ped),
-    #                   parent1=match(ped$parent1,ped$id,nomatch=0),
-    #                   parent2=match(ped$parent2,ped$id,nomatch=0))
-    #invisible(capture.output(A <- as(Amatrix(ped2,
-    #                                         ploidy=ploidy[1]),
-    #                                 "symmetricMatrix")))
-    #use polyBreedR function because it checks founders are present
-    A <- A_mat(ped[,1:3],ploidy=ploidy[1])[id3,id3]
-    
+  
     if (ncol(ped)==4) {
-      id2 <- setdiff(id3,id) #no marker data
+      colnames(ped) <- c("id","parent1","parent2","H")
+      tmp <- ped$id[which(ped$H==1)] #id for H matrix
+      id1 <- intersect(id,tmp) #genotyped
+      id2 <- setdiff(tmp,id1) #not genotyped
+      id3 <- c(id1,id2)
+      
+      n2 <- length(id2)
+      if (n2 > 0 & dominance)
+        stop("Dominance cannot be used with ungenotyped individuals.")
+      cat(sub("X",length(tmp),"Individuals in the H matrix: X\n"))
+      
+      #initially, all genotyped id included in A to help with H
+      #those not in H column are excluded after inversion
+      A <- A_mat(ped[,1:3],ploidy=ploidy[1])[c(id,id2),c(id,id2)]
       iv <- match(id3,c(id,id2))
+      
+      coeff <- coeff[id1,]
+      scale.param <- scale.param[id1]
     } else {
-      id2 <- character(0)
+      n2 <- 0
+      colnames(ped) <- c("id","parent1","parent2")
+      A <- A_mat(ped[,1:3],ploidy=ploidy[1])[id,id]
     }
-    n2 <- length(id2)
-    A <- as(A[c(id,id2),c(id,id2)],"symmetricMatrix")
-    A11 <- A[id,id]
     
+    A11 <- as(A[id,id],"symmetricMatrix")
     if (n2 > 0) {
-      A.inv <- solve(A)
+      A.inv <- solve(as(A,"symmetricMatrix"))
       A11.inv <- solve(A11)
-      coeff <- coeff[intersect(id,id3),]
-      scale.param <- scale.param[intersect(id,id3)]
     }
     
     for (i in 1:nw) {
@@ -209,7 +192,6 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
         Hinv[[i]] <- tmp[iv,iv]
       }
     }
-    #id <- c(id,id2)
   }
   
   if (n.ploidy > 1) {
