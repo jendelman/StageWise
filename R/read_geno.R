@@ -30,7 +30,8 @@
 #' @export
 #' @importFrom utils capture.output
 #' @import Matrix
-#' @importFrom polyBreedR A_mat
+#' @importFrom AGHmatrix Amatrix
+#' @importFrom pedigree orderPed
 #' @importFrom data.table fread
 
 read_geno <- function(filename, ploidy, map, min.minor.allele=5, 
@@ -147,12 +148,30 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
     if (!all(id %in% ped$id)) 
       stop("Some genotyped individuals are not in the pedigree file.")
     
+    colnames(ped) <- replace(colnames(ped),1:3,c("id","parent1","parent2"))
     for (i in 1:3) {
       ped[,i] <- as.character(ped[,i])
     }
-  
+    parents <- union(ped$parent1,ped$parent2)
+    founders <- setdiff(parents,c(NA_character_,ped$id))
+    if (length(founders) > 0) {
+      ped <- rbind(data.frame(id=founders, 
+                            parent1=NA_character_, 
+                            parent2=NA_character_),
+                   ped)
+      }
+    ped2 <- data.frame(id=1:nrow(ped),
+                       parent1=match(ped$parent1,ped$id,nomatch=0),
+                       parent2=match(ped$parent2,ped$id,nomatch=0))
+    ix <- orderPed(ped=ped2)
+    ped2 <- ped2[order(ix),]
+    ped <- ped[order(ix),]
+    
+    invisible(capture.output(A <- Amatrix(ped2,ploidy=ploidy[1])))
+    dimnames(A) <- list(ped$id,ped$id)
+    
     if (ncol(ped)==4) {
-      colnames(ped) <- c("id","parent1","parent2","H")
+      colnames(ped) <- replace(colnames(ped),4,"H")
       tmp <- ped$id[which(ped$H==1)] #id for H matrix
       id1 <- intersect(id,tmp) #genotyped
       id2 <- setdiff(tmp,id1) #not genotyped
@@ -165,15 +184,13 @@ read_geno <- function(filename, ploidy, map, min.minor.allele=5,
       
       #initially, all genotyped id included in A to help with H
       #those not in H column are excluded after inversion
-      A <- A_mat(ped[,1:3],ploidy=ploidy[1])[c(id,id2),c(id,id2)]
+      A <- A[c(id,id2),c(id,id2)]
       iv <- match(id3,c(id,id2))
-      
       coeff <- coeff[id1,]
       scale.param <- scale.param[id1]
     } else {
       n2 <- 0
-      colnames(ped) <- c("id","parent1","parent2")
-      A <- A_mat(ped[,1:3],ploidy=ploidy[1])[id,id]
+      A <- A[id,id]
     }
     
     A11 <- as(A[id,id],"symmetricMatrix")

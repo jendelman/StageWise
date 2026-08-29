@@ -1,4 +1,4 @@
-#' @importFrom CVXR Variable Minimize Problem psolve value norm
+#' @importFrom CVXR Variable Minimize Problem psolve value
 #'
 sigdig <- function(x,digits=3) {
   m <- digits - ceiling(log10(max(abs(x),na.rm=T)))
